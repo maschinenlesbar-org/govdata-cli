@@ -14,7 +14,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
 
 ## High severity
 
-### 1. CKAN error message/detail is dropped from all API errors (data loss on every failure)
+### 1. CKAN error message/detail is dropped from all API errors (data loss on every failure) — ✅ FIXED
+**Fix:** `src/client/engine.ts` `toApiError` now inspects the nested `error.message`/`error.__type` (CKAN shape) before falling back to top-level `detail`/`message`. A 404 now surfaces e.g. `HTTP 404 ... : Not Found Error: Nicht gefunden`.
 - **Severity:** High
 - **Confidence:** High
 - **Repro:**
@@ -40,7 +41,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   for GovData, because CKAN returns non-2xx for failures and the engine throws
   `GovDataApiError` before `action()` ever sees `success:false`.
 
-### 2. `parseIntArg` accepts empty string and whitespace, silently coercing to 0
+### 2. `parseIntArg` accepts empty string and whitespace, silently coercing to 0 — ✅ FIXED
+**Fix:** `src/cli/shared.ts` `parseIntArg` now validates the literal shape with `/^\d+$/` before calling `Number()`, so `""` and `" "` are rejected with `Expected a non-negative integer`.
 - **Severity:** High
 - **Confidence:** High
 - **Repro (captured against local echo server to show what is sent):**
@@ -61,7 +63,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   `Number(" ")` are both `0`, which passes `Number.isInteger(n) && n >= 0`.
   Affects every numeric flag (`--rows --start --limit --offset --timeout --max-retries --max-response-bytes`).
 
-### 3. `parseIntArg` accepts hex (`0x..`) and exponent (`1e3`) notation
+### 3. `parseIntArg` accepts hex (`0x..`) and exponent (`1e3`) notation — ✅ FIXED
+**Fix:** Same `/^\d+$/` shape check in `src/cli/shared.ts` `parseIntArg` rejects `0x10`, `0xff`, `1e3` (only plain decimal digit strings are accepted).
 - **Severity:** High
 - **Confidence:** High
 - **Repro:**
@@ -89,7 +92,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
 
 ## Medium severity
 
-### 4. `action` allowlist is case-insensitive — uppercase names bypass it and hit the API
+### 4. `action` allowlist is case-insensitive — uppercase names bypass it and hit the API — ✅ FIXED
+**Fix:** `src/client/client.ts` — dropped the `i` flag from `ACTION_NAME` (`/^[a-z0-9_]+$/`), so `TAG_LIST` is now rejected locally with `Invalid CKAN action name`.
 - **Severity:** Medium
 - **Confidence:** High
 - **Repro:**
@@ -109,7 +113,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   `i` flag makes it case-insensitive, contradicting both the documented regex and
   the adjacent comment. Drop the `i` flag.
 
-### 5. `parseIntArg` accepts unsafe integers, silently losing precision
+### 5. `parseIntArg` accepts unsafe integers, silently losing precision — ✅ FIXED
+**Fix:** `src/cli/shared.ts` `parseIntArg` now rejects values where `!Number.isSafeInteger(n)`, so `99999999999999999999` is rejected instead of silently sent as `1e20`.
 - **Severity:** Medium
 - **Confidence:** High
 - **Repro:**
@@ -126,7 +131,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   returns `true`, so it passes the guard even though it is not safe.)
 - **Root cause:** `shared.ts:10-15` does not check `Number.isSafeInteger`.
 
-### 6. Bare invocation prints help to STDERR and exits 1 (vs `--help`/`help` → stdout, exit 0)
+### 6. Bare invocation prints help to STDERR and exits 1 (vs `--help`/`help` → stdout, exit 0) — ✅ FIXED
+**Fix:** `src/cli/program.ts` registers a root `.action()` that calls `program.help()`, so a bare `govdata` now prints help to stdout and exits 0, matching `help`/`--help`.
 - **Severity:** Medium
 - **Confidence:** High
 - **Repro:**
@@ -146,7 +152,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   `program.ts` does not call `.action()`/`.helpCommand` on the root or override
   the empty-command behaviour). No explicit default action is registered.
 
-### 7. `tags --query ''` sends an empty `query=` parameter instead of omitting it
+### 7. `tags --query ''` sends an empty `query=` parameter instead of omitting it — ✅ FIXED
+**Fix:** `src/client/client.ts` `prune()` now drops empty-string values as well as `undefined`, so an empty filter is treated as "no filter" and the param is omitted.
 - **Severity:** Medium (low-ish)
 - **Confidence:** High
 - **Repro:**
@@ -166,7 +173,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
 
 ## Low severity / UX / docs
 
-### 8. `--param` with a repeated key silently overwrites earlier values (no warning)
+### 8. `--param` with a repeated key silently overwrites earlier values (no warning) — ✅ FIXED
+**Fix:** `src/cli/commands/catalogue.ts` `collectKeyValue` now throws an `InvalidArgumentError` (`Duplicate --param key "..."`) when a key repeats, instead of silently overwriting.
 - **Severity:** Low
 - **Confidence:** High
 - **Repro:**
@@ -183,7 +191,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
 - **Root cause:** `catalogue.ts:13-20` `collectKeyValue` accumulates into a plain
   object (`{...previous, [key]: value}`), so a repeated key overwrites.
 
-### 9. README claims global options must go "before the command" but they work after too
+### 9. README claims global options must go "before the command" but they work after too — ✅ FIXED
+**Fix:** Doc mismatch (the behaviour is correct/friendlier). Updated `README.md` to state global options may be given before or after the command, with both examples.
 - **Severity:** Low (doc/behaviour mismatch — behaviour is the friendlier one)
 - **Confidence:** High
 - **Repro:**
@@ -195,7 +204,8 @@ All bugs below are **real and reproducible**. Outputs are pasted verbatim with e
   output (commander resolves it via `optsWithGlobals()` in `shared.ts:66`). Not a
   defect in itself, but the README is misleading / overly restrictive.
 
-### 10. `--param` parse failure is reported as a runtime error, not a usage error
+### 10. `--param` parse failure is reported as a runtime error, not a usage error — ✅ FIXED
+**Fix:** `src/cli/commands/catalogue.ts` `collectKeyValue` now throws commander's `InvalidArgumentError` instead of `GovDataError`, so a malformed `--param` gets the standard `error:` prefix + usage help, consistent with `--rows abc`.
 - **Severity:** Low
 - **Confidence:** High
 - **Repro:**

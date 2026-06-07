@@ -49,7 +49,8 @@ a single line.
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | Print JSON on a single line |
 
-Global options go **before** the command, e.g. `govdata --compact search Haushalt`.
+Global options may be given before or after the command, e.g.
+`govdata --compact search Haushalt` or `govdata search Haushalt --compact`.
 
 ### Commands
 

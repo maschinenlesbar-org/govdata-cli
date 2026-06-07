@@ -149,9 +149,30 @@ export class RequestEngine {
     const text = body.toString("utf8");
     let detail: string | undefined;
     try {
-      const parsed = JSON.parse(text) as { detail?: unknown; message?: unknown };
-      if (parsed && typeof parsed.detail === "string") detail = parsed.detail;
-      else if (parsed && typeof parsed.message === "string") detail = parsed.message;
+      const parsed = JSON.parse(text) as {
+        detail?: unknown;
+        message?: unknown;
+        error?: { message?: unknown; __type?: unknown } | unknown;
+      };
+      // CKAN nests its human-readable error under `error.message` (with an
+      // `error.__type` classifier); plainer APIs use a top-level
+      // `detail`/`message`. Prefer the nested CKAN shape, then fall back.
+      const ckanError =
+        parsed && typeof parsed.error === "object" && parsed.error !== null
+          ? (parsed.error as { message?: unknown; __type?: unknown })
+          : undefined;
+      if (ckanError && typeof ckanError.message === "string") {
+        detail =
+          typeof ckanError.__type === "string"
+            ? `${ckanError.__type}: ${ckanError.message}`
+            : ckanError.message;
+      } else if (ckanError) {
+        detail = JSON.stringify(ckanError);
+      } else if (parsed && typeof parsed.detail === "string") {
+        detail = parsed.detail;
+      } else if (parsed && typeof parsed.message === "string") {
+        detail = parsed.message;
+      }
     } catch {
       // Non-JSON error body; leave detail undefined.
     }

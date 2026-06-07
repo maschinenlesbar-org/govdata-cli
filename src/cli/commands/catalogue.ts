@@ -1,7 +1,7 @@
 import type { Command } from "commander";
+import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "../io.js";
 import { action, parseIntArg, renderJson } from "../shared.js";
-import { GovDataError } from "../../client/errors.js";
 import type { QueryParams } from "../../client/query.js";
 
 /** commander accumulator for a repeatable string option. */
@@ -15,8 +15,18 @@ function collectKeyValue(
   previous: Record<string, string> = {},
 ): Record<string, string> {
   const eq = value.indexOf("=");
-  if (eq <= 0) throw new GovDataError(`Invalid --param "${value}". Expected key=value.`);
-  return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) };
+  // Throw commander's InvalidArgumentError (not a GovDataError) so the failure
+  // is formatted as a usage error with `error:` prefix and help, consistent
+  // with other parse-time flag validation (e.g. `--rows abc`).
+  if (eq <= 0) {
+    throw new InvalidArgumentError(`Invalid --param "${value}". Expected key=value.`);
+  }
+  const key = value.slice(0, eq);
+  // Reject a duplicated key rather than silently overwriting the earlier value.
+  if (Object.prototype.hasOwnProperty.call(previous, key)) {
+    throw new InvalidArgumentError(`Duplicate --param key "${key}".`);
+  }
+  return { ...previous, [key]: value.slice(eq + 1) };
 }
 
 export function registerCatalogueCommands(program: Command, deps: CliDeps): void {

@@ -38,6 +38,13 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .showHelpAfterError();
 
+  // A bare invocation (no subcommand) should print help to stdout and exit 0,
+  // matching `govdata help` / `govdata --help`. Without an explicit root action,
+  // commander writes help to stderr and exits 1 for the empty-command case.
+  program.action(() => {
+    program.help();
+  });
+
   registerCatalogueCommands(program, deps);
 
   return program;

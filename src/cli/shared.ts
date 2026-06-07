@@ -8,8 +8,15 @@ import type { EngineOptions } from "../client/engine.js";
 
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
+  // Validate the literal shape rather than trusting Number(): that rejects
+  // empty/whitespace ("" and " " coerce to 0), hex (0x10) and exponent (1e3)
+  // notation, all of which Number() would silently accept.
+  if (!/^\d+$/.test(value)) {
+    throw new InvalidArgumentError("Expected a non-negative integer.");
+  }
   const n = Number(value);
-  if (!Number.isInteger(n) || n < 0) {
+  // Reject magnitudes that cannot be represented exactly (silent precision loss).
+  if (!Number.isSafeInteger(n)) {
     throw new InvalidArgumentError("Expected a non-negative integer.");
   }
   return n;

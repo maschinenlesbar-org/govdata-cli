@@ -29,13 +29,18 @@ const ACTION = "/api/3/action";
  * query/fragment-injection hole (a `?`/`#` in the name corrupting the query) for
  * both the library and the CLI generic-action escape hatch.
  */
-const ACTION_NAME = /^[a-z0-9_]+$/i;
+const ACTION_NAME = /^[a-z0-9_]+$/;
 
-/** Drop undefined values so only the parameters the caller set are sent. */
+/**
+ * Drop undefined (and empty-string) values so only the parameters the caller
+ * actually set are sent. An empty string filter (e.g. `tags --query ""`) is
+ * treated as "no filter" rather than forwarded as `query=`.
+ */
 function prune(params: Record<string, unknown>): QueryParams {
   const out: QueryParams = {};
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) out[k] = v as QueryParams[string];
+    if (v === undefined || v === "") continue;
+    out[k] = v as QueryParams[string];
   }
   return out;
 }

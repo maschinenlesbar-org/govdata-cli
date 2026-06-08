@@ -93,7 +93,7 @@ Exit codes: `0` success (and for `--help`/`--version`), `4` on a `404` from the 
 ## Library usage
 
 ```ts
-import { GovDataClient, GovDataError } from "govdata-cli";
+import { GovDataClient, GovDataError } from "@maschinenlesbar.org/govdata-cli";
 
 const client = new GovDataClient(); // defaults to https://ckan.govdata.de
 

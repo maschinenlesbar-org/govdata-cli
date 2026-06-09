@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/ci.yml)
 [![Release](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/release.yml)
-[![GitHub release](https://img.shields.io/github/v/release/maschinenlesbar-org/govdata-cli)](https://github.com/maschinenlesbar-org/govdata-cli/releases/latest)
 [![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/govdata-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/govdata-cli)
 
 Browse Germany's central open-data catalogue from your terminal. `govdata` is a

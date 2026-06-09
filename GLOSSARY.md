@@ -139,52 +139,6 @@ instead of just names. CLI: `--all-fields`.
 
 ---
 
-## Project / technical terms
-
-**API client.** [`GovDataClient`](src/client/client.ts) — the typed wrapper over
-the CKAN Action API, with result-unwrapping and a generic `action` escape hatch.
-Usable as a library independently of the CLI.
-
-**Transport.** A single function `(HttpRequest) => Promise<HttpResponse>`
-([`http.ts`](src/client/http.ts)). The default uses Node's built-in
-`http`/`https`; tests inject a mock. This is the only HTTP seam — no HTTP
-framework or fetch polyfill.
-
-**Request engine.** [`RequestEngine`](src/client/engine.ts) — builds URLs,
-serialises queries, applies retry/backoff, follows redirects, decodes JSON and
-maps errors. Sits between the client's action methods and the transport.
-
-**RawResponse.** The low-level engine result: `{ data: Buffer, contentType,
-status }` — raw bytes, decoded to JSON only by `getJson`.
-
-**Query builder.** [`query.ts`](src/client/query.ts) — a dependency-free
-query-string serialiser: omits `undefined`/`null`, repeats arrays as repeated
-keys (`?fq=a&fq=b`), stringifies booleans/Dates, and encodes spaces as `%20`.
-
-**CliDeps / CliIO.** The dependency-injection seam for the CLI
-([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object. Lets the whole
-CLI run in tests with a mocked client and captured output — no subprocess.
-
-**Global options.** CLI-wide flags resolved for every command and translated to
-`EngineOptions`: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
-`--max-response-bytes`, `--compact`. May appear before or after the subcommand.
-
-**`--compact`.** Print the result JSON on a single line instead of
-pretty-printed (2-space indent).
-
-**Retry / backoff.** Transient `429` (rate limited) and `503` responses are
-retried automatically with **linear** backoff, up to `maxRetries`
-(`--max-retries`, default 2).
-
-**Redirect credential-strip.** Redirects are followed up to `maxRedirects`; if a
-redirect crosses origin, request headers are dropped so nothing (e.g. a future
-auth/cookie header) leaks to another host.
-
-**`maxResponseBytes`.** A hard cap on response body size (default 100 MiB; `0` =
-unlimited) defending against memory exhaustion from a hostile/buggy endpoint.
-
-**Error types.** [`errors.ts`](src/client/errors.ts): `GovDataApiError` (non-2xx,
-carries `status`/`detail`/`url`, with `isRetryable`), `GovDataNetworkError`
-(transport failure/timeout), `GovDataParseError` (bad JSON), and a
-`success: false` envelope surfacing the base `GovDataError` — all extending
-`GovDataError`. The CLI maps a `404` to exit code `4`, other errors to `1`.
+> **Library & internals.** Terms for the TypeScript client and its internals —
+> `GovDataClient`, the request engine, transport, retry/backoff, error types,
+> query builder — now live in **[DEVELOPING.md](DEVELOPING.md)**.

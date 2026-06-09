@@ -1,187 +1,213 @@
 # govdata-cli
 
-A TypeScript **API client** and **command-line interface** for the open
-[GovData](https://www.govdata.de/) **CKAN Action API** (`ckan.govdata.de`) — the
-central German open-data catalogue (Bund/Länder/Kommunen): search datasets,
-inspect packages, organizations, groups, tags and resources.
+Browse Germany's central open-data catalogue from your terminal. `govdata` is a
+command-line tool over the [GovData CKAN Action API](https://www.govdata.de/)
+(`ckan.govdata.de`) — the national portal that federates open datasets from
+federal government, federal states and municipalities: search, inspect, filter
+and pipe straight into [`jq`](https://jqlang.github.io/jq/).
 
-- **Zero runtime HTTP dependencies** — built on Node's built-in `http`/`https` (no axios, no fetch polyfill).
-- **One small dependency** for the CLI: [`commander`](https://github.com/tj/commander.js).
-- **Strongly typed** — typed CKAN envelope, search result and parameter objects, plus a generic `action` escape hatch.
-- **Well tested** — unit tests on Node's built-in test runner (`node --test`), every HTTP response mocked.
-- **Read-only, no auth** — only CKAN read actions are wrapped; no key required.
+- **Works out of the box** — no account, no API key, no configuration. Install
+  and explore.
+- **Clean JSON output** — the CKAN envelope is unwrapped for you; `--compact`
+  for one-line/scripting.
+- **Ten commands** — `search`, `package`, `packages`, `organizations`,
+  `organization`, `groups`, `group`, `tags`, `resource`, and a generic `action`
+  escape hatch.
+- **Everything is open** — every dataset this tool reaches is publicly licensed;
+  nothing to register for.
 
-## Requirements
-
-- Node.js **>= 20** (uses the stable built-in test runner, ESM and top-level `await`).
+> Want to use this as a TypeScript library or understand how it's built?
+> See **[DEVELOPING.md](DEVELOPING.md)**.
 
 ## Install
 
 ```bash
-npm install
-npm run build        # compiles TypeScript to dist/
+npm i -g @maschinenlesbar.org/govdata-cli
 ```
 
-Run the CLI without a global install:
+This installs the **`govdata`** command. Requires **Node.js 20+**.
+
+Check it works:
 
 ```bash
-node dist/src/cli/index.js --help
-# or, after `npm link` / global install:
 govdata --help
 ```
 
----
+## Quickstart
 
-## CLI usage
+No setup needed — the API is open and requires no key. Your first search:
 
-CKAN wraps every response in `{ help, success, result }`; this CLI prints the
-unwrapped **`result`** (and exits non-zero if `success` is false). `--compact` for
-a single line.
+```bash
+govdata search Haushalt --rows 5
+```
 
-### Global options
+The result is unwrapped from CKAN's `{ help, success, result }` envelope — you
+get the search object directly: `{ count, results, sort, … }`. Pull out just
+the titles with `jq`:
+
+```bash
+govdata search Haushalt --rows 5 | jq '{count, titles: [.results[].title]}'
+```
+
+Take a name from those results and fetch the full dataset record:
+
+```bash
+govdata package luftqualitat
+```
+
+## Commands
+
+```text
+search [query] [filters…]             search datasets
+package <id>                          show one dataset by id or name
+packages [--limit <n>] [--offset <n>] list dataset names
+organizations [--all-fields]          list organizations (publishers)
+organization <id>                     show one organization
+groups [--all-fields]                 list groups (themes/categories)
+group <id>                            show one group
+tags [--query <substring>]            list tags
+resource <id>                         show one resource (distribution)
+action <name> [--param key=value …]   call any CKAN action (generic)
+```
+
+### `search` filters
+
+| Flag | Meaning |
+| --- | --- |
+| `[query]` | free-text Solr query, e.g. `Haushalt` or `title:Klimaschutz` |
+| `--fq <filter>` | Solr filter query, e.g. `organization:destatis` (repeatable) |
+| `--rows <n>` | max results to return |
+| `--start <n>` | zero-based offset for paging |
+| `--sort <expr>` | Solr sort expression, e.g. `metadata_modified desc` |
+
+### `packages` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--limit <n>` | max names to return |
+| `--offset <n>` | number of records to skip |
+
+### `organizations` / `groups` flag
+
+| Flag | Meaning |
+| --- | --- |
+| `--all-fields` | return full objects instead of bare names |
+
+### `tags` flag
+
+| Flag | Meaning |
+| --- | --- |
+| `--query <substring>` | filter tags by substring |
+
+### `action` flag
+
+| Flag | Meaning |
+| --- | --- |
+| `--param <key=value>` | query parameter (repeatable; duplicate keys are rejected) |
+
+The **[Glossary](GLOSSARY.md)** decodes every CKAN term and search-parameter
+name.
+
+## Common tasks
+
+A few recipes to get going — see **[Usage.md](Usage.md)** for the full,
+use-case-driven set.
+
+```bash
+# Newest datasets first
+govdata search Klima --rows 10 --sort "metadata_modified desc"
+
+# Filter by publisher and file format
+govdata search --fq organization:destatis --fq res_format:CSV
+
+# Full dataset with all its resources (distributions)
+govdata package luftqualitat | jq '.resources[] | {name, format, url}'
+
+# All data publishers (short names)
+govdata organizations
+
+# Full publisher objects, then drill into one
+govdata organizations --all-fields | jq '.[] | {name, title, packages: .package_count}'
+govdata organization statistisches-bundesamt | jq '{title, package_count}'
+
+# Tags matching a substring
+govdata tags --query energie
+
+# Any CKAN action not covered by a dedicated command
+govdata action package_search --param q=Verkehr --param rows=3
+```
+
+## Output & scripting
+
+Every command prints the **unwrapped `result`** as pretty JSON to stdout.
+Errors and diagnostics go to stderr, so piping stdout into `jq` stays clean.
+
+```bash
+# Total datasets in the catalogue
+govdata action package_search --param rows=0 | jq '.count'
+
+# Resource format and download URL from a dataset
+govdata package luftqualitat | jq '.resources[] | {format, url}'
+
+# Discover a valid dataset name from a search hit
+govdata search Luftqualität --rows 1 | jq -r '.results[0].name'
+```
+
+Use `--compact` for single-line JSON in pipelines and logs:
+
+```bash
+govdata --compact search Haushalt --rows 5 | jq -c '.results[].title'
+```
+
+`--compact` (and every global option) works **before or after** the command —
+both `govdata --compact search …` and `govdata search … --compact` do the same
+thing.
+
+**Exit codes** make the CLI easy to use in scripts:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | success (also `--help` / `--version`) |
+| `4` | dataset/resource not found (`404`) |
+| `1` | any other error — bad usage, CKAN `success:false`, network failure |
+
+## Troubleshooting
+
+- **`command not found: govdata`** — the global npm bin directory isn't on your
+  `PATH`. Run `npm bin -g` to find it and add it, or run via
+  `npx @maschinenlesbar.org/govdata-cli …`.
+- **Exit `4` / "not found"** — the dataset or resource id doesn't exist or has
+  been removed. Re-run a `search` to get a fresh name/id.
+- **Exit `1` / CKAN `success:false`** — the catalogue rejected the request
+  (malformed filter, unknown action name, etc.). Check your `--fq` syntax or
+  `--param` values.
+- **Network failure / timeout** — connectivity or a slow server. Try again, or
+  raise the limit with `--timeout 60000`.
+- **Empty `results`** — the search matched nothing; broaden the keyword, drop
+  an `--fq` filter, or check spelling.
+
+## Global options
+
+These apply to every command and may be given before *or* after it:
 
 | Option | Description |
 | --- | --- |
+| `-V, --version` | Print the version number |
+| `-h, --help` | Show help for the program or a command |
+| `--compact` | Print JSON on a single line instead of pretty-printed |
 | `--base-url <url>` | API base URL (default `https://ckan.govdata.de`) |
 | `--timeout <ms>` | Per-request timeout (default `30000`) |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
-| `--compact` | Print JSON on a single line |
 
-Global options may be given before or after the command, e.g.
-`govdata --compact search Haushalt` or `govdata search Haushalt --compact`.
+## Learn more
 
-### Commands
-
-```text
-search [query] [--rows <n>] [--start <n>] [--sort <expr>] [--fq <filter> ...]
-package <id>                  show one dataset
-packages [--limit] [--offset] list dataset names
-organizations [--all-fields]  list organizations (publishers)
-organization <id>             show one organization
-groups [--all-fields]         list groups (themes)
-group <id>                    show one group
-tags [--query <substring>]    list tags
-resource <id>                 show one resource (distribution)
-action <name> [--param key=value ...]   call any CKAN action (generic)
-```
-
-### Examples
-
-```bash
-# Search datasets, newest first
-govdata search Haushalt --rows 5 --sort "metadata_modified desc"
-
-# Filter by organization and format
-govdata search --fq organization:destatis --fq res_format:CSV
-
-# A specific dataset
-govdata package <dataset-id-or-name>
-
-# Publishers
-govdata organizations
-
-# Any action not wrapped above
-govdata action package_search --param q=Klima --param rows=3
-```
-
-Exit codes: `0` success (and for `--help`/`--version`), `4` on a `404` from the API, `1` for any other error (incl. a CKAN `success:false`) and for commander usage/parse errors.
-
----
-
-## Library usage
-
-```ts
-import { GovDataClient, GovDataError } from "@maschinenlesbar.org/govdata-cli";
-
-const client = new GovDataClient(); // defaults to https://ckan.govdata.de
-
-const hits = await client.packageSearch({ q: "Haushalt", rows: 5 });
-const dataset = await client.packageShow(hits.results[0]!.id as string);
-const orgs = await client.organizationList();
-
-// Generic escape hatch for any read action:
-const tags = await client.action<string[]>("tag_list", { query: "energie" });
-
-try {
-  await client.packageShow("does-not-exist");
-} catch (err) {
-  if (err instanceof GovDataError) console.error(err.message);
-}
-```
-
-### Client options
-
-```ts
-new GovDataClient({
-  baseUrl: "https://ckan.govdata.de",
-  timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried with linear backoff
-  maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
-  userAgent: "my-app/1.0",
-  transport: customTransport, // inject your own HTTP transport
-});
-```
-
-### Methods
-
-`packageSearch`, `packageShow`, `packageList`, `organizationList`, `organizationShow`,
-`groupList`, `groupShow`, `tagList`, `resourceShow`, and the generic `action(name, params)`.
-
----
-
-## Architecture
-
-```
-src/
-  client/
-    types.ts     # CkanEnvelope, PackageSearchResult + parameter objects
-    query.ts     # dependency-free query-string builder
-    http.ts      # the Transport interface + default node:http/https transport
-    engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
-    errors.ts    # GovDataError / GovDataApiError / GovDataNetworkError / GovDataParseError
-    client.ts    # GovDataClient — CKAN actions over the engine (with result-unwrapping)
-  cli/
-    io.ts        # injectable I/O seam (stdout/stderr)
-    shared.ts    # option parsers, global-option resolver, JSON renderer
-    commands/    # search / package / organizations / groups / tags / resource / action
-    program.ts   # assembles the commander program from injectable deps
-    run.ts       # parses argv -> exit code (no process.exit; testable)
-    index.ts     # #! bin shim
-```
-
-**Design notes**
-
-- The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
-  uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
-- The client unwraps CKAN's `{ help, success, result }` envelope and raises `GovDataError`
-  when `success` is false, so callers work directly with `result`.
-- A generic `action(name, params)` exposes every read action even where there is no typed convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so it cannot inject extra path segments, query string, or fragments into the request URL.
-- Redirects are followed up to `maxRedirects`; if a redirect crosses origin, the request headers are dropped so nothing (e.g. a future auth/cookie header) leaks to another host.
-
----
-
-## Testing
-
-```bash
-npm test          # builds, then runs `node --test` over dist/test
-```
-
-- **`query.test.ts`** — query-string serialisation.
-- **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
-- **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry, redirects — mocked transport.
-- **`client.test.ts`** — action URL/param mapping, result unwrapping, success:false handling — mocked transport.
-- **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
-
-## Continuous integration
-
-GitHub Actions workflows under `.github/workflows/`:
-
-- **ci.yml** — type-check, build and test on Node 20/22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, and create a GitHub Release with the tarball.
-- **publish.yml** — manual dispatch: publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
-- **docs.yml** — build TypeDoc API docs and deploy to GitHub Pages on each `v*` tag.
+- **[Usage.md](Usage.md)** — full use-case-driven cookbook.
+- **[GLOSSARY.md](GLOSSARY.md)** — every CKAN term, search parameter and domain
+  concept explained.
+- **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, architecture,
+  testing, CI.
 
 ## License
 

@@ -212,6 +212,8 @@ These apply to every command and may be given before *or* after it:
   concept explained.
 - **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, architecture,
   testing, CI.
+- **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills bundled with this repo
+  (dataset finder, catalogue stats, resource harvest), installable as a plugin.
 
 ## License
 

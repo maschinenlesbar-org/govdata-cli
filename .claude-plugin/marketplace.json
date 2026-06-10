@@ -1,0 +1,37 @@
+{
+  "name": "govdata-skills",
+  "owner": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "metadata": {
+    "description": "Open German government data skills powered by the govdata-cli (GovData CKAN catalogue API)"
+  },
+  "plugins": [
+    {
+      "name": "govdata",
+      "source": "./",
+      "description": "Find and rank open German government datasets, build catalogue statistics with CKAN facets, and harvest downloadable resources into a manifest — all over the open, key-free GovData CKAN API via the govdata-cli.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sebastian Schürmann",
+        "email": "sebs@2xs.org"
+      },
+      "license": "AGPL-3.0-or-later",
+      "repository": "https://github.com/maschinenlesbar-org/govdata-cli",
+      "homepage": "https://github.com/maschinenlesbar-org/govdata-cli#readme",
+      "category": "data",
+      "keywords": [
+        "govdata",
+        "ckan",
+        "open-data",
+        "opendata",
+        "catalogue",
+        "datasets",
+        "facets",
+        "germany",
+        "bund.dev"
+      ]
+    }
+  ]
+}

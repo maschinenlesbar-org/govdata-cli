@@ -215,6 +215,16 @@ These apply to every command and may be given before *or* after it:
 - **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills bundled with this repo
   (dataset finder, catalogue stats, resource harvest), installable as a plugin.
 
+## Data license
+
+This CLI is a **client** — it accesses data it does not own or redistribute. The
+upstream data is © its provider and licensed **separately from this tool's code**.
+See **[DATA_LICENSE.md](DATA_LICENSE.md)**.
+
+> **GovData** — catalogue *metadata* is Datenlizenz Deutschland **Zero** 2.0 (≈ CC0,
+> no attribution). Each linked **dataset has its own license** set by its publisher
+> — always check the dataset's `dct:license` before reusing its contents.
+
 ## License
 
 **Dual-licensed** — use it under **either**:

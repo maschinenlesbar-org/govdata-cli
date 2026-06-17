@@ -103,15 +103,20 @@ those without a typed convenience method — and return the unwrapped `result`.
 CKAN search is backed by **Apache Solr**, so its parameters use Solr syntax.
 
 **`q` (query).** The Solr query string, e.g. `title:Haushalt` or a bare term.
-CLI positional: `search [query]`.
+CLI positional: `search [query]`. Solr **tokenises** the query, so a bare term may
+match on a sub-token rather than the whole string (e.g. `abc12345` can hit a title
+containing `12345`). Scope the field (`title:…`) or add an `--fq` filter when you
+need a precise match instead of a loose keyword.
 
 **`fq` (filter query).** A repeatable Solr filter constraining results without
 affecting relevance scoring, e.g. `organization:destatis`, `res_format:CSV`.
 CLI: `--fq` (repeatable).
 
 **`rows` / `start`.** Page size and zero-based offset for paging through search
-hits. CLI: `--rows`, `--start`. (The `*_list` actions instead use
-`limit` / `offset`.)
+hits. CLI: `--rows`, `--start`. GovData's Solr **caps `rows` at 1000** per
+request, so a larger value yields at most 1000 results (with `count` still
+reporting the true total); page past the first 1000 with `start`. (The `*_list`
+actions instead use `limit` / `offset`.)
 
 **`sort`.** A Solr sort expression, e.g. `metadata_modified desc`. CLI: `--sort`.
 

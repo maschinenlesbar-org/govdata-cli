@@ -84,6 +84,17 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 | `--start <n>` | zero-based offset for paging |
 | `--sort <expr>` | Solr sort expression, e.g. `metadata_modified desc` |
 
+> **Note on `--rows`** — GovData's Solr caps a single search at **1000 results**
+> server-side. Asking for more (e.g. `--rows 100000`) is not an error — you simply
+> get at most 1000 back, while `count` still reports the true total. Use `--start`
+> to page beyond the first 1000.
+
+> **Note on free-text matching** — the bare `[query]` is a Solr query, and Solr
+> *tokenises* terms: a string like `abc12345` can match a dataset whose title
+> contains `12345` (e.g. `1,2,3,4,5 …`). If you need an exact field match, scope
+> the query (`title:Klimaschutz`) or add an `--fq` filter rather than relying on a
+> bare keyword.
+
 ### `packages` flags
 
 | Flag | Meaning |
@@ -108,6 +119,12 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 | Flag | Meaning |
 | --- | --- |
 | `--param <key=value>` | query parameter (repeatable; duplicate keys are rejected) |
+
+> **Note on the `<name>`** — the action name is validated client-side against
+> `^[a-z0-9_]+$` (lowercase letters, digits and underscores). Names with dashes,
+> uppercase letters or spaces are rejected before any request is sent — this keeps
+> the escape hatch from injecting extra path segments into the request URL. Use the
+> exact CKAN action name, e.g. `package_search`, `organization_list`, `status_show`.
 
 The **[Glossary](GLOSSARY.md)** decodes every CKAN term and search-parameter
 name.

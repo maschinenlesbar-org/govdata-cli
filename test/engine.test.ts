@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine } from "../src/client/engine.js";
-import { GovDataApiError, GovDataParseError } from "../src/client/errors.js";
+import {
+  GovDataApiError,
+  GovDataNetworkError,
+  GovDataParseError,
+} from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpResponse } from "../src/client/http.js";
 
@@ -18,6 +22,14 @@ function hasControlChars(s: string): boolean {
     return n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f);
   });
 }
+
+test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
+  assert.throws(
+    () => new RequestEngine({ baseUrl: "file:///etc/passwd" }),
+    GovDataNetworkError,
+  );
+  assert.throws(() => new RequestEngine({ baseUrl: "not a url" }), GovDataNetworkError);
+});
 
 test("buildUrl normalises the path and appends the query", () => {
   const e = new RequestEngine({ baseUrl: "https://example.test/" });

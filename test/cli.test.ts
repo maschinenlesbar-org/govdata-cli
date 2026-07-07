@@ -81,6 +81,13 @@ test("action rejects a malformed --param before any request", async () => {
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("--base-url with a non-http(s) scheme is rejected before any request", async () => {
+  const cli = makeCli(() => jsonResponse(ckan({})));
+  const code = await run(["--base-url", "file:///etc/passwd", "search", "x"], cli.deps);
+  assert.notEqual(code, 0);
+  assert.equal(cli.mt.calls.length, 0);
+});
+
 test("a success:false envelope exits non-zero", async () => {
   const cli = makeCli(() => jsonResponse({ help: "h", success: false, error: { message: "x" } }));
   const code = await run(["package", "nope"], cli.deps);

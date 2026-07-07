@@ -22,6 +22,28 @@ export function parseIntArg(value: string): number {
   return n;
 }
 
+/**
+ * commander value-parser for --base-url: reject a non-http(s) scheme at parse
+ * time so `file:`, `ftp:`, etc. fail fast with a usage error rather than only
+ * being caught later in the transport. The default transport also re-checks the
+ * scheme per hop (and RequestEngine.buildUrl guards it for custom transports),
+ * but this surfaces the mistake up front and independently of the transport.
+ */
+export function parseBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new InvalidArgumentError(
+      `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`,
+    );
+  }
+  return value;
+}
+
 export interface GlobalOptions {
   baseUrl?: string;
   timeout?: number;

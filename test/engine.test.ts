@@ -3,6 +3,21 @@ import assert from "node:assert/strict";
 import { RequestEngine } from "../src/client/engine.js";
 import { GovDataApiError, GovDataParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
+import type { HttpResponse } from "../src/client/http.js";
+
+// Control characters built via char codes so no raw control byte ever appears in
+// this source file.
+const ESC = String.fromCharCode(0x1b);
+const BEL = String.fromCharCode(0x07);
+const CSI = String.fromCharCode(0x9b); // a C1 control
+
+/** True if the string contains any C0/C1 control char except tab/newline. */
+function hasControlChars(s: string): boolean {
+  return [...s].some((c) => {
+    const n = c.charCodeAt(0);
+    return n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f);
+  });
+}
 
 test("buildUrl normalises the path and appends the query", () => {
   const e = new RequestEngine({ baseUrl: "https://example.test/" });
@@ -81,6 +96,39 @@ test("a same-origin redirect is followed with headers preserved", async () => {
   });
   assert.deepEqual(await e.getJson("/x"), { ok: 1 });
   assert.equal(calls, 2);
+});
+
+test("error detail is stripped of terminal control characters (GOV-02)", async () => {
+  // A CKAN-shaped error body whose message interleaves ESC/CSI/BEL escapes with
+  // printable text. JSON.parse turns the escaped bytes into real control bytes.
+  const evil = `boom${ESC}[31mred${BEL}${CSI}2J`;
+  const body: HttpResponse = {
+    status: 500,
+    headers: { "content-type": "application/json" },
+    body: Buffer.from(
+      JSON.stringify({ error: { __type: "Internal Server Error", message: evil } }),
+    ),
+  };
+  const mt = makeMockTransport(() => body);
+  const e = new RequestEngine({
+    transport: mt.transport,
+    baseUrl: "https://a.example",
+    maxRetries: 0,
+  });
+
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err: unknown) => {
+      assert.ok(err instanceof GovDataApiError);
+      // Control bytes are gone from both the structured detail and the
+      // human-readable message that run.ts prints to stderr...
+      assert.ok(!hasControlChars(err.detail ?? ""));
+      assert.ok(!hasControlChars(err.message));
+      // ...while the printable characters (and the __type prefix) survive.
+      assert.equal(err.detail, "Internal Server Error: boom[31mred2J");
+      return true;
+    },
+  );
 });
 
 test("a cross-origin redirect drops the request headers (credential-strip guard)", async () => {

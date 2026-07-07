@@ -100,8 +100,9 @@ src/
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.
-- Redirects are followed up to `maxRedirects`; if a redirect crosses origin, the request headers
-  are dropped so nothing (e.g. a future auth/cookie header) leaks to another host.
+- Redirects are followed up to `maxRedirects`; if a redirect crosses origin (scheme + host + port,
+  so a same-host `https:` -> `http:` downgrade counts), the request headers are dropped so nothing
+  (e.g. a future auth/cookie header) leaks to another host or crosses the wire in cleartext.
 
 ### Library / technical terms
 
@@ -139,8 +140,14 @@ retried automatically with linear backoff, up to `maxRetries` (`--max-retries`,
 default `2`).
 
 **Redirect credential-strip.** Redirects are followed up to `maxRedirects`; if
-a redirect crosses origin, request headers are dropped so nothing (e.g. a future
-auth/cookie header) leaks to another host.
+a redirect crosses origin — comparing the full origin (scheme + host + port), so
+a same-host `https:` -> `http:` *downgrade* counts too — request headers are
+dropped so nothing (e.g. a future auth/cookie header) leaks to another host or
+crosses the wire in cleartext. Redirects to a non-`http(s)` scheme are rejected
+(the transport re-checks the scheme per hop). A redirect *is* still followed to
+any origin, including private/link-local addresses; because this CLI is keyless
+and only renders the response to the local user's terminal, that pivot yields an
+attacker nothing, so no private-address block is imposed.
 
 **`maxResponseBytes`.** A hard cap on response body size (default 100 MiB; `0` =
 unlimited) defending against memory exhaustion from a hostile/buggy endpoint.

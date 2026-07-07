@@ -42,6 +42,30 @@ test("rejects an unsupported protocol with GovDataNetworkError", async () => {
   );
 });
 
+test("enforces a wall-clock deadline against a slow-drip response (GOV-04)", async () => {
+  // The server flushes headers immediately, then trickles one byte every 15ms
+  // and never ends. Each byte resets the socket-inactivity timer, so only the
+  // overall wall-clock deadline can stop this. With timeoutMs=50 the deadline
+  // must fire and the transport must reject.
+  await withServer(
+    (_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      const timer = setInterval(() => res.write("x"), 15);
+      res.on("close", () => clearInterval(timer));
+    },
+    async (baseUrl) => {
+      await assert.rejects(
+        () => nodeHttpTransport({ method: "GET", url: baseUrl, timeoutMs: 50 }),
+        (err: unknown) => {
+          assert.ok(err instanceof GovDataNetworkError);
+          assert.match(err.message, /deadline|timed out/);
+          return true;
+        },
+      );
+    },
+  );
+});
+
 test("enforces maxResponseBytes", async () => {
   await withServer(
     (_req, res) => res.end("x".repeat(1000)),

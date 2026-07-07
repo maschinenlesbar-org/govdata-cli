@@ -58,6 +58,18 @@ export const nodeHttpTransport: Transport = (request) =>
     const driver = isHttps ? https : http;
     const maxBytes = request.maxResponseBytes;
 
+    // Wall-clock deadline (see below). Declared here so both the settle wrappers
+    // and the request setup can reference it; cleared on the first settle.
+    let deadline: NodeJS.Timeout | undefined;
+    const settleResolve = (value: HttpResponse): void => {
+      if (deadline) clearTimeout(deadline);
+      resolve(value);
+    };
+    const settleReject = (err: unknown): void => {
+      if (deadline) clearTimeout(deadline);
+      reject(err);
+    };
+
     const req = driver.request(
       url,
       {
@@ -75,14 +87,14 @@ export const nodeHttpTransport: Transport = (request) =>
           if (maxBytes !== undefined && received > maxBytes) {
             aborted = true;
             res.destroy();
-            reject(new GovDataNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
+            settleReject(new GovDataNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
             return;
           }
           chunks.push(chunk);
         });
         res.on("end", () => {
           if (aborted) return;
-          resolve({
+          settleResolve({
             status: res.statusCode ?? 0,
             headers: res.headers,
             body: Buffer.concat(chunks),
@@ -90,20 +102,32 @@ export const nodeHttpTransport: Transport = (request) =>
         });
         res.on("error", (err) => {
           if (aborted) return; // we already rejected with the size-cap error
-          reject(new GovDataNetworkError(`Response stream error: ${err.message}`, { cause: err }));
+          settleReject(new GovDataNetworkError(`Response stream error: ${err.message}`, { cause: err }));
         });
       },
     );
 
     if (request.timeoutMs && request.timeoutMs > 0) {
+      // Two complementary guards, both using timeoutMs:
+      //  - setTimeout: a socket-*inactivity* timeout (no bytes for timeoutMs).
+      //  - deadline:   an overall *wall-clock* deadline, so a server that
+      //    trickles one byte just under the inactivity window can't keep the
+      //    request alive forever. Whichever trips first destroys the request.
       req.setTimeout(request.timeoutMs, () => {
         req.destroy(new GovDataNetworkError(`Request timed out after ${request.timeoutMs}ms`));
       });
+      deadline = setTimeout(() => {
+        req.destroy(
+          new GovDataNetworkError(`Request exceeded the ${request.timeoutMs}ms deadline`),
+        );
+      }, request.timeoutMs);
+      // Don't let a pending deadline timer keep the event loop alive on its own.
+      deadline.unref?.();
     }
 
     req.on("error", (err) => {
       // A timeout destroy already passes an GovDataNetworkError; don't double-wrap.
-      reject(err instanceof GovDataNetworkError ? err : new GovDataNetworkError(err.message, { cause: err }));
+      settleReject(err instanceof GovDataNetworkError ? err : new GovDataNetworkError(err.message, { cause: err }));
     });
 
     if (request.body !== undefined) req.write(request.body);

@@ -1,0 +1,15 @@
+# The only repo-specific texts of the website. Everything else comes from the
+# repository: the English intro from README.md, the commands from the built CLI.
+
+# How the API is accessed: open | key (env: VAR) | account (token, user, password: VARs)
+access:
+  type: open
+
+de:
+  # German version of the README's intro paragraph. Keep it in step with README.md.
+  intro: >-
+    Den zentralen deutschen Open-Data-Katalog direkt im Terminal durchsuchen. `govdata` ist
+    ein Kommandozeilen-Tool für die [GovData-CKAN-Action-API](https://www.govdata.de/)
+    (`ckan.govdata.de`) – das nationale Portal, das offene Datensätze von Bund, Ländern und
+    Kommunen bündelt: suchen, prüfen, filtern und direkt an
+    [`jq`](https://jqlang.github.io/jq/) weitergeben.

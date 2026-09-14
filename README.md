@@ -4,6 +4,8 @@
 [![Release](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/govdata-cli/actions/workflows/release.yml)
 [![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/govdata-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/govdata-cli)
 
+**Website:** [English](https://maschinenlesbar-org.github.io/govdata-cli/) · [Deutsch](https://maschinenlesbar-org.github.io/govdata-cli/de/) — command reference, guides and API docs
+
 Browse Germany's central open-data catalogue from your terminal. `govdata` is a
 command-line tool over the [GovData CKAN Action API](https://www.govdata.de/)
 (`ckan.govdata.de`) — the national portal that federates open datasets from

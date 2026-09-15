@@ -36,7 +36,11 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .option("--rows <n>", "max results", parseIntArg)
     .option("--start <n>", "offset for paging", parseIntArg)
     .option("--sort <expr>", 'e.g. "metadata_modified desc"')
-    .option("--fq <filter>", "filter query, e.g. organization:destatis (repeatable)", collect)
+    .option(
+      "--fq <filter>",
+      "filter query, e.g. groups:tran (repeatable; all must match)",
+      collect,
+    )
     .action(
       action(deps, async ({ client, global, opts }, [query]) => {
         renderJson(

@@ -59,11 +59,22 @@ test("DEL and C1 control characters in server data are escaped in the JSON outpu
   }
 });
 
-test("repeated --fq accumulates", async () => {
+test("repeated --fq accumulates into fq_list, never a repeated fq key", async () => {
+  // CKAN answers a repeated `fq=` with HTTP 409 (it pastes the list into Solr).
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await run(["search", "--fq", "organization:a", "--fq", "res_format:CSV"], cli.deps);
-  const params = new URL(cli.mt.last().url).searchParams.getAll("fq");
-  assert.deepEqual(params, ["organization:a", "res_format:CSV"]);
+  const code = await run(["search", "--fq", "organization:a", "--fq", "res_format:CSV"], cli.deps);
+  assert.equal(code, 0);
+  const params = new URL(cli.mt.last().url).searchParams;
+  assert.deepEqual(params.getAll("fq"), []);
+  assert.deepEqual(params.getAll("fq_list"), ["organization:a", "res_format:CSV"]);
+});
+
+test("a single --fq is sent as one fq", async () => {
+  const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
+  await run(["search", "--fq", "organization:a"], cli.deps);
+  const params = new URL(cli.mt.last().url).searchParams;
+  assert.deepEqual(params.getAll("fq"), ["organization:a"]);
+  assert.equal(params.has("fq_list"), false);
 });
 
 test("action --param builds query parameters", async () => {

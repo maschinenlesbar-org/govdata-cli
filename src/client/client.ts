@@ -76,13 +76,23 @@ export class GovDataClient {
     return env.result as T;
   }
 
-  /** Full-text / faceted dataset search. */
+  /**
+   * Full-text / faceted dataset search.
+   *
+   * CKAN reads a repeated `fq=` key as a Python list and pastes it into the Solr
+   * filter, which fails with HTTP 409. So a single filter is sent as `fq`, and
+   * several are sent as CKAN's `fq_list` (each applied as its own Solr filter
+   * query; all must match). `fq_list` is only used for two or more, because
+   * CKAN splits a lone `fq_list` value into characters.
+   */
   packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
+    const fq = (params.fq ?? []).filter((f) => f !== "");
     return this.action<PackageSearchResult>(
       "package_search",
       prune({
         q: params.q,
-        fq: params.fq,
+        fq: fq.length === 1 ? fq[0] : undefined,
+        fq_list: fq.length > 1 ? fq : undefined,
         rows: params.rows,
         start: params.start,
         sort: params.sort,

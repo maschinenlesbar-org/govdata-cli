@@ -42,7 +42,10 @@ export type Resource = JsonObject;
 export interface PackageSearchParams {
   /** Solr query string, e.g. `title:Haushalt`. */
   q?: string;
-  /** Filter queries, e.g. `["organization:destatis"]`. */
+  /**
+   * Filter queries, e.g. `["organization:statistisches-bundesamt"]`. All must
+   * match: one is sent as `fq`, several as CKAN's `fq_list`.
+   */
   fq?: string[];
   rows?: number;
   start?: number;

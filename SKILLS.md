@@ -18,7 +18,7 @@ time.
 |---|---|---|
 | **govdata-dataset-finder** | Searches a topic, ranks and dedupes hits, and enriches each with publisher, formats, the *real* per-resource licence and download links. | "find datasets about Luftqualität", "newest open data from destatis", "is there CSV data on Haushalt?" |
 | **govdata-catalogue-stats** | Builds counts and rankings via CKAN facets — publishers, formats, licences, themes — folding the duplicated/messy facet values into a clean breakdown. | "which orgs publish the most Verkehr datasets?", "what file formats dominate the catalogue?", "the licence landscape on GovData" |
-| **govdata-resource-harvest** | Flattens many datasets into a manifest of downloadable files with direct URLs, format, size and licence — handling the format-filter trap. | "get all the CSVs about flood maps", "download links for one publisher's data", "build a file list for X" |
+| **govdata-resource-harvest** | Flattens many datasets into a manifest of downloadable files with URLs, format, size and per-file licence — handling the format-filter trap and URLs that aren't files. | "get all the CSVs about flood maps", "download links for one publisher's data", "build a file list for X" |
 
 ## Requirements
 
@@ -100,8 +100,9 @@ encode the non-obvious parts of this catalogue, for example:
   `soci`); resolve them via `govdata groups --all-fields`;
 - the `search` command exposes no facet flags — facet breakdowns go through the generic
   `action package_search` escape hatch, whose `--param` keys must be unique;
-- a `num_resources: 0` dataset is a **metadata-only stub** with nothing to download, and
-  WMS/WFS/`view` "formats" are map service endpoints, not files;
+- a `num_resources: 0` dataset is a **metadata-only stub** with nothing to download,
+  WMS/WFS/`view` "formats" are map service endpoints, not files, and some harvested
+  `resources[].url` values are templates, landing pages or truncated links;
 - an empty search is `{"count":0,"results":[]}` at exit `0` (a valid "nothing matched"),
   exit `4` is a not-found id, exit `1` is a real error.
 

@@ -33,9 +33,18 @@ govdata --compact search "Haushalt" --rows 50 --sort "metadata_modified desc"
 - Set `--rows` high enough to harvest meaningfully (25–100). Note `count` so you can warn
   if there's far more than one page; page with `--start 50`, `--start 100`, … if the user
   wants the lot.
-- Scope with `--fq` as needed (combine conditions with `AND`/`OR` in **one** `--fq`):
+- Scope with `--fq` as needed. Repeat `--fq` for filters that must all match, or combine
+  conditions in one `--fq` with `AND`/`OR`; inside one `--fq`, wrap a top-level `OR` in
+  parentheses (a bare `OR` is silently not applied):
   - publisher: `--fq organization:open-data-baden-wurttemberg`
   - theme: `--fq groups:soci` (codes from `govdata groups --all-fields`)
+- **Check relevance before you harvest.** Full-text search matches loosely:
+  `search "Trinkwasserbrunnen"` (24 hits on 2026-09-15) also returned Ingolstadt
+  Bodenfeuchtigkeit and Wetterstation datasets and `augsburg-servicepunkte-fahrrad`, whose
+  GeoJSON would land in the manifest. Read each hit's `title` (and `notes` when unsure) and
+  drop off-topic datasets, telling the user which. A `title:` query
+  (`search 'title:Trinkwasserbrunnen'`, 12 hits) is tighter but misses synonyms such as
+  "Trinkbrunnen", so it doesn't replace the check.
 
 ## Step 2 — Filter to the wanted format — mind the duplication trap
 
@@ -55,28 +64,36 @@ For every dataset hit, expand `resources[]` into individual rows. The fields per
 
 | Field | Meaning |
 |---|---|
-| `url` | **Direct download URL** — the thing to fetch. |
-| `format` | File format (clean string *or* the EU URI — normalise it). |
-| `mimetype` | MIME type (often more reliable than `format`). |
+| `url` | The link to fetch — **usually** a file, but not always (see the URL notes below). |
+| `format` | File format (clean string *or* the EU URI — normalise it). Can be wrong: Münster lists `…_Stundenauswertung_2022.xlsx` files as `XLS`, so cross-check the URL's extension. |
+| `mimetype` | MIME type, often empty or an IANA URI (`https://www.iana.org/assignments/media-types/text/csv`); take the part after `/media-types/`. |
 | `name` | Resource label. |
 | `size` | Bytes (may be `null`). |
 | `last_modified` / `created` | Timestamps (often `null`). |
-| `license` | **Per-resource DCAT-AP licence URI** — the real licence (the package-level `license_id` is usually empty). |
+| `license` | **Per-resource licence URI** — the real licence (the package-level `license_id` is usually empty). Mostly `http://dcat-ap.de/def/licenses/…`, but not always (`https://www.govdata.de/dl-de/zero-2-0`), and resources of one dataset can differ (`dl-by-de/2.0` and `other-closed`). |
 
 Carry the parent dataset's `name` (slug) and `organization.title` onto each row for
 provenance.
 
 ```bash
-# CSV manifest for one publisher, flattened, with jq
+# CSV manifest for one publisher, flattened, with jq (resources without a url dropped)
 govdata --compact search --fq organization:open-data-baden-wurttemberg --rows 50 \
   | jq -r '.results[] as $d | $d.resources[]
            | select((.format // "" | ascii_downcase | sub(".*/";"")) == "csv")
+           | select((.url // "") != "")
            | [$d.name, .name, (.size//"?"), (.license//"-"), .url] | @tsv'
 ```
 
 Notes:
 - **Skip resources without a `url`** (service stubs); count and report how many you
   dropped.
+- **Check each URL before calling it a file.** Harvested URLs seen on 2026-09-15 include
+  templates with a placeholder (`…_stundenwerten_%7Byyyymm%7D.csv.gz`), landing pages
+  (`https://mobidata-bw.de/fahrradzaehldaten/`), API calls with an `api-key=` already in
+  the query, WFS `GetFeature` requests that generate a GeoJSON/CSV on request, and
+  Münster `opendata.stadt-muenster.de/dataset/…/resource…` links cut off mid-UUID by the
+  harvester. Keep the fetchable ones; list templates, landing pages and broken links
+  separately (or drop them, saying how many) so `wget -i` doesn't choke on them.
 - A `WMS`/`WFS`/`view` "format" is a **map service endpoint, not a file** — exclude it
   from a "files to download" harvest unless the user wants services too.
 - `size:null` is common — show "?" rather than guessing.
@@ -103,8 +120,9 @@ Offer to:
   flag any resource with no licence so the user can check terms before redistributing).
 
 Rules:
-- Always state the **licence per file** from `resources[].license`; harvesting is only
-  safe to redistribute under the stated open licence.
+- Always state the **licence per file** from `resources[].license`, not per dataset: one
+  dataset can mix open and `other-closed` resources. Harvesting is only safe to
+  redistribute under the stated open licence.
 - Don't silently cap: if `count` exceeds what you fetched, say "showing first N of M;
   page with `--start`".
 - Keep service endpoints (WMS/WFS/view) out of a file harvest unless asked.

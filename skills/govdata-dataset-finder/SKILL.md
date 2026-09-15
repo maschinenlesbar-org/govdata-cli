@@ -35,7 +35,10 @@ govdata --compact search "Luftqualität" --rows 25 --sort "metadata_modified des
   `--rows 25` to have enough to rank).
 - Sorting `metadata_modified desc` surfaces freshest data first; offer
   `metadata_created desc` for "newest *published*".
-- Narrow on request with repeatable `--fq` (Solr filter), combined with `AND`/`OR`:
+- Narrow on request with `--fq` (Solr filter). Repeat `--fq` for filters that must all
+  match, or combine conditions inside one `--fq` with `AND`/`OR`. Inside one `--fq`, wrap
+  a top-level `OR` in parentheses (`--fq '(organization:open-nrw OR groups:tran)'`); a
+  bare `OR` there is silently not applied and you get the unfiltered result.
   - publisher: `--fq organization:statistisches-bundesamt`
   - theme/category: `--fq groups:tran` (group names are 4-letter DCAT codes — resolve
     them with `govdata groups --all-fields`; e.g. `tran`=Verkehr, `envi`=Umwelt,
@@ -55,7 +58,7 @@ Per item in `results`, the useful fields:
 | `organization.name` / `.title` | Publisher slug / label. |
 | `metadata_modified` / `metadata_created` | ISO timestamps — recency for ranking. |
 | `num_resources` | How many downloadable files/services. **`0` = metadata-only stub**, deprioritise. |
-| `resources[]` | The distributions: `{ name, format, mimetype, url, size, last_modified }`. The `url` is a **direct download**. |
+| `resources[]` | The distributions: `{ name, format, mimetype, url, size, last_modified, license }`. The `url` is **usually** a download link, but not always (see the URL trap). |
 | `tags[].name` | Keywords. |
 | `groups[].name` | Theme codes. |
 | `extras[]` | `{key,value}` pairs of DCAT-AP.de metadata (publisher_name, access_rights, source portal, …). |
@@ -67,13 +70,33 @@ Per item in `results`, the useful fields:
 > `http://dcat-ap.de/def/licenses/dl-by-de/2.0` (Datenlizenz Deutschland Namensnennung)
 > or `…/dl-zero-de/2.0` (DL-DE Zero, no attribution). Read the licence from there and map
 > the URI tail to a short label; say "licence not stated" only if no resource carries one.
+> Not every URI follows the `dcat-ap.de/def/licenses/` pattern: Dortmund's
+> `trinkwasserbrunnen6a2dc` uses `https://www.govdata.de/dl-de/zero-2-0` (DL-DE Zero 2.0),
+> so recognise the licence from the whole URI, not the prefix. Resources of **one dataset
+> can carry different licences** (Münster's cycle-counter datasets: `dl-by-de/2.0` for
+> recent years, `other-closed` for 2018/2019), so collect the distinct values and show
+> all of them.
+
+> **URL trap.** Harvested `resources[].url` values are not all files. Seen on 2026-09-15
+> in searches for "Fahrradzählstellen" and "Trinkwasserbrunnen":
+> - URL templates with a placeholder (`…fahrradzaehler_stundenwerten_%7Byyyymm%7D.csv.gz`);
+> - landing pages (`https://mobidata-bw.de/fahrradzaehldaten/`);
+> - API calls with an `api-key=` already in the query;
+> - WFS `GetFeature` requests labelled GeoJSON or CSV (they generate the file on request);
+> - resources with an empty `url`;
+> - Münster `opendata.stadt-muenster.de/dataset/…/resource…` links cut off mid-UUID by
+>   the harvester.
+>
+> Call a link a "download" only when it looks like a file; otherwise label it (template,
+> landing page, API, service) or say it is broken and point to the source portal.
 
 ## Step 3 — Handle the format filter trap
 
 GovData stores the **same logical format twice**: a clean string (`CSV`, `PDF`) *and* an
 EU-vocabulary URI (`http://publications.europa.eu/resource/authority/file-type/CSV`). The
-URI variant is by far the more common — for a typical topic ~5600 resources carry
-`…/file-type/CSV` vs only a few hundred the bare `CSV`. So:
+URI variant is by far the more common: for "Verkehr" on 2026-09-15, about 5,800 datasets
+carried `…/file-type/CSV` and a few dozen the bare `CSV` (facet counts are datasets; check
+current figures with the facet query in govdata-catalogue-stats). So:
 
 - `--fq res_format:CSV` silently **misses the majority** of CSV datasets. Don't rely on it
   alone. To filter server-side, OR both forms:
@@ -113,8 +136,9 @@ real licence (from `resources[].license`), and the dataset slug for follow-up.
 
 Rules:
 - Always give the dataset `name` so the user can run `govdata package <name>` for the full
-  record, and offer the direct `resources[].url` download links on request.
-- State formats and licence per hit — those are the decision drivers for reuse.
+  record, and offer the `resources[].url` links on request, labelled as in the URL trap.
+- State formats and licence per hit — those are the decision drivers for reuse. When a
+  dataset's resources carry different licences, list each (e.g. `DL-DE-BY 2.0 / other-closed`).
 - If the user wants the files, hand off to **govdata-resource-harvest**; for "who
   publishes most / format breakdown" questions, hand off to **govdata-catalogue-stats**.
 - Don't claim a licence the data doesn't carry; if every resource lacks `license`, say so.

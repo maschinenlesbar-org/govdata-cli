@@ -53,9 +53,11 @@ classifies them. CLI: `groups`, `group`.
 and filtered by substring. CLI: `tags [--query <substring>]`.
 
 **Facet.** A field CKAN aggregates over a search result to give value counts
-(e.g. how many hits per `organization` or `res_format`). Requested via
-`facet_field` and returned under `facets` / `search_facets` in a
-`PackageSearchResult`.
+(e.g. how many hits per `organization` or `res_format`). The counts are
+**datasets**, not resources: a dataset with five CSV files counts once. Requested
+via `facet.field` (the library's `facet_field` option) and returned under
+`facets` / `search_facets` in a `PackageSearchResult`. Only the top
+`facet.limit` values come back (50 unless you set it; `-1` returns all).
 
 ---
 
@@ -79,7 +81,8 @@ on `success: false`.
 
 **`package_search`.** The full-text / faceted dataset search action. Returns a
 `PackageSearchResult` (`count`, `results`, `facets`, `search_facets`, `sort`).
-CLI: `search`. Parameters: `q`, `fq`, `rows`, `start`, `sort`, `facet_field`.
+CLI: `search`. Parameters: `q`, `fq` / `fq_list`, `rows`, `start`, `sort`,
+`facet.field`.
 
 **`package_show` / `package_list`.** Fetch one dataset by id/name; list dataset
 names with `limit`/`offset`. CLI: `package`, `packages`.
@@ -108,9 +111,12 @@ match on a sub-token rather than the whole string (e.g. `abc12345` can hit a tit
 containing `12345`). Scope the field (`title:…`) or add an `--fq` filter when you
 need a precise match instead of a loose keyword.
 
-**`fq` (filter query).** A repeatable Solr filter constraining results without
-affecting relevance scoring, e.g. `organization:destatis`, `res_format:CSV`.
-CLI: `--fq` (repeatable).
+**`fq` (filter query).** A Solr filter constraining results without affecting
+relevance scoring, e.g. `organization:statistisches-bundesamt`, `groups:tran`.
+CLI: `--fq` (repeatable; every filter must match). CKAN rejects a repeated `fq`
+key, so the client sends one filter as `fq` and several as `fq_list`. CKAN puts
+`+capacity:public` in front of an `fq`, so a top-level `OR` in one filter is not
+applied: write `(organization:open-nrw OR groups:tran)`, not the bare `OR`.
 
 **`rows` / `start`.** Page size and zero-based offset for paging through search
 hits. CLI: `--rows`, `--start`. GovData's Solr **caps `rows` at 1000** per
@@ -120,10 +126,15 @@ actions instead use `limit` / `offset`.)
 
 **`sort`.** A Solr sort expression, e.g. `metadata_modified desc`. CLI: `--sort`.
 
-**`facet_field`.** The fields to compute facet counts over (see *Facet*).
+**`facet.field`.** The fields to compute facet counts over, as a JSON list such
+as `["res_format"]` (see *Facet*). The library option is `facet_field`; CKAN
+itself rejects a `facet_field` parameter.
 
 **`res_format`.** A common facet/filter value: the format of a resource (`CSV`,
-`JSON`, `WMS`, …). Used inside an `fq`, not a dedicated flag.
+`JSON`, `WMS`, …). Used inside an `fq`, not a dedicated flag. The same format
+appears as a bare string and as an EU file-type URI
+(`http://publications.europa.eu/resource/authority/file-type/CSV`), so filter on
+both: `res_format:("CSV" OR "http://publications.europa.eu/resource/authority/file-type/CSV")`.
 
 **`metadata_modified` / `metadata_created`.** Timestamp fields on a dataset; the
 former is the usual sort key for "newest first".

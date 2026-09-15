@@ -55,9 +55,11 @@ Datensätze; sie ordnet sie ein. CLI: `groups`, `group`.
 sich auflisten und nach Teilzeichenketten filtern. CLI: `tags [--query <substring>]`.
 
 **Facette.** Ein Feld, über das CKAN ein Suchergebnis aggregiert, um Häufigkeiten der
-Werte zu liefern (z. B. wie viele Treffer je `organization` oder `res_format`).
-Angefordert über `facet_field` und zurückgegeben unter `facets` / `search_facets` in
-einem `PackageSearchResult`.
+Werte zu liefern (z. B. wie viele Treffer je `organization` oder `res_format`). Gezählt
+werden **Datensätze**, nicht Ressourcen: Ein Datensatz mit fünf CSV-Dateien zählt einmal.
+Angefordert über `facet.field` (in der Bibliothek die Option `facet_field`) und
+zurückgegeben unter `facets` / `search_facets` in einem `PackageSearchResult`. Es kommen
+nur die obersten `facet.limit` Werte zurück (50, sofern nicht gesetzt; `-1` liefert alle).
 
 ---
 
@@ -81,7 +83,7 @@ Status-Flag, `result` die Nutzdaten. Der Client **packt `result` aus** und löst
 
 **`package_search`.** Die Action für Volltext- und facettierte Suche nach Datensätzen.
 Liefert ein `PackageSearchResult` (`count`, `results`, `facets`, `search_facets`, `sort`).
-CLI: `search`. Parameter: `q`, `fq`, `rows`, `start`, `sort`, `facet_field`.
+CLI: `search`. Parameter: `q`, `fq` / `fq_list`, `rows`, `start`, `sort`, `facet.field`.
 
 **`package_show` / `package_list`.** Einen Datensatz per ID oder Name abrufen; Namen von
 Datensätzen mit `limit`/`offset` auflisten. CLI: `package`, `packages`.
@@ -111,9 +113,13 @@ ein einfacher Begriff kann also auf ein Teil-Token statt auf die ganze Zeichenke
 ein (`title:…`) oder ergänzen Sie einen `--fq`-Filter, wenn Sie einen genauen Treffer statt
 eines losen Stichworts brauchen.
 
-**`fq` (Filterabfrage).** Ein mehrfach angebbarer Solr-Filter, der die Ergebnisse
-einschränkt, ohne die Relevanzbewertung zu beeinflussen, z. B. `organization:destatis`,
-`res_format:CSV`. CLI: `--fq` (mehrfach angebbar).
+**`fq` (Filterabfrage).** Ein Solr-Filter, der die Ergebnisse einschränkt, ohne die
+Relevanzbewertung zu beeinflussen, z. B. `organization:statistisches-bundesamt`,
+`groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). CKAN lehnt
+einen wiederholten `fq`-Schlüssel ab, daher sendet der Client einen einzelnen Filter als
+`fq` und mehrere als `fq_list`. CKAN stellt einem `fq` `+capacity:public` voran, deshalb
+wirkt ein `OR` auf oberster Ebene innerhalb eines Filters nicht: Schreiben Sie
+`(organization:open-nrw OR groups:tran)` statt des bloßen `OR`.
 
 **`rows` / `start`.** Seitengröße und nullbasierter Offset zum Blättern durch
 Suchtreffer. CLI: `--rows`, `--start`. Das Solr von GovData **begrenzt `rows` auf 1.000**
@@ -123,11 +129,15 @@ mit `start`. (Die `*_list`-Actions verwenden stattdessen `limit` / `offset`.)
 
 **`sort`.** Ein Solr-Sortierausdruck, z. B. `metadata_modified desc`. CLI: `--sort`.
 
-**`facet_field`.** Die Felder, für die Facettenzahlen berechnet werden (siehe *Facette*).
+**`facet.field`.** Die Felder, für die Facettenzahlen berechnet werden, als JSON-Liste wie
+`["res_format"]` (siehe *Facette*). In der Bibliothek heißt die Option `facet_field`; CKAN
+selbst lehnt einen Parameter `facet_field` ab.
 
 **`res_format`.** Ein gängiger Facetten- bzw. Filterwert: das Format einer Ressource
 (`CSV`, `JSON`, `WMS`, …). Wird innerhalb eines `fq` verwendet, nicht über ein eigenes
-Flag.
+Flag. Dasselbe Format erscheint als einfache Zeichenkette und als URI des EU-Dateityp-Vokabulars
+(`http://publications.europa.eu/resource/authority/file-type/CSV`); filtern Sie daher auf
+beide: `res_format:("CSV" OR "http://publications.europa.eu/resource/authority/file-type/CSV")`.
 
 **`metadata_modified` / `metadata_created`.** Zeitstempelfelder eines Datensatzes; ersteres
 ist der übliche Sortierschlüssel für „neueste zuerst“.

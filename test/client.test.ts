@@ -35,6 +35,21 @@ test("packageSearch sends several filters as fq_list, not a repeated fq", async 
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["organization:x", "-groups:tran"]);
 });
 
+test("packageSearch sends facet_field as CKAN's facet.field JSON list", async () => {
+  // CKAN rejects `facet_field` with HTTP 400 "Invalid search parameters".
+  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  await clientWith(mt).packageSearch({ rows: 0, facet_field: ["organization", "res_format"] });
+  const url = new URL(mt.last().url);
+  assert.equal(url.searchParams.get("facet.field"), '["organization","res_format"]');
+  assert.equal(url.searchParams.has("facet_field"), false);
+});
+
+test("packageSearch omits facet.field when no facet fields are given", async () => {
+  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  await clientWith(mt).packageSearch({ q: "x", facet_field: [] });
+  assert.equal(new URL(mt.last().url).searchParams.has("facet.field"), false);
+});
+
 test("packageSearch never sends a lone fq_list (CKAN splits it into characters)", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
   await clientWith(mt).packageSearch({ fq: ["", "organization:x"] });

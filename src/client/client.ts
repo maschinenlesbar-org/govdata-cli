@@ -83,10 +83,13 @@ export class GovDataClient {
    * filter, which fails with HTTP 409. So a single filter is sent as `fq`, and
    * several are sent as CKAN's `fq_list` (each applied as its own Solr filter
    * query; all must match). `fq_list` is only used for two or more, because
-   * CKAN splits a lone `fq_list` value into characters.
+   * CKAN splits a lone `fq_list` value into characters. Facet fields go out as
+   * the JSON list CKAN expects in `facet.field`; it rejects `facet_field` with
+   * HTTP 400.
    */
   packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     const fq = (params.fq ?? []).filter((f) => f !== "");
+    const facetFields = params.facet_field ?? [];
     return this.action<PackageSearchResult>(
       "package_search",
       prune({
@@ -96,7 +99,7 @@ export class GovDataClient {
         rows: params.rows,
         start: params.start,
         sort: params.sort,
-        facet_field: params.facet_field,
+        "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
       }),
     );
   }

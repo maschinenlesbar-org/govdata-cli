@@ -51,7 +51,10 @@ export interface PackageSearchParams {
   start?: number;
   /** e.g. `"metadata_modified desc"`. */
   sort?: string;
-  /** Facet fields to compute. */
+  /**
+   * Facet fields to compute, e.g. `["organization", "res_format"]`. Sent as
+   * CKAN's `facet.field` JSON list; counts come back in `search_facets`.
+   */
   facet_field?: string[];
 }
 

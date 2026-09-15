@@ -38,7 +38,8 @@ Data comes from the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`), read-onl
 ## Step 2 — Run the facet query
 
 Set `rows=0` so you pay only for the aggregation, not the documents. `facet.field` is a
-**JSON array string**; raise `facet.limit` so the long tail isn't truncated:
+**JSON array string**. CKAN returns only the top `facet.limit` values (50 unless set), with
+no sign that more exist:
 
 ```bash
 # Which organizations publish the most "Verkehr" datasets?
@@ -49,17 +50,27 @@ govdata --compact action package_search \
   --param 'facet.limit=50'
 ```
 
+> **Cut-off check.** If `.search_facets.<field>.items | length` equals `facet.limit`, the
+> list is truncated. `facet.limit=50` for `res_format` on `q=Radverkehr` returned exactly
+> 50 items; `facet.limit=-1` (all values) returned 53. Use `facet.limit=-1` for totals,
+> format or licence breakdowns, and anything that folds variants; a small limit is only
+> safe for a plain "top N" of a field without duplicates, such as `organization`.
+
 Other useful facet fields: `res_format` (file formats), `license_id` (licences),
-`groups` (themes), `tags`. Add `q=…` and/or repeat `--param fq=…` to scope the universe
+`groups` (themes), `tags`. Add `q=…` and/or one `--param fq=…` to scope the universe
 (e.g. only datasets from one org, one theme). For a catalogue-wide picture, drop `q`.
 
 > `--param` keys must be unique — the CLI **rejects a duplicated `--param` key**. To pass
 > several Solr `fq` filters in one call, combine them inside one `fq` value with
-> `AND`/`OR` instead of repeating `--param fq=…`.
+> `AND`/`OR` instead of repeating `--param fq=…`. Wrap a top-level `OR` in parentheses
+> (`fq=(organization:open-nrw OR groups:tran)`): CKAN puts `+capacity:public` in front of
+> the filter, and a bare `OR` is silently not applied.
 
 ## Step 3 — Read and clean the facet items
 
 The result is `search_facets.<field>.items[]`, each `{ name, display_name, count }`.
+**`count` is a number of datasets**, not files or resources: a dataset with ten CSV files
+counts once for `CSV`.
 
 > **These items are NOT pre-sorted by count** — sort them yourself descending before
 > ranking. Use `jq 'sort_by(-.count)'`.
@@ -70,10 +81,30 @@ Field-specific clean-up — the raw `name` values are messy and need normalising
   that. (e.g. `open-data-bayern` → `open.bydata`.)
 - **`res_format`**: the SAME format appears under **two `name` values** — a clean string
   (`CSV`) *and* an EU-vocabulary URI
-  (`http://publications.europa.eu/resource/authority/file-type/CSV`). To report true
-  format totals you must **fold them together**: take the tail after the last `/`,
-  uppercase it, and **sum the counts** of both variants. Reporting them separately
-  badly undercounts every format (the URI variant usually dwarfs the bare one).
+  (`http://publications.europa.eu/resource/authority/file-type/CSV`). Reporting them
+  separately badly undercounts every format (the URI variant usually dwarfs the bare
+  one), so **fold them together** and sum the counts. The mechanical fold (tail after the
+  last `/` or `#`, uppercase, drop the EU `_SRVC` suffix so `WMS_SRVC` joins `WMS`):
+
+  ```bash
+  govdata --compact action package_search --param q=Radverkehr --param rows=0 \
+    --param 'facet.field=["res_format"]' --param 'facet.limit=-1' \
+  | jq -c '.search_facets.res_format.items
+        | map(. + {key: (.name | sub("^.*[/#]"; "") | ascii_upcase | sub("_SRVC$"; ""))})
+        | group_by(.key)
+        | map({format: .[0].key, datasets_max: (map(.count) | add), variants: map(.name)})
+        | sort_by(-.datasets_max) | .[]'
+  ```
+
+  Then check the leftovers by eye; the fold doesn't catch everything. Free-text values need
+  merging by hand (`Shape`, `Shapefiles`, `gezippte shape` → `SHP`; `GeoPackage`,
+  `application/geopackage+sqlite3` → `GPKG`). MIME types (`application/x-7z-compressed`),
+  `…file_media_type#ANY_OTHER_MEDIATYPE` and combined values (`Shape, CSV`) don't yield a
+  clean label: group them as "other" rather than inventing one.
+- **Folded sums are an upper bound.** A dataset that carries both the bare and the URI
+  value is counted in both rows. For `q=Radverkehr` (2026-09-15), JSON folded to 7 + 35 = 42,
+  but only 41 datasets match either form. When a format total must be exact, count it
+  directly: `govdata --compact search Radverkehr --rows 0 --fq 'res_format:("JSON" OR "http://publications.europa.eu/resource/authority/file-type/JSON")' | jq .count`.
 - **`license_id`**: same duplication problem and worse — `name` is a DCAT-AP URI with
   punctuation variants (`…/dl-by-de/2.0` *and* `…/dl-by-de/2_0`, plus an "ältere
   DCAT-AP.de Version" of each). Use `display_name` for the human label and **merge the
@@ -88,7 +119,7 @@ Field-specific clean-up — the raw `name` values are messy and need normalising
 A ranked table or bar-style list, cleaned and summed, with the scope stated:
 
 ```
-Publishers of "Verkehr" datasets (top 5 of 50 facets):
+Publishers of "Verkehr" datasets (top 5):
 
   Open Data Brandenburg     4 446
   open.bydata               3 446
@@ -99,7 +130,8 @@ Publishers of "Verkehr" datasets (top 5 of 50 facets):
 ```
 
 ```
-File formats across "Verkehr" (folded clean+URI variants):
+Datasets per file format across "Verkehr" (folded clean+URI variants; a dataset
+with several formats counts under each):
 
   CSV    5 700   ████████████
   HTML   4 939   ██████████
@@ -112,6 +144,8 @@ Rules:
   a count is meaningless without it.
 - Always **fold `res_format` and `license_id` duplicates** and **sort by count** before
   presenting; never paste raw facet items.
+- Call the counts **datasets**, never files or resources. If the list hit `facet.limit`,
+  say it is truncated or rerun with `facet.limit=-1`.
 - Use `display_name`, not `name`, for orgs and licences; map group codes to titles.
 - For a single org's total, prefer `organization <slug>` → `package_count` over a facet.
 - If a facet is empty (`items: []`), the field isn't faceted for that scope — say so.

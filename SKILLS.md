@@ -94,7 +94,8 @@ encode the non-obvious parts of this catalogue, for example:
   every format (see **govdata-resource-harvest**, **govdata-catalogue-stats**);
 - **facets aren't sorted** — `search_facets.<field>.items[]` come back unordered and must
   be sorted by `count`; use `display_name`, not the slug/URI `name`, for org and licence
-  labels (see **govdata-catalogue-stats**);
+  labels. Facet counts are datasets, not files, and the list silently stops at
+  `facet.limit` (see **govdata-catalogue-stats**);
 - **themes are cryptic codes** — group names are 4-letter DCAT codes (`tran`, `envi`,
   `soci`); resolve them via `govdata groups --all-fields`;
 - the `search` command exposes no facet flags — facet breakdowns go through the generic

@@ -102,6 +102,17 @@ test("--base-url with a non-http(s) scheme is rejected before any request", asyn
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("--timeout accepts up to the largest timer Node supports", async () => {
+  const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
+  assert.equal(await run(["--timeout", "2147483647", "search", "x"], cli.deps), 0);
+  assert.equal(cli.mt.last().timeoutMs, 2_147_483_647);
+
+  const over = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
+  assert.equal(await run(["--timeout", "2147483648", "search", "x"], over.deps), 1);
+  assert.equal(over.mt.calls.length, 0);
+  assert.match(over.err.join("\n"), /Must be <= 2147483647/);
+});
+
 test("a success:false envelope exits non-zero", async () => {
   const cli = makeCli(() => jsonResponse({ help: "h", success: false, error: { message: "x" } }));
   const code = await run(["package", "nope"], cli.deps);

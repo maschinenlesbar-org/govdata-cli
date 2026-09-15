@@ -32,6 +32,12 @@ export interface HttpResponse {
 export type Transport = (request: HttpRequest) => Promise<HttpResponse>;
 
 /**
+ * The longest delay Node's timers support (2^31 - 1 ms, about 24.8 days). A longer one
+ * prints a TimeoutOverflowWarning and fires after 1 ms, so timeouts are capped here.
+ */
+export const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/**
  * Default transport. Resolves with the raw response (including non-2xx) — status
  * interpretation is the client's job. Rejects only on transport-level failures
  * (connection errors, timeouts, malformed URLs).
@@ -113,14 +119,15 @@ export const nodeHttpTransport: Transport = (request) =>
       //  - deadline:   an overall *wall-clock* deadline, so a server that
       //    trickles one byte just under the inactivity window can't keep the
       //    request alive forever. Whichever trips first destroys the request.
-      req.setTimeout(request.timeoutMs, () => {
+      const delay = Math.min(request.timeoutMs, MAX_TIMEOUT_MS);
+      req.setTimeout(delay, () => {
         req.destroy(new GovDataNetworkError(`Request timed out after ${request.timeoutMs}ms`));
       });
       deadline = setTimeout(() => {
         req.destroy(
           new GovDataNetworkError(`Request exceeded the ${request.timeoutMs}ms deadline`),
         );
-      }, request.timeoutMs);
+      }, delay);
       // Don't let a pending deadline timer keep the event loop alive on its own.
       deadline.unref?.();
     }

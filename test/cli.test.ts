@@ -45,6 +45,20 @@ test("--compact prints JSON on a single line", async () => {
   assert.deepEqual(JSON.parse(printed), { count: 1, results: [{ id: "d1" }] });
 });
 
+test("DEL and C1 control characters in server data are escaped in the JSON output", async () => {
+  const controls = String.fromCharCode(0x7f, 0x85, 0x9b) + "2J";
+  const result = { count: 1, results: [{ id: "d1", title: `Haushalt${controls}`, notes: String.fromCharCode(0x1b) + "[31m" }] };
+  for (const format of [[], ["--compact"]]) {
+    const cli = makeCli(() => jsonResponse(ckan(result)));
+    assert.equal(await run([...format, "search", "Haushalt"], cli.deps), 0);
+    const text = cli.out.join("\n");
+    const raw = [...text].filter((c) => c.charCodeAt(0) < 0x20 ? c !== "\n" : c.charCodeAt(0) >= 0x7f && c.charCodeAt(0) <= 0x9f);
+    assert.deepEqual(raw, [], format.join(" "));
+    assert.match(text, /Haushalt\\u007f\\u0085\\u009b2J/);
+    assert.deepEqual(JSON.parse(text), result);
+  }
+});
+
 test("repeated --fq accumulates", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   await run(["search", "--fq", "organization:a", "--fq", "res_format:CSV"], cli.deps);

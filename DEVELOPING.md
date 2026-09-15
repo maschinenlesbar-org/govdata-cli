@@ -121,7 +121,11 @@ built-in `http`/`https`; tests inject a mock. This is the only HTTP seam.
 
 **Query builder.** [`query.ts`](src/client/query.ts) — a dependency-free
 query-string serialiser: omits `undefined`/`null`, repeats arrays as repeated
-keys (`?fq=a&fq=b`), stringifies booleans/Dates, and encodes spaces as `%20`.
+keys (`?fq_list=a&fq_list=b`), stringifies booleans/Dates, and encodes spaces as
+`%20`. CKAN does not accept every parameter repeated: a repeated `fq` fails with
+HTTP 409 and a lone `fq_list` is split into characters, so `packageSearch` sends
+one filter as `fq` and two or more as `fq_list`. Facet fields go out as the JSON
+list `facet.field` expects.
 
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
 ([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`).

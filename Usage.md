@@ -54,12 +54,21 @@ Narrow a search to one publisher and only datasets that ship CSV — for example
 to harvest tabular data from the Federal Statistical Office (destatis).
 
 ```bash
-govdata search --fq 'organization:statistisches-bundesamt AND res_format:CSV' --rows 20
+govdata search --fq organization:statistisches-bundesamt \
+  --fq 'res_format:("CSV" OR "http://publications.europa.eu/resource/authority/file-type/CSV")' --rows 20
 ```
 
-`--fq` is a Solr filter query. Combine several conditions in one filter with
-Solr boolean operators (`AND` / `OR`), as shown above. The bare `[query]`
-argument is optional, so you can filter without a text query as shown here.
+`--fq` is a Solr filter query. Repeat it for filters that must all match, or
+combine conditions in one filter with Solr boolean operators (`AND` / `OR`).
+Inside a single `--fq`, wrap a top-level `OR` in parentheses
+(`--fq '(organization:open-nrw OR groups:tran)'`): CKAN puts `+capacity:public`
+in front of the filter, and a bare `OR` is then not applied at all. The bare
+`[query]` argument is optional, so you can filter without a text query as shown
+here.
+
+GovData records a file format both as a bare string (`CSV`) and as an EU
+file-type URI, and the URI is far more common, so `--fq res_format:CSV` alone
+misses most CSV datasets. Match both forms, as above.
 
 ### 4. Page through a large result set
 

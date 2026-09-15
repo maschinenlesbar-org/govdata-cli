@@ -81,7 +81,7 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 | Flag | Meaning |
 | --- | --- |
 | `[query]` | free-text Solr query, e.g. `Haushalt` or `title:Klimaschutz` |
-| `--fq <filter>` | Solr filter query, e.g. `organization:destatis` (repeatable) |
+| `--fq <filter>` | Solr filter query, e.g. `groups:tran` (repeatable; every filter must match) |
 | `--rows <n>` | max results to return |
 | `--start <n>` | zero-based offset for paging |
 | `--sort <expr>` | Solr sort expression, e.g. `metadata_modified desc` |
@@ -140,8 +140,9 @@ use-case-driven set.
 # Newest datasets first
 govdata search Klima --rows 10 --sort "metadata_modified desc"
 
-# Filter by publisher and file format
-govdata search --fq organization:destatis --fq res_format:CSV
+# Filter by publisher and file format (formats come as a bare string and an EU URI)
+govdata search --fq organization:statistisches-bundesamt \
+  --fq 'res_format:("CSV" OR "http://publications.europa.eu/resource/authority/file-type/CSV")'
 
 # Full dataset with all its resources (distributions)
 govdata package luftqualitat | jq '.resources[] | {name, format, url}'

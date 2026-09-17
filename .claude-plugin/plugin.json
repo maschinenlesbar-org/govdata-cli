@@ -1,6 +1,6 @@
 {
   "name": "govdata",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Open German government data skills powered by the govdata-cli (GovData CKAN catalogue API).",
   "author": {
     "name": "Sebastian Schürmann",

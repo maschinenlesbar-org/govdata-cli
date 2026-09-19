@@ -106,6 +106,31 @@ test("action rejects a malformed --param before any request", async () => {
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("a blank filter, query or id is a usage error before any request", async () => {
+  // A blank value (often an unset shell variable) would otherwise be dropped or
+  // sent as `key=`, so the command would silently run unfiltered and exit 0.
+  const cases: string[][] = [
+    ["search", ""],
+    ["search", "   "],
+    ["search", "--sort", ""],
+    ["search", "--fq", ""],
+    ["search", "--fq", "organization:a", "--fq", " "],
+    ["package", ""],
+    ["package", " \t "],
+    ["organization", ""],
+    ["group", ""],
+    ["resource", ""],
+    ["tags", "--query", ""],
+    ["tags", "--query", "  "],
+  ];
+  for (const argv of cases) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    const code = await run(argv, cli.deps);
+    assert.notEqual(code, 0, JSON.stringify(argv));
+    assert.equal(cli.mt.calls.length, 0, JSON.stringify(argv));
+  }
+});
+
 test("--base-url with a non-http(s) scheme is rejected before any request", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   const code = await run(["--base-url", "file:///etc/passwd", "search", "x"], cli.deps);

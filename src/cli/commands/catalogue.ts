@@ -1,13 +1,8 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "../io.js";
-import { action, parseIntArg, renderJson } from "../shared.js";
+import { action, collectNonEmpty, parseIntArg, parseNonEmpty, renderJson } from "../shared.js";
 import type { QueryParams } from "../../client/query.js";
-
-/** commander accumulator for a repeatable string option. */
-function collect(value: string, previous: string[] = []): string[] {
-  return previous.concat([value]);
-}
 
 /** commander accumulator for repeatable `key=value` pairs into a record. */
 function collectKeyValue(
@@ -31,15 +26,16 @@ function collectKeyValue(
 
 export function registerCatalogueCommands(program: Command, deps: CliDeps): void {
   program
-    .command("search [query]")
+    .command("search")
+    .argument("[query]", "Solr query", parseNonEmpty)
     .description("Search datasets (Solr query syntax)")
     .option("--rows <n>", "max results", parseIntArg)
     .option("--start <n>", "offset for paging", parseIntArg)
-    .option("--sort <expr>", 'e.g. "metadata_modified desc"')
+    .option("--sort <expr>", 'e.g. "metadata_modified desc"', parseNonEmpty)
     .option(
       "--fq <filter>",
       "filter query, e.g. groups:tran (repeatable; all must match)",
-      collect,
+      collectNonEmpty,
     )
     .action(
       action(deps, async ({ client, global, opts }, [query]) => {
@@ -58,7 +54,8 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     );
 
   program
-    .command("package <id>")
+    .command("package")
+    .argument("<id>", "dataset id or name", parseNonEmpty)
     .description("Show one dataset by id or name")
     .action(
       action(deps, async ({ client, global }, [id]) => {
@@ -99,7 +96,8 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     );
 
   program
-    .command("organization <id>")
+    .command("organization")
+    .argument("<id>", "organization id or name", parseNonEmpty)
     .description("Show one organization")
     .action(
       action(deps, async ({ client, global }, [id]) => {
@@ -122,7 +120,8 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     );
 
   program
-    .command("group <id>")
+    .command("group")
+    .argument("<id>", "group id or name", parseNonEmpty)
     .description("Show one group")
     .action(
       action(deps, async ({ client, global }, [id]) => {
@@ -133,7 +132,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("tags")
     .description("List tags")
-    .option("--query <substring>", "filter tags by substring")
+    .option("--query <substring>", "filter tags by substring", parseNonEmpty)
     .action(
       action(deps, async ({ client, global, opts }) => {
         renderJson(deps, global, await client.tagList(opts["query"] as string | undefined));
@@ -141,7 +140,8 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     );
 
   program
-    .command("resource <id>")
+    .command("resource")
+    .argument("<id>", "resource id", parseNonEmpty)
     .description("Show one resource (distribution) by id")
     .action(
       action(deps, async ({ client, global }, [id]) => {

@@ -33,6 +33,22 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
+ * commander value-parser: a value that is not blank. A blank filter would
+ * otherwise be dropped and the command would silently run unfiltered.
+ */
+export function parseNonEmpty(value: string): string {
+  if (value.trim() === "") {
+    throw new InvalidArgumentError("Expected a non-empty value.");
+  }
+  return value;
+}
+
+/** commander accumulator for a repeatable option whose values must not be blank. */
+export function collectNonEmpty(value: string, previous: string[] = []): string[] {
+  return previous.concat([parseNonEmpty(value)]);
+}
+
+/**
  * commander value-parser for --base-url: reject a non-http(s) scheme at parse
  * time so `file:`, `ftp:`, etc. fail fast with a usage error rather than only
  * being caught later in the transport. The default transport also re-checks the

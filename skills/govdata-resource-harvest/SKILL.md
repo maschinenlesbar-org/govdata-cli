@@ -7,8 +7,10 @@ description: >
   links for destatis transport data", "harvest the GeoJSON files on flood maps",
   "build a list of files I can fetch for X", or wants direct download URLs +
   format + size across many datasets rather than browsing one dataset at a time.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `govdata` CLI (npm package @maschinenlesbar.org/govdata-cli) on
+  PATH, installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to ckan.govdata.de.
 ---
 
 # GovData Resource Harvest
@@ -21,6 +23,8 @@ file with its direct URL, format, size, licence and parent dataset — ready to 
 ## Tooling
 
 This skill drives the `govdata` command. **Before anything else, validate it is available** — run `command -v govdata` (or `govdata --version`). If it is not on your PATH, STOP and inform the user that the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 Data comes from the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`), read-only, **no API key**. Always `--compact`. `count:0` (exit `0`) = nothing matched; report it, don't treat it as an error. This skill only **lists** download URLs — it does not download anything unless the user explicitly asks you to fetch them.
 

@@ -7,8 +7,10 @@ description: >
   datasets from destatis", "is there CSV data on X I can download?", or wants a
   ranked, deduped briefing of catalogue hits with publishers, formats, real
   licences and download links — not the raw CKAN search JSON.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `govdata` CLI (npm package @maschinenlesbar.org/govdata-cli) on
+  PATH, installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to ckan.govdata.de.
 ---
 
 # GovData Dataset Finder
@@ -21,6 +23,8 @@ the 30-field-per-hit CKAN search blob.
 ## Tooling
 
 This skill drives the `govdata` command. **Before anything else, validate it is available** — run `command -v govdata` (or `govdata --version`). If it is not on your PATH, STOP and inform the user that the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 Data comes from the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`) over the open GovData CKAN Action API. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. A search that matches nothing returns `{"count":0,"results":[]}` and exits `0` — that is **not** an error, it means "nothing in the catalogue on that topic"; report it plainly and suggest a broader term. Exit `4` means a named dataset id wasn't found; exit `1` is a real error (bad `--fq` syntax, network). Bump `--timeout 60000` if a call is slow.
 

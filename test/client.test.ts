@@ -88,6 +88,21 @@ test("packageList refuses a limit that is not a positive integer, before any req
   }
 });
 
+test("organizationList and groupList forward limit and offset", async () => {
+  for (const method of ["organizationList", "groupList"] as const) {
+    const mt = makeMockTransport(() => jsonResponse(ckan([])));
+    await clientWith(mt)[method]({ limit: 5, offset: 10, all_fields: true });
+    const params = new URL(mt.last().url).searchParams;
+    assert.equal(params.get("limit"), "5", method);
+    assert.equal(params.get("offset"), "10", method);
+    assert.equal(params.get("all_fields"), "true", method);
+
+    const zero = makeMockTransport(() => jsonResponse(ckan([])));
+    await assert.rejects(() => clientWith(zero)[method]({ limit: 0 }), GovDataError);
+    assert.equal(zero.calls.length, 0, method);
+  }
+});
+
 test("action returns the unwrapped result", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan(["a", "b"])));
   const result = await clientWith(mt).action<string[]>("tag_list");

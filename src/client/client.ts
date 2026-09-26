@@ -143,18 +143,26 @@ export class GovDataClient {
     );
   }
 
-  /** Organizations (names, or full objects with `all_fields`). */
-  organizationList(params: ListParams = {}): Promise<JsonValue[]> {
-    return this.action<JsonValue[]>("organization_list", prune({ all_fields: params.all_fields }));
+  /** Organizations (names, or full objects with `all_fields`), paged with limit/offset. */
+  async organizationList(params: ListParams = {}): Promise<JsonValue[]> {
+    assertLimit(params.limit);
+    return this.action<JsonValue[]>(
+      "organization_list",
+      prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
+    );
   }
 
   organizationShow(id: string): Promise<Organization> {
     return this.action<Organization>("organization_show", { id });
   }
 
-  /** Groups (themes/categories). */
-  groupList(params: ListParams = {}): Promise<JsonValue[]> {
-    return this.action<JsonValue[]>("group_list", prune({ all_fields: params.all_fields }));
+  /** Groups (themes/categories), paged with limit/offset like organizationList. */
+  async groupList(params: ListParams = {}): Promise<JsonValue[]> {
+    assertLimit(params.limit);
+    return this.action<JsonValue[]>(
+      "group_list",
+      prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
+    );
   }
 
   groupShow(id: string): Promise<Group> {

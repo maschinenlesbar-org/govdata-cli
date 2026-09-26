@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
 import {
   GovDataApiError,
+  GovDataError,
   GovDataNetworkError,
   GovDataParseError,
   redactUrl,
@@ -48,6 +49,28 @@ test("redactUrl hides userinfo and leaves other URLs alone", () => {
   assert.equal(redactUrl("http://user:secret@h.test/p?q=1"), "http://***@h.test/p?q=1");
   assert.equal(redactUrl("https://h.test/p"), "https://h.test/p");
   assert.equal(redactUrl("not a url"), "not a url");
+});
+
+test("numeric engine options must be integers in range", () => {
+  const cases: Array<[Record<string, number>, string]> = [
+    [{ timeoutMs: -1 }, "Invalid option timeoutMs: expected an integer from 0 to 2147483647, got -1."],
+    [{ timeoutMs: Number.NaN }, "Invalid option timeoutMs: expected an integer from 0 to 2147483647, got NaN."],
+    [{ timeoutMs: 2_147_483_648 }, "Invalid option timeoutMs: expected an integer from 0 to 2147483647, got 2147483648."],
+    [{ maxRetries: Infinity }, "Invalid option maxRetries: expected an integer from 0 to 10, got Infinity."],
+    [{ maxRetries: 11 }, "Invalid option maxRetries: expected an integer from 0 to 10, got 11."],
+    [{ retryDelayMs: 1.5 }, "Invalid option retryDelayMs: expected an integer from 0 to 30000, got 1.5."],
+    [{ maxRedirects: Number.NaN }, "Invalid option maxRedirects: expected an integer from 0 to 20, got NaN."],
+    [{ maxResponseBytes: -1 }, "Invalid option maxResponseBytes: expected an integer from 0 to 9007199254740991, got -1."],
+  ];
+  for (const [options, message] of cases) {
+    assert.throws(
+      () => new RequestEngine(options),
+      (err: unknown) => err instanceof GovDataError && err.message === message,
+      message,
+    );
+  }
+  // 0 stays valid: no timeout, no retries, no redirects, no size cap.
+  new RequestEngine({ timeoutMs: 0, maxRetries: 0, retryDelayMs: 0, maxRedirects: 0, maxResponseBytes: 0 });
 });
 
 test("buildUrl normalises the path and appends the query", () => {

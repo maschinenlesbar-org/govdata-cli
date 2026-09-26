@@ -33,8 +33,8 @@ const ACTION_NAME = /^[a-z0-9_]+$/;
 
 /**
  * Drop undefined (and empty-string) values so only the parameters the caller
- * actually set are sent. An empty string filter (e.g. `tags --query ""`) is
- * treated as "no filter" rather than forwarded as `query=`.
+ * actually set are sent. The typed methods reject a blank filter before they get
+ * here (assertText), so nothing is silently dropped.
  */
 function prune(params: Record<string, unknown>): QueryParams {
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
@@ -45,6 +45,30 @@ function prune(params: Record<string, unknown>): QueryParams {
     out[k] = v as QueryParams[string];
   }
   return out;
+}
+
+function invalid(name: string, expected: string, value: unknown): GovDataError {
+  const shown = typeof value === "string" ? JSON.stringify(value) : String(value);
+  return new GovDataError(`Invalid ${name}: expected ${expected}, got ${shown}.`);
+}
+
+/**
+ * Throw unless `value` is a string with non-whitespace content. CKAN reads a blank
+ * filter as no filter, so a blank `q`, `fq` or tag query would silently widen the
+ * result, and a blank id is not an id.
+ */
+function assertText(name: string, value: unknown): void {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw invalid(name, "a non-empty string", value);
+  }
+}
+
+/** Throw unless `value` is undefined or a non-negative safe integer (paging values). */
+function assertCount(name: string, value: number | undefined): void {
+  if (value === undefined) return;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw invalid(name, "a non-negative integer", value);
+  }
 }
 
 /**
@@ -156,9 +180,17 @@ export class GovDataClient {
    * `(-organization:x)`. Facet fields go out as the JSON list CKAN expects in
    * `facet.field`; it rejects `facet_field` with HTTP 400.
    */
-  packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    const fq = (params.fq ?? []).filter((f) => f !== "");
+  async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
+    // Checked before any request: a blank text value or a NaN/negative number
+    // would otherwise go out as is.
+    if (params.q !== undefined) assertText("q", params.q);
+    if (params.sort !== undefined) assertText("sort", params.sort);
+    const fq = params.fq ?? [];
+    for (const f of fq) assertText("fq entry", f);
     const facetFields = params.facet_field ?? [];
+    for (const f of facetFields) assertText("facet_field entry", f);
+    assertCount("rows", params.rows);
+    assertCount("start", params.start);
     return this.typed<PackageSearchResult>(
       "package_search",
       prune({
@@ -175,13 +207,15 @@ export class GovDataClient {
   }
 
   /** A single dataset by id or name. */
-  packageShow(id: string): Promise<Package> {
+  async packageShow(id: string): Promise<Package> {
+    assertText("id", id);
     return this.typed<Package>("package_show", { id }, isObject, "a JSON object");
   }
 
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
   async packageList(params: ListParams = {}): Promise<string[]> {
     assertLimit(params.limit);
+    assertCount("offset", params.offset);
     return this.typed<string[]>(
       "package_list",
       prune({ limit: params.limit, offset: params.offset }),
@@ -193,6 +227,7 @@ export class GovDataClient {
   /** Organizations (names, or full objects with `all_fields`), paged with limit/offset. */
   async organizationList(params: ListParams = {}): Promise<JsonValue[]> {
     assertLimit(params.limit);
+    assertCount("offset", params.offset);
     return this.typed<JsonValue[]>(
       "organization_list",
       prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
@@ -201,13 +236,15 @@ export class GovDataClient {
     );
   }
 
-  organizationShow(id: string): Promise<Organization> {
+  async organizationShow(id: string): Promise<Organization> {
+    assertText("id", id);
     return this.typed<Organization>("organization_show", { id }, isObject, "a JSON object");
   }
 
   /** Groups (themes/categories), paged with limit/offset like organizationList. */
   async groupList(params: ListParams = {}): Promise<JsonValue[]> {
     assertLimit(params.limit);
+    assertCount("offset", params.offset);
     return this.typed<JsonValue[]>(
       "group_list",
       prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
@@ -216,17 +253,20 @@ export class GovDataClient {
     );
   }
 
-  groupShow(id: string): Promise<Group> {
+  async groupShow(id: string): Promise<Group> {
+    assertText("id", id);
     return this.typed<Group>("group_show", { id }, isObject, "a JSON object");
   }
 
   /** Tags, optionally filtered by a query substring. */
-  tagList(query?: string): Promise<string[]> {
+  async tagList(query?: string): Promise<string[]> {
+    if (query !== undefined) assertText("query", query);
     return this.typed<string[]>("tag_list", prune({ query }), Array.isArray, "an array");
   }
 
   /** A single resource (distribution) by id. */
-  resourceShow(id: string): Promise<Resource> {
+  async resourceShow(id: string): Promise<Resource> {
+    assertText("id", id);
     return this.typed<Resource>("resource_show", { id }, isObject, "a JSON object");
   }
 }

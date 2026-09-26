@@ -29,7 +29,7 @@ test("packageSearch unwraps result and passes params", async () => {
 
 test("packageSearch sends several filters as fq_list, not a repeated fq", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await clientWith(mt).packageSearch({ fq: ["organization:x", "", "-groups:tran"] });
+  await clientWith(mt).packageSearch({ fq: ["organization:x", "-groups:tran"] });
   const url = new URL(mt.last().url);
   assert.equal(url.searchParams.has("fq"), false);
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["organization:x", "-groups:tran"]);
@@ -52,7 +52,7 @@ test("packageSearch omits facet.field when no facet fields are given", async () 
 
 test("packageSearch never sends a lone fq_list value (CKAN splits it into characters)", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await clientWith(mt).packageSearch({ fq: ["", "organization:x OR groups:tran"] });
+  await clientWith(mt).packageSearch({ fq: ["organization:x OR groups:tran"] });
   const url = new URL(mt.last().url);
   assert.equal(url.searchParams.has("fq"), false);
   assert.deepEqual(url.searchParams.getAll("fq_list"), [
@@ -155,6 +155,37 @@ test("typed methods check the top-level shape of the result", async () => {
   // The generic action passes any result through.
   const any = makeMockTransport(() => jsonResponse(ckan("plain")));
   assert.equal(await clientWith(any).action("package_search"), "plain");
+});
+
+test("library parameters are checked before any request", async () => {
+  const cases: Array<[(c: GovDataClient) => Promise<unknown>, string]> = [
+    [(c) => c.packageSearch({ q: "  " }), 'Invalid q: expected a non-empty string, got "  ".'],
+    [(c) => c.packageSearch({ q: "" }), 'Invalid q: expected a non-empty string, got "".'],
+    [(c) => c.packageSearch({ fq: ["  "] }), 'Invalid fq entry: expected a non-empty string, got "  ".'],
+    [(c) => c.packageSearch({ fq: ["a:b", ""] }), 'Invalid fq entry: expected a non-empty string, got "".'],
+    [(c) => c.packageSearch({ sort: " " }), 'Invalid sort: expected a non-empty string, got " ".'],
+    [(c) => c.packageSearch({ facet_field: [""] }), 'Invalid facet_field entry: expected a non-empty string, got "".'],
+    [(c) => c.packageSearch({ q: "x", rows: Number.NaN }), "Invalid rows: expected a non-negative integer, got NaN."],
+    [(c) => c.packageSearch({ q: "x", start: -5 }), "Invalid start: expected a non-negative integer, got -5."],
+    [(c) => c.packageSearch({ rows: 1.5 }), "Invalid rows: expected a non-negative integer, got 1.5."],
+    [(c) => c.packageList({ offset: -1 }), "Invalid offset: expected a non-negative integer, got -1."],
+    [(c) => c.organizationList({ offset: Infinity }), "Invalid offset: expected a non-negative integer, got Infinity."],
+    [(c) => c.groupList({ offset: Number.NaN }), "Invalid offset: expected a non-negative integer, got NaN."],
+    [(c) => c.packageShow(""), 'Invalid id: expected a non-empty string, got "".'],
+    [(c) => c.organizationShow(" "), 'Invalid id: expected a non-empty string, got " ".'],
+    [(c) => c.groupShow("\t"), 'Invalid id: expected a non-empty string, got "\\t".'],
+    [(c) => c.resourceShow(""), 'Invalid id: expected a non-empty string, got "".'],
+    [(c) => c.tagList("   "), 'Invalid query: expected a non-empty string, got "   ".'],
+  ];
+  for (const [call, message] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan([])));
+    await assert.rejects(
+      () => call(clientWith(mt)),
+      (err: unknown) => err instanceof GovDataError && err.message === message,
+      message,
+    );
+    assert.equal(mt.calls.length, 0, message);
+  }
 });
 
 test("action returns the unwrapped result", async () => {

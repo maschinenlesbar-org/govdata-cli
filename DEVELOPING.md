@@ -102,6 +102,12 @@ src/
   the typed methods check the result's top-level shape (an object for `*_show`, an array for
   the lists, `count` + `results` for `package_search`); the generic `action` passes any result
   through. A response nested too deeply to print is a clear error, not a stack overflow.
+- Library input is checked before any request, as the CLI checks its options: a blank `q`,
+  `sort`, `fq`/`facet_field` entry, tag query or id, or a paging value that is not a
+  non-negative integer throws `GovDataError` (`Invalid <name>: expected …, got …`), and the
+  engine's numeric options must be integers in range (`timeoutMs` 0..2^31 − 1, `maxRetries`
+  0..10, `retryDelayMs` 0..30000, `maxRedirects` 0..20, `maxResponseBytes` ≥ 0; `0` disables
+  the timeout, retries, redirects or size cap).
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.

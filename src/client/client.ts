@@ -79,13 +79,16 @@ export class GovDataClient {
   /**
    * Full-text / faceted dataset search.
    *
-   * CKAN reads a repeated `fq=` key as a Python list and pastes it into the Solr
-   * filter, which fails with HTTP 409. So a single filter is sent as `fq`, and
-   * several are sent as CKAN's `fq_list` (each applied as its own Solr filter
-   * query; all must match). `fq_list` is only used for two or more, because
-   * CKAN splits a lone `fq_list` value into characters. Facet fields go out as
-   * the JSON list CKAN expects in `facet.field`; it rejects `facet_field` with
-   * HTTP 400.
+   * Filters always go out as CKAN's `fq_list`, each applied as its own Solr
+   * filter query (all must match). Not as `fq`: CKAN reads a repeated `fq=` key as
+   * a Python list and fails with HTTP 409, and it puts `+capacity:public` in front
+   * of a single `fq`, so a top-level `OR` in it (`organization:a OR groups:b`)
+   * stopped filtering at all and the whole catalogue came back. CKAN splits a lone
+   * `fq_list` value into characters, so a single filter is sent twice (the same
+   * filter applied twice selects the same datasets). Wrapping it in parentheses
+   * instead would break a negated filter: Solr matches nothing for a nested
+   * `(-organization:x)`. Facet fields go out as the JSON list CKAN expects in
+   * `facet.field`; it rejects `facet_field` with HTTP 400.
    */
   packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     const fq = (params.fq ?? []).filter((f) => f !== "");
@@ -94,8 +97,7 @@ export class GovDataClient {
       "package_search",
       prune({
         q: params.q,
-        fq: fq.length === 1 ? fq[0] : undefined,
-        fq_list: fq.length > 1 ? fq : undefined,
+        fq_list: fq.length === 1 ? [fq[0], fq[0]] : fq.length > 1 ? fq : undefined,
         rows: params.rows,
         start: params.start,
         sort: params.sort,

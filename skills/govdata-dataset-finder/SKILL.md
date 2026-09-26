@@ -40,9 +40,8 @@ govdata --compact search "Luftqualität" --rows 25 --sort "metadata_modified des
 - Sorting `metadata_modified desc` surfaces freshest data first; offer
   `metadata_created desc` for "newest *published*".
 - Narrow on request with `--fq` (Solr filter). Repeat `--fq` for filters that must all
-  match, or combine conditions inside one `--fq` with `AND`/`OR`. Inside one `--fq`, wrap
-  a top-level `OR` in parentheses (`--fq '(organization:open-nrw OR groups:tran)'`); a
-  bare `OR` there is silently not applied and you get the unfiltered result.
+  match, or combine conditions inside one `--fq` with `AND`/`OR`
+  (`--fq 'organization:open-nrw OR groups:tran'`).
   - publisher: `--fq organization:statistisches-bundesamt`
   - theme/category: `--fq groups:tran` (group names are 4-letter DCAT codes — resolve
     them with `govdata groups --all-fields`; e.g. `tran`=Verkehr, `envi`=Umwelt,

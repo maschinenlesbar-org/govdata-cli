@@ -59,12 +59,10 @@ govdata search --fq organization:statistisches-bundesamt \
 ```
 
 `--fq` is a Solr filter query. Repeat it for filters that must all match, or
-combine conditions in one filter with Solr boolean operators (`AND` / `OR`).
-Inside a single `--fq`, wrap a top-level `OR` in parentheses
-(`--fq '(organization:open-nrw OR groups:tran)'`): CKAN puts `+capacity:public`
-in front of the filter, and a bare `OR` is then not applied at all. The bare
-`[query]` argument is optional, so you can filter without a text query as shown
-here.
+combine conditions in one filter with Solr boolean operators (`AND` / `OR`),
+e.g. `--fq 'organization:open-nrw OR groups:tran'`. Each `--fq` is applied as a
+filter of its own, so a top-level `OR` works as written. The bare `[query]`
+argument is optional, so you can filter without a text query as shown here.
 
 GovData records a file format both as a bare string (`CSV`) and as an EU
 file-type URI, and the URI is far more common, so `--fq res_format:CSV` alone

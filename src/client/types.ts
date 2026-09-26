@@ -44,7 +44,8 @@ export interface PackageSearchParams {
   q?: string;
   /**
    * Filter queries, e.g. `["organization:statistisches-bundesamt"]`. All must
-   * match: one is sent as `fq`, several as CKAN's `fq_list`.
+   * match. Sent as CKAN's `fq_list` (a single filter twice), each its own Solr
+   * filter, so a top-level `OR` inside one filter works as written.
    */
   fq?: string[];
   rows?: number;

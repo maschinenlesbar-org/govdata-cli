@@ -116,10 +116,11 @@ eines losen Stichworts brauchen.
 **`fq` (Filterabfrage).** Ein Solr-Filter, der die Ergebnisse einschränkt, ohne die
 Relevanzbewertung zu beeinflussen, z. B. `organization:statistisches-bundesamt`,
 `groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). CKAN lehnt
-einen wiederholten `fq`-Schlüssel ab, daher sendet der Client einen einzelnen Filter als
-`fq` und mehrere als `fq_list`. CKAN stellt einem `fq` `+capacity:public` voran, deshalb
-wirkt ein `OR` auf oberster Ebene innerhalb eines Filters nicht: Schreiben Sie
-`(organization:open-nrw OR groups:tran)` statt des bloßen `OR`.
+einen wiederholten `fq`-Schlüssel ab und stellt einem einzelnen `fq` `+capacity:public`
+voran, wodurch ein `OR` auf oberster Ebene darin wirkungslos wird. Daher sendet der Client
+jeden Filter als `fq_list` (einen einzelnen zweimal, weil CKAN einen einzelnen
+`fq_list`-Wert in Zeichen zerlegt), und `organization:open-nrw OR groups:tran` wirkt wie
+geschrieben.
 
 **`rows` / `start`.** Seitengröße und nullbasierter Offset zum Blättern durch
 Suchtreffer. CLI: `--rows`, `--start`. Das Solr von GovData **begrenzt `rows` auf 1.000**

@@ -68,7 +68,8 @@ Other useful facet fields: `res_format` (file formats), `license_id` (licences),
 > several Solr `fq` filters in one call, combine them inside one `fq` value with
 > `AND`/`OR` instead of repeating `--param fq=…`. Wrap a top-level `OR` in parentheses
 > (`fq=(organization:open-nrw OR groups:tran)`): CKAN puts `+capacity:public` in front of
-> the filter, and a bare `OR` is silently not applied.
+> the filter, and a bare `OR` is silently not applied. (`govdata search --fq` handles
+> that itself; the raw `action` call does not.)
 
 ## Step 3 — Read and clean the facet items
 

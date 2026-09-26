@@ -114,9 +114,10 @@ need a precise match instead of a loose keyword.
 **`fq` (filter query).** A Solr filter constraining results without affecting
 relevance scoring, e.g. `organization:statistisches-bundesamt`, `groups:tran`.
 CLI: `--fq` (repeatable; every filter must match). CKAN rejects a repeated `fq`
-key, so the client sends one filter as `fq` and several as `fq_list`. CKAN puts
-`+capacity:public` in front of an `fq`, so a top-level `OR` in one filter is not
-applied: write `(organization:open-nrw OR groups:tran)`, not the bare `OR`.
+key, and it puts `+capacity:public` in front of a single `fq`, which disables a
+top-level `OR` in it. So the client sends every filter as `fq_list` (a single one
+twice, because CKAN splits a lone `fq_list` value into characters), and
+`organization:open-nrw OR groups:tran` works as written.
 
 **`rows` / `start`.** Page size and zero-based offset for paging through search
 hits. CLI: `--rows`, `--start`. GovData's Solr **caps `rows` at 1000** per

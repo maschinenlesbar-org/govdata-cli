@@ -123,9 +123,12 @@ built-in `http`/`https`; tests inject a mock. This is the only HTTP seam.
 query-string serialiser: omits `undefined`/`null`, repeats arrays as repeated
 keys (`?fq_list=a&fq_list=b`), stringifies booleans/Dates, and encodes spaces as
 `%20`. CKAN does not accept every parameter repeated: a repeated `fq` fails with
-HTTP 409 and a lone `fq_list` is split into characters, so `packageSearch` sends
-one filter as `fq` and two or more as `fq_list`. Facet fields go out as the JSON
-list `facet.field` expects.
+HTTP 409 and a lone `fq_list` is split into characters. A single `fq` is no way
+out either: CKAN puts `+capacity:public` in front of it, and a top-level `OR` in
+the filter then stops filtering. So `packageSearch` sends every filter as
+`fq_list`, a single one twice (parentheses would break a negated filter: Solr
+matches nothing for a nested `(-organization:x)`). Facet fields go out as the
+JSON list `facet.field` expects.
 
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
 ([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`).

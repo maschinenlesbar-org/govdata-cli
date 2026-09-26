@@ -69,12 +69,16 @@ test("repeated --fq accumulates into fq_list, never a repeated fq key", async ()
   assert.deepEqual(params.getAll("fq_list"), ["organization:a", "res_format:CSV"]);
 });
 
-test("a single --fq is sent as one fq", async () => {
+test("a single --fq goes out as fq_list too, so a top-level OR in it is applied", async () => {
+  // As a lone `fq`, CKAN prefixed it with `+capacity:public` and the OR made the
+  // filter optional: the whole catalogue came back. A lone fq_list value is split
+  // into characters by CKAN, so the filter is sent twice.
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await run(["search", "--fq", "organization:a"], cli.deps);
+  const filter = "organization:open-nrw OR groups:tran";
+  assert.equal(await run(["search", "--fq", filter], cli.deps), 0);
   const params = new URL(cli.mt.last().url).searchParams;
-  assert.deepEqual(params.getAll("fq"), ["organization:a"]);
-  assert.equal(params.has("fq_list"), false);
+  assert.deepEqual(params.getAll("fq"), []);
+  assert.deepEqual(params.getAll("fq_list"), [filter, filter]);
 });
 
 test("action --param builds query parameters", async () => {

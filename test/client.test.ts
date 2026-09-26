@@ -23,8 +23,8 @@ test("packageSearch unwraps result and passes params", async () => {
   assert.equal(url.pathname, `${ACTION}/package_search`);
   assert.equal(url.searchParams.get("q"), "Haushalt");
   assert.equal(url.searchParams.get("rows"), "5");
-  assert.equal(url.searchParams.get("fq"), "organization:x");
-  assert.equal(url.searchParams.has("fq_list"), false);
+  assert.equal(url.searchParams.has("fq"), false);
+  assert.deepEqual(url.searchParams.getAll("fq_list"), ["organization:x", "organization:x"]);
 });
 
 test("packageSearch sends several filters as fq_list, not a repeated fq", async () => {
@@ -50,12 +50,15 @@ test("packageSearch omits facet.field when no facet fields are given", async () 
   assert.equal(new URL(mt.last().url).searchParams.has("facet.field"), false);
 });
 
-test("packageSearch never sends a lone fq_list (CKAN splits it into characters)", async () => {
+test("packageSearch never sends a lone fq_list value (CKAN splits it into characters)", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
-  await clientWith(mt).packageSearch({ fq: ["", "organization:x"] });
+  await clientWith(mt).packageSearch({ fq: ["", "organization:x OR groups:tran"] });
   const url = new URL(mt.last().url);
-  assert.deepEqual(url.searchParams.getAll("fq"), ["organization:x"]);
-  assert.equal(url.searchParams.has("fq_list"), false);
+  assert.equal(url.searchParams.has("fq"), false);
+  assert.deepEqual(url.searchParams.getAll("fq_list"), [
+    "organization:x OR groups:tran",
+    "organization:x OR groups:tran",
+  ]);
 });
 
 test("packageShow passes the id", async () => {

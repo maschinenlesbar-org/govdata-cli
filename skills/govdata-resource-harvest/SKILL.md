@@ -38,8 +38,7 @@ govdata --compact search "Haushalt" --rows 50 --sort "metadata_modified desc"
   if there's far more than one page; page with `--start 50`, `--start 100`, … if the user
   wants the lot.
 - Scope with `--fq` as needed. Repeat `--fq` for filters that must all match, or combine
-  conditions in one `--fq` with `AND`/`OR`; inside one `--fq`, wrap a top-level `OR` in
-  parentheses (a bare `OR` is silently not applied):
+  conditions in one `--fq` with `AND`/`OR`:
   - publisher: `--fq organization:open-data-baden-wurttemberg`
   - theme: `--fq groups:soci` (codes from `govdata groups --all-fields`)
 - **Check relevance before you harvest.** Full-text search matches loosely:

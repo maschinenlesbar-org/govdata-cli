@@ -202,9 +202,11 @@ thing.
   `npx @maschinenlesbar.org/govdata-cli …`.
 - **Exit `4` / "not found"** — the dataset or resource id doesn't exist or has
   been removed. Re-run a `search` to get a fresh name/id.
-- **Exit `1` / CKAN `success:false`** — the catalogue rejected the request
-  (malformed filter, unknown action name, etc.). Check your `--fq` syntax or
-  `--param` values.
+- **Exit `1` / `HTTP 400` or `HTTP 409`** — the catalogue rejected the request:
+  a malformed `--fq` or `--param` value, or an unknown action name
+  (`HTTP 400 …: Fehlerhafte Anfrage - Action name not known: …`). CKAN's reason
+  follows the status. Check your `--fq` syntax, the action name or the `--param`
+  values.
 - **Network failure / timeout** — connectivity or a slow server. Try again, or
   raise the limit with `--timeout 60000`.
 - **Empty `results`** — the search matched nothing; broaden the keyword, drop

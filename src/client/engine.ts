@@ -219,11 +219,15 @@ export class RequestEngine {
     const text = body.toString("utf8");
     let detail: string | undefined;
     try {
-      const parsed = JSON.parse(text) as {
+      const json: unknown = JSON.parse(text);
+      // CKAN's own routing errors (an unknown action name: HTTP 400 "Fehlerhafte
+      // Anfrage - Action name not known: …") are a bare JSON string.
+      if (typeof json === "string") detail = json;
+      const parsed = (typeof json === "object" ? json : null) as {
         detail?: unknown;
         message?: unknown;
         error?: { message?: unknown; __type?: unknown } | unknown;
-      };
+      } | null;
       // CKAN nests its human-readable error under `error.message` (with an
       // `error.__type` classifier); plainer APIs use a top-level
       // `detail`/`message`. Prefer the nested CKAN shape, then fall back.

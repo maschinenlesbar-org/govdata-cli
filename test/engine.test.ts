@@ -143,6 +143,25 @@ test("error detail is stripped of terminal control characters (GOV-02)", async (
   );
 });
 
+test("a bare JSON string error body (CKAN's unknown-action answer) becomes the detail", async () => {
+  const mt = makeMockTransport(() =>
+    jsonResponse(`Fehlerhafte Anfrage - Action name not known: no_such_action${ESC}[2J`, 400),
+  );
+  const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+  await assert.rejects(
+    () => e.getJson("/api/3/action/no_such_action"),
+    (err: unknown) => {
+      assert.ok(err instanceof GovDataApiError);
+      assert.equal(err.detail, "Fehlerhafte Anfrage - Action name not known: no_such_action[2J");
+      assert.equal(
+        err.message,
+        "HTTP 400 for GET https://a.example/api/3/action/no_such_action: Fehlerhafte Anfrage - Action name not known: no_such_action[2J",
+      );
+      return true;
+    },
+  );
+});
+
 test("error detail loses newlines and bidi overrides, so it cannot forge stderr lines", async () => {
   const RLO = String.fromCharCode(0x202e);
   const mt = makeMockTransport(() =>

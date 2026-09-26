@@ -12,6 +12,7 @@ export {
   GovDataApiError,
   GovDataNetworkError,
   GovDataParseError,
+  redactUrl,
 } from "./errors.js";
 
 export * from "./types.js";

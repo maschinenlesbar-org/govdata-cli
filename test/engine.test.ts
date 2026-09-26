@@ -5,6 +5,7 @@ import {
   GovDataApiError,
   GovDataNetworkError,
   GovDataParseError,
+  redactUrl,
 } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpResponse } from "../src/client/http.js";
@@ -29,6 +30,24 @@ test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
     GovDataNetworkError,
   );
   assert.throws(() => new RequestEngine({ baseUrl: "not a url" }), GovDataNetworkError);
+});
+
+test("the constructor rejects a base URL with a query or fragment, redacting userinfo", () => {
+  for (const baseUrl of ["https://u:pw@example.test/?x=1", "https://u:pw@example.test/#f"]) {
+    assert.throws(
+      () => new RequestEngine({ baseUrl }),
+      (err: unknown) =>
+        err instanceof GovDataNetworkError &&
+        err.message.startsWith("Base URL must not contain a query or fragment: https://***@example.test/") &&
+        !err.message.includes("pw"),
+    );
+  }
+});
+
+test("redactUrl hides userinfo and leaves other URLs alone", () => {
+  assert.equal(redactUrl("http://user:secret@h.test/p?q=1"), "http://***@h.test/p?q=1");
+  assert.equal(redactUrl("https://h.test/p"), "https://h.test/p");
+  assert.equal(redactUrl("not a url"), "not a url");
 });
 
 test("buildUrl normalises the path and appends the query", () => {

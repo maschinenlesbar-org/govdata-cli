@@ -153,6 +153,30 @@ test("--base-url with a non-http(s) scheme is rejected before any request", asyn
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("--base-url with a query, fragment or surrounding whitespace is a usage error", async () => {
+  const cases: Array<[string, RegExp]> = [
+    ["http://127.0.0.1:1/echo?token=1", /query \(\?\) or fragment \(#\)/],
+    ["http://127.0.0.1:1/echo#frag", /query \(\?\) or fragment \(#\)/],
+    [" https://ckan.govdata.de", /surrounding whitespace/],
+    ["https://ckan.govdata.de/ ", /surrounding whitespace/],
+  ];
+  for (const [value, message] of cases) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["--base-url", value, "action", "status_show"], cli.deps), 1, value);
+    assert.equal(cli.mt.calls.length, 0, value);
+    assert.match(cli.err.join("\n"), message, value);
+  }
+});
+
+test("userinfo in --base-url is sent but redacted in error messages", async () => {
+  const cli = makeCli(() => jsonResponse({}, 500));
+  assert.equal(await run(["--base-url", "http://user:secret@mirror.test/s500", "action", "x"], cli.deps), 1);
+  assert.equal(new URL(cli.mt.last().url).password, "secret");
+  const stderr = cli.err.join("\n");
+  assert.ok(!stderr.includes("secret"), stderr);
+  assert.match(stderr, /HTTP 500 for GET http:\/\/\*\*\*@mirror\.test\/s500\/api\/3\/action\/x/);
+});
+
 test("--timeout accepts up to the largest timer Node supports", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   assert.equal(await run(["--timeout", "2147483647", "search", "x"], cli.deps), 0);

@@ -45,6 +45,20 @@ function prune(params: Record<string, unknown>): QueryParams {
   return out;
 }
 
+/**
+ * Check a `*_list` limit. CKAN reads `limit=0` as "no limit" (the whole catalogue,
+ * 168,956 names on GovData), so 0, like any non-positive or fractional value, is
+ * refused. To get the whole list, leave the limit out.
+ */
+function assertLimit(limit: number | undefined): void {
+  if (limit === undefined) return;
+  if (!Number.isSafeInteger(limit) || limit < 1) {
+    throw new GovDataError(
+      `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
+    );
+  }
+}
+
 export class GovDataClient {
   private readonly engine: RequestEngine;
 
@@ -120,8 +134,9 @@ export class GovDataClient {
     return this.action<Package>("package_show", { id });
   }
 
-  /** Dataset names (paginated). */
-  packageList(params: ListParams = {}): Promise<string[]> {
+  /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
+  async packageList(params: ListParams = {}): Promise<string[]> {
+    assertLimit(params.limit);
     return this.action<string[]>(
       "package_list",
       prune({ limit: params.limit, offset: params.offset }),

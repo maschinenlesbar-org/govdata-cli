@@ -101,7 +101,7 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 
 | Flag | Meaning |
 | --- | --- |
-| `--limit <n>` | max names to return |
+| `--limit <n>` | max names to return (1 or more; omit for all) |
 | `--offset <n>` | number of records to skip |
 
 ### `organizations` / `groups` flag

@@ -150,6 +150,8 @@ either their CKAN **id** (UUID) or their human-readable **name** (URL slug). The
 
 **`limit` / `offset` (`ListParams`).** Pagination for the `*_list` actions: page
 size and number of records to skip. (Distinct from search's `rows` / `start`.)
+`--limit` is 1 or more: CKAN reads `limit=0` as "no limit", so the CLI and the
+client refuse 0; leave `--limit` out for the whole list.
 
 **`all_fields`.** On `organization_list` / `group_list`, return full objects
 instead of just names. CLI: `--all-fields`.

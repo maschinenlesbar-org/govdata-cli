@@ -1,8 +1,21 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "../io.js";
-import { action, collectNonEmpty, parseIntArg, parseNonEmpty, renderJson } from "../shared.js";
+import {
+  action,
+  collectNonEmpty,
+  parseBoundedInt,
+  parseIntArg,
+  parseNonEmpty,
+  renderJson,
+} from "../shared.js";
 import type { QueryParams } from "../../client/query.js";
+
+/**
+ * commander value-parser for a list --limit: 1 or more. CKAN reads `limit=0` as
+ * "no limit" and would send the whole list; leave --limit out for that.
+ */
+const parseLimit = parseBoundedInt(1, Number.MAX_SAFE_INTEGER);
 
 /** commander accumulator for repeatable `key=value` pairs into a record. */
 function collectKeyValue(
@@ -66,7 +79,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("packages")
     .description("List dataset names")
-    .option("--limit <n>", "max names", parseIntArg)
+    .option("--limit <n>", "max names (1 or more; omit for all)", parseLimit)
     .option("--offset <n>", "offset for paging", parseIntArg)
     .action(
       action(deps, async ({ client, global, opts }) => {

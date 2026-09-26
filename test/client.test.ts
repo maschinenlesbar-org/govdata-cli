@@ -75,6 +75,19 @@ test("organizationList passes all_fields", async () => {
   assert.equal(new URL(mt.last().url).searchParams.get("all_fields"), "true");
 });
 
+test("packageList refuses a limit that is not a positive integer, before any request", async () => {
+  for (const limit of [0, -1, 1.5, Number.NaN, Infinity]) {
+    const mt = makeMockTransport(() => jsonResponse(ckan([])));
+    await assert.rejects(
+      () => clientWith(mt).packageList({ limit }),
+      (err: unknown) =>
+        err instanceof GovDataError &&
+        err.message === `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
+    );
+    assert.equal(mt.calls.length, 0, String(limit));
+  }
+});
+
 test("action returns the unwrapped result", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan(["a", "b"])));
   const result = await clientWith(mt).action<string[]>("tag_list");

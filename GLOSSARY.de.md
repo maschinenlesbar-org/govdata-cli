@@ -153,7 +153,8 @@ CKAN-**ID** (UUID) oder ihren menschenlesbaren **Namen** (URL-Slug) ansprechen. 
 
 **`limit` / `offset` (`ListParams`).** Paginierung für die `*_list`-Actions: Seitengröße
 und Anzahl der zu überspringenden Einträge. (Nicht zu verwechseln mit `rows` / `start` der
-Suche.)
+Suche.) `--limit` ist 1 oder mehr: CKAN liest `limit=0` als „keine Grenze“, daher lehnen
+CLI und Client 0 ab; für die ganze Liste `--limit` einfach weglassen.
 
 **`all_fields`.** Bei `organization_list` / `group_list` vollständige Objekte statt nur
 Namen zurückgeben. CLI: `--all-fields`.

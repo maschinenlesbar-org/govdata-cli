@@ -61,6 +61,10 @@ export interface PackageSearchParams {
 
 /** Parameters for the `*_list` endpoints. */
 export interface ListParams {
+  /**
+   * Most entries to return: a positive integer (CKAN reads 0 as "no limit", so 0
+   * is refused). Leave it out for the whole list.
+   */
   limit?: number;
   offset?: number;
   /** Return full objects instead of just names (organization/group lists). */

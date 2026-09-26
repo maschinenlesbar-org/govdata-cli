@@ -81,6 +81,17 @@ test("a single --fq goes out as fq_list too, so a top-level OR in it is applied"
   assert.deepEqual(params.getAll("fq_list"), [filter, filter]);
 });
 
+test("packages --limit 0 is refused (CKAN reads it as no limit)", async () => {
+  const cli = makeCli(() => jsonResponse(ckan(["a"])));
+  assert.equal(await run(["packages", "--limit", "0"], cli.deps), 1);
+  assert.equal(cli.mt.calls.length, 0);
+  assert.match(cli.err.join("\n"), /Must be >= 1\./);
+
+  const ok = makeCli(() => jsonResponse(ckan(["a"])));
+  assert.equal(await run(["packages", "--limit", "1", "--offset", "0"], ok.deps), 0);
+  assert.equal(new URL(ok.mt.last().url).search, "?limit=1&offset=0");
+});
+
 test("action --param builds query parameters", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ ok: true })));
   await run(["action", "package_show", "--param", "id=abc"], cli.deps);

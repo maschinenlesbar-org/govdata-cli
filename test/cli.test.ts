@@ -189,6 +189,35 @@ test("--max-retries is bounded to 0..10", async () => {
   }
 });
 
+test("help, help <command>, --help and --version exit 0; an unknown command is named", async () => {
+  for (const argv of [["help"], ["help", "search"], ["search", "--help"], ["--version"], [], ["--compact"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 0, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.doesNotMatch(cli.err.join("\n"), /too many arguments/, argv.join(" "));
+  }
+  const helpSearch = makeCli(() => jsonResponse(ckan({})));
+  await run(["help", "search"], helpSearch.deps);
+  assert.match(helpSearch.out.join("\n"), /Usage: govdata search/);
+
+  for (const argv of [["pakages"], ["help", "nope"]]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.doesNotMatch(cli.err.join("\n"), /too many arguments/, argv.join(" "));
+  }
+  const typo = makeCli(() => jsonResponse(ckan({})));
+  await run(["pakages"], typo.deps);
+  assert.match(typo.err.join("\n"), /error: unknown command 'pakages'/);
+});
+
+test("a leaf command still rejects an extra positional", async () => {
+  const cli = makeCli(() => jsonResponse(ckan([])));
+  assert.equal(await run(["packages", "extra"], cli.deps), 1);
+  assert.equal(cli.mt.calls.length, 0);
+  assert.match(cli.err.join("\n"), /too many arguments for 'packages'/);
+});
+
 test("--timeout accepts up to the largest timer Node supports", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   assert.equal(await run(["--timeout", "2147483647", "search", "x"], cli.deps), 0);

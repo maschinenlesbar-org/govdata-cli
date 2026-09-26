@@ -65,11 +65,24 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   // A bare invocation (no subcommand) should print help to stdout and exit 0,
   // matching `govdata help` / `govdata --help`. Without an explicit root action,
   // commander writes help to stderr and exits 1 for the empty-command case.
+  // A root action turns off two things commander otherwise does for a program
+  // with subcommands, so both are restored: the implicit `help [command]`
+  // subcommand (helpCommand(true)), and the "unknown command" error — the
+  // action receives the stray operand (allowExcessArguments below) and reports
+  // it, instead of commander's "too many arguments".
+  program.helpCommand(true);
   program.action(() => {
+    const [unknown] = program.args;
+    if (unknown !== undefined) {
+      program.error(`error: unknown command '${unknown}'`, { code: "commander.unknownCommand" });
+    }
     program.help();
   });
 
   registerCatalogueCommands(program, deps);
+  // Set after the subcommands exist (they copy this setting when created), so it
+  // applies to the root only: a stray operand reaches the root action above.
+  program.allowExcessArguments(true);
 
   return program;
 }

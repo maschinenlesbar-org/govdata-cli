@@ -153,6 +153,26 @@ test("--timeout accepts up to the largest timer Node supports", async () => {
   assert.match(over.err.join("\n"), /Must be <= 2147483647/);
 });
 
+test("bidi formatting characters in server data are escaped in the JSON output", async () => {
+  const bidi = String.fromCharCode(0x202e, 0x2066, 0x200f, 0x061c);
+  const result = { title: `a${bidi}b` };
+  const cli = makeCli(() => jsonResponse(ckan(result)));
+  assert.equal(await run(["--compact", "package", "x"], cli.deps), 0);
+  const text = cli.out.join("\n");
+  assert.equal(text, '{"title":"a\\u202e\\u2066\\u200f\\u061cb"}');
+  assert.deepEqual(JSON.parse(text), result);
+});
+
+test("a success:false error on HTTP 200 reaches stderr without escape sequences", async () => {
+  const ESC = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const cli = makeCli(() =>
+    jsonResponse({ success: false, error: { message: `evil${ESC}[31mRED${ESC}]0;TITLE${BEL}` } }),
+  );
+  assert.equal(await run(["package", "x"], cli.deps), 1);
+  assert.deepEqual(cli.err, ['Error: CKAN action "package_show" failed: evil[31mRED]0;TITLE']);
+});
+
 test("a success:false envelope exits non-zero", async () => {
   const cli = makeCli(() => jsonResponse({ help: "h", success: false, error: { message: "x" } }));
   const code = await run(["package", "nope"], cli.deps);

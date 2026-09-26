@@ -6,7 +6,7 @@
 //   client.packageShow("some-dataset-id")
 //   client.action("organization_list")   // generic escape hatch
 
-import { RequestEngine, type EngineOptions } from "./engine.js";
+import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
 import { GovDataError } from "./errors.js";
 import type {
@@ -68,10 +68,19 @@ export class GovDataClient {
     if (!env.success) {
       // Surface CKAN's human-readable error.message; fall back to the raw JSON
       // only when no message is present (mirrors the HTTP-error detail path).
-      const e = env.error as { message?: unknown } | undefined;
+      const e: unknown = env.error;
+      const message = (e as { message?: unknown } | undefined)?.message;
       const detail =
-        typeof e?.message === "string" ? e.message : e ? JSON.stringify(e) : "unknown error";
-      throw new GovDataError(`CKAN action "${name}" failed: ${detail}`);
+        typeof e === "string"
+          ? e
+          : typeof message === "string"
+            ? message
+            : e !== undefined
+              ? JSON.stringify(e)
+              : "unknown error";
+      // A success:false envelope can come with HTTP 200, so it never passes the
+      // engine's error-detail sanitising: strip terminal controls here too.
+      throw new GovDataError(`CKAN action "${name}" failed: ${sanitizeServerText(detail)}`);
     }
     return env.result as T;
   }

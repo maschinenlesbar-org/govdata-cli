@@ -104,6 +104,31 @@ test("a success:false envelope without error.message falls back to JSON", async 
   );
 });
 
+test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi and newlines", async () => {
+  // Built from char codes so the source stays free of control bytes.
+  const ESC = String.fromCharCode(0x1b);
+  const BEL = String.fromCharCode(0x07);
+  const CSI8 = String.fromCharCode(0x9b);
+  const RLO = String.fromCharCode(0x202e);
+  const errors: unknown[] = [
+    { message: `evil${ESC}[31mRED${ESC}]0;TITLE${BEL} ${ESC}[2J${CSI8}31m` },
+    { __type: `X${CSI8}31m`, detail: `d${ESC}[2J` },
+    `str ${ESC}[31merr\nError: forged ${RLO}line`,
+  ];
+  const expected = [
+    'CKAN action "package_show" failed: evil[31mRED]0;TITLE [2J31m',
+    'CKAN action "package_show" failed: {"__type":"X31m","detail":"d\\u001b[2J"}',
+    'CKAN action "package_show" failed: str [31merr Error: forged line',
+  ];
+  for (const [i, error] of errors.entries()) {
+    const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
+    await assert.rejects(
+      () => clientWith(mt).packageShow("x"),
+      (err: unknown) => err instanceof GovDataError && err.message === expected[i],
+    );
+  }
+});
+
 test("action rejects a name with path-traversal / query chars before any request", async () => {
   for (const bad of ["../../../etc/passwd", "package_search?rows=9999", "a/b/c", "pkg#frag", ""]) {
     const mt = makeMockTransport(() => jsonResponse(ckan({})));

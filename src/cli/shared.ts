@@ -4,7 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
-import type { EngineOptions } from "../client/engine.js";
+import { isBidiControl, type EngineOptions } from "../client/engine.js";
 
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
@@ -91,9 +91,10 @@ export function toEngineOptions(global: GlobalOptions): EngineOptions {
 }
 
 /**
- * Escape the control characters JSON.stringify leaves raw. It escapes C0 (including
- * ESC) but not DEL or the C1 range U+0080–U+009F, and terminals may act on those —
- * U+009B is the 8-bit form of CSI. The output is server data, so escape them; the
+ * Escape the characters JSON.stringify leaves raw although a terminal acts on them.
+ * It escapes C0 (including ESC) but not DEL, the C1 range U+0080–U+009F (U+009B is
+ * the 8-bit form of CSI) or the bidi formatting characters (isBidiControl), which
+ * reorder the text that follows. The output is server data, so escape them; the
  * result is equivalent, valid JSON (these characters only occur inside strings).
  * Checked by char code so the source stays free of control bytes.
  */
@@ -102,7 +103,7 @@ export function escapeControlChars(json: string): string {
   let from = 0;
   for (let i = 0; i < json.length; i++) {
     const c = json.charCodeAt(i);
-    if (c >= 0x7f && c <= 0x9f) {
+    if ((c >= 0x7f && c <= 0x9f) || isBidiControl(c)) {
       result += json.slice(from, i) + "\\u" + c.toString(16).padStart(4, "0");
       from = i + 1;
     }

@@ -143,6 +143,26 @@ test("error detail is stripped of terminal control characters (GOV-02)", async (
   );
 });
 
+test("error detail loses newlines and bidi overrides, so it cannot forge stderr lines", async () => {
+  const RLO = String.fromCharCode(0x202e);
+  const mt = makeMockTransport(() =>
+    jsonResponse(
+      { success: false, error: { __type: "Not Found Error", message: `Not found\nOK: 0 problems ${RLO}` } },
+      404,
+    ),
+  );
+  const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err: unknown) => {
+      assert.ok(err instanceof GovDataApiError);
+      assert.equal(err.detail, "Not Found Error: Not found OK: 0 problems");
+      assert.ok(!err.message.includes("\n"));
+      return true;
+    },
+  );
+});
+
 test("a cross-origin redirect drops the request headers (credential-strip guard)", async () => {
   let calls = 0;
   const mt = makeMockTransport((req) => {

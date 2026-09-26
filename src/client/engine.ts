@@ -28,7 +28,11 @@ export interface EngineOptions {
   maxRetries?: number;
   /** Base backoff between retries in milliseconds (grows linearly). */
   retryDelayMs?: number;
-  /** Number of HTTP redirects (301/302/303/307/308) to follow. Defaults to 5. */
+  /**
+   * Number of HTTP redirects (301/302/303/307/308) to follow. Defaults to 5. Any
+   * other 3xx, one with a missing or malformed Location, and one past this limit
+   * surface as a GovDataApiError naming the target.
+   */
   maxRedirects?: number;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
@@ -40,6 +44,13 @@ export interface EngineOptions {
 }
 
 const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
+
+/**
+ * The redirect statuses the engine follows. 300 (a choice for the user), 304 (a
+ * cache answer to a conditional request this client never sends) and 305/306
+ * (deprecated) are not redirects to follow; they surface as a GovDataApiError.
+ */
+const FOLLOWED_REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
 /**
  * True for the Unicode bidirectional formatting characters: ALM (U+061C), LRM/RLM
@@ -184,27 +195,31 @@ export class RequestEngine {
       }
 
       // Follow redirects, resolving the Location relative to the current URL.
-      if (status >= 300 && status < 400 && redirects < this.maxRedirects) {
-        const location = response.headers["location"];
-        if (typeof location === "string" && location.length > 0) {
-          const previous = new URL(url);
-          const next = new URL(location, url);
-          // Credential-strip guard: if the redirect crosses origin, drop the
-          // request headers so any future auth/cookie header is never re-sent to
-          // a different host. (Today only Accept/User-Agent are sent, but this
-          // future-proofs against header leakage across origins.)
-          if (next.origin !== previous.origin) {
-            headers = { Accept: options.accept };
-          }
-          url = next.toString();
-          redirects += 1;
-          continue;
-        }
+      const location = response.headers["location"];
+      const next = FOLLOWED_REDIRECTS.has(status) ? resolveLocation(location, url) : undefined;
+      if (next !== undefined && redirects >= this.maxRedirects) {
+        // A loop (or a long chain): say how far it got rather than a bare 3xx.
+        // (With maxRedirects 0 nothing was followed; the plain text says enough.)
+        throw this.toApiError(method, url, status, response.body, location, redirects || undefined);
       }
+      if (next !== undefined) {
+        // Credential-strip guard: if the redirect crosses origin, drop the
+        // request headers so any future auth/cookie header is never re-sent to
+        // a different host. (Today only Accept/User-Agent are sent, but this
+        // future-proofs against header leakage across origins.)
+        if (next.origin !== new URL(url).origin) {
+          headers = { Accept: options.accept };
+        }
+        url = next.toString();
+        redirects += 1;
+        continue;
+      }
+      // Any other 3xx — not a followed status, or no usable Location — falls
+      // through and surfaces as a GovDataApiError naming the target.
 
       const contentType = String(response.headers["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(method, url, status, response.body);
+        throw this.toApiError(method, url, status, response.body, location);
       }
 
       return { data: response.body, contentType, status };
@@ -222,7 +237,14 @@ export class RequestEngine {
     }
   }
 
-  private toApiError(method: string, url: string, status: number, body: Buffer): GovDataApiError {
+  private toApiError(
+    method: string,
+    url: string,
+    status: number,
+    body: Buffer,
+    locationHeader?: string,
+    redirectsFollowed?: number,
+  ): GovDataApiError {
     const text = body.toString("utf8");
     let detail: string | undefined;
     try {
@@ -260,6 +282,38 @@ export class RequestEngine {
     // `detail` came from the response body; strip control characters so a hostile
     // endpoint cannot inject terminal escape sequences via the stderr error message.
     if (detail !== undefined) detail = sanitizeServerText(detail);
-    return new GovDataApiError({ status, url, method, body: text, detail });
+    // Name the target of a redirect that was not followed.
+    const location =
+      status >= 300 && status < 400 && locationHeader ? redirectTarget(url, locationHeader) : undefined;
+    return new GovDataApiError({
+      status,
+      url,
+      method,
+      body: text,
+      detail,
+      ...(location !== undefined ? { location } : {}),
+      ...(redirectsFollowed !== undefined ? { redirectsFollowed } : {}),
+    });
   }
+}
+
+/** Resolve a Location header against the current URL; undefined if missing or malformed. */
+function resolveLocation(location: string | undefined, base: string): URL | undefined {
+  if (location === undefined || location === "") return undefined;
+  try {
+    return new URL(location, base);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The absolute, printable form of a `Location` header: resolved against the request
+ * URL, userinfo redacted, control characters stripped (it is server text bound for
+ * stderr). An unparseable value is shown sanitised as it came.
+ */
+function redirectTarget(requestUrl: string, location: string): string | undefined {
+  const resolved = resolveLocation(location, requestUrl);
+  const clean = sanitizeServerText(resolved ? redactUrl(resolved.href) : location);
+  return clean === "" ? undefined : clean;
 }

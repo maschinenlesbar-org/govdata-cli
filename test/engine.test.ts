@@ -201,6 +201,70 @@ test("error detail loses newlines and bidi overrides, so it cannot forge stderr 
   );
 });
 
+function redirect(status: number, location?: string): HttpResponse {
+  return { status, headers: location === undefined ? {} : { location }, body: Buffer.from("") };
+}
+
+test("only 301/302/303/307/308 are followed; other 3xx name the target", async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    let n = 0;
+    const mt = makeMockTransport(() => (++n === 1 ? redirect(status, "/ok") : jsonResponse({ ok: status })));
+    const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+    assert.deepEqual(await e.getJson("/x"), { ok: status });
+  }
+  for (const status of [300, 304, 305, 306]) {
+    const mt = makeMockTransport(() => redirect(status, "/ok"));
+    const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://a.example" });
+    await assert.rejects(
+      () => e.getJson("/x"),
+      (err: unknown) =>
+        err instanceof GovDataApiError &&
+        err.location === "https://a.example/ok" &&
+        err.message === `HTTP ${status} for GET https://a.example/x: redirect to https://a.example/ok not followed`,
+      String(status),
+    );
+    assert.equal(mt.calls.length, 1);
+  }
+});
+
+test("a malformed or missing Location is an API error, not an Unexpected error", async () => {
+  const bad = makeMockTransport(() => redirect(302, `http://[::1${ESC}[2J`));
+  await assert.rejects(
+    () => new RequestEngine({ transport: bad.transport, baseUrl: "https://a.example" }).getJson("/x"),
+    (err: unknown) =>
+      err instanceof GovDataApiError &&
+      err.message === "HTTP 302 for GET https://a.example/x: redirect to http://[::1[2J not followed",
+  );
+  const none = makeMockTransport(() => redirect(302));
+  await assert.rejects(
+    () => new RequestEngine({ transport: none.transport, baseUrl: "https://a.example" }).getJson("/x"),
+    (err: unknown) =>
+      err instanceof GovDataApiError &&
+      err.message === "HTTP 302 for GET https://a.example/x: redirect not followed (no Location header)",
+  );
+});
+
+test("the redirect limit names the loop", async () => {
+  const mt = makeMockTransport((req) => redirect(302, new URL(req.url).pathname));
+  const e = new RequestEngine({ transport: mt.transport, baseUrl: "https://u:pw@a.example" });
+  await assert.rejects(
+    () => e.getJson("/loop"),
+    (err: unknown) =>
+      err instanceof GovDataApiError &&
+      err.message ===
+        "HTTP 302 for GET https://***@a.example/loop: redirect to https://***@a.example/loop not followed (stopped after 5 redirects)",
+  );
+  assert.equal(mt.calls.length, 6);
+
+  const zero = makeMockTransport(() => redirect(302, "/loop"));
+  await assert.rejects(
+    () => new RequestEngine({ transport: zero.transport, baseUrl: "https://a.example", maxRedirects: 0 }).getJson("/x"),
+    (err: unknown) =>
+      err instanceof GovDataApiError &&
+      err.message === "HTTP 302 for GET https://a.example/x: redirect to https://a.example/loop not followed",
+  );
+});
+
 test("a cross-origin redirect drops the request headers (credential-strip guard)", async () => {
   let calls = 0;
   const mt = makeMockTransport((req) => {

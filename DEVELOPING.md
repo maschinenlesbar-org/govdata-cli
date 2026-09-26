@@ -159,7 +159,11 @@ crosses the wire in cleartext. Redirects to a non-`http(s)` scheme are rejected
 (the transport re-checks the scheme per hop). A redirect *is* still followed to
 any origin, including private/link-local addresses; because this CLI is keyless
 and only renders the response to the local user's terminal, that pivot yields an
-attacker nothing, so no private-address block is imposed.
+attacker nothing, so no private-address block is imposed. Only 301/302/303/307/308
+with a parseable `Location` are followed; any other 3xx (300, 304, 305, 306), a
+missing or malformed `Location` and the redirect limit surface as a
+`GovDataApiError` with a `location` field: `HTTP 302 for GET …: redirect to <target>
+not followed`, plus `(stopped after 5 redirects)` at the limit.
 
 **`maxResponseBytes`.** A hard cap on response body size (default 100 MiB; `0` =
 unlimited) defending against memory exhaustion from a hostile/buggy endpoint.

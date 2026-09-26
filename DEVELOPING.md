@@ -96,7 +96,12 @@ src/
 - The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
   uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
 - The client unwraps CKAN's `{ help, success, result }` envelope and raises `GovDataError`
-  when `success` is false, so callers work directly with `result`.
+  when `success` is false, so callers work directly with `result`. A body that is not an
+  envelope (`null`, an array, no boolean `success`) or has no `result` is a
+  `GovDataParseError` (`Unexpected response shape from /api/3/action/<name>: expected …`), and
+  the typed methods check the result's top-level shape (an object for `*_show`, an array for
+  the lists, `count` + `results` for `package_search`); the generic `action` passes any result
+  through. A response nested too deeply to print is a clear error, not a stack overflow.
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.
@@ -138,7 +143,7 @@ subprocess.
 **Error types.** [`errors.ts`](src/client/errors.ts): `GovDataApiError`
 (non-2xx, carries `status`/`detail`/`url`, with `isRetryable`),
 `GovDataNetworkError` (transport failure/timeout), `GovDataParseError` (bad
-JSON), and a `success: false` envelope surfacing the base `GovDataError` — all
+JSON, or an answer that is not a CKAN envelope of the expected shape), and a `success: false` envelope surfacing the base `GovDataError` — all
 extending `GovDataError`. The CLI maps a `404` to exit code `4`, other errors to
 `1`.
 

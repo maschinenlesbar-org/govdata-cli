@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GovDataClient } from "../src/client/client.js";
-import { GovDataError, GovDataApiError } from "../src/client/errors.js";
+import { GovDataError, GovDataApiError, GovDataParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): GovDataClient {
@@ -101,6 +101,60 @@ test("organizationList and groupList forward limit and offset", async () => {
     await assert.rejects(() => clientWith(zero)[method]({ limit: 0 }), GovDataError);
     assert.equal(zero.calls.length, 0, method);
   }
+});
+
+test("a body that is not a CKAN envelope is a GovDataParseError, not a TypeError", async () => {
+  for (const body of [null, [1, 2], {}, { result: [] }, "text", 5]) {
+    const mt = makeMockTransport(() => jsonResponse(body));
+    await assert.rejects(
+      () => clientWith(mt).packageSearch({ q: "x" }),
+      (err: unknown) =>
+        err instanceof GovDataParseError &&
+        err.message ===
+          "Unexpected response shape from /api/3/action/package_search: expected a CKAN envelope (a JSON object with a boolean success).",
+      JSON.stringify(body),
+    );
+  }
+});
+
+test("a success envelope without a result is a GovDataParseError; a null result is kept", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ success: true }));
+  await assert.rejects(
+    () => clientWith(mt).action("status_show"),
+    (err: unknown) =>
+      err instanceof GovDataParseError &&
+      err.message === "Unexpected response shape from /api/3/action/status_show: expected a result in the envelope.",
+  );
+  const nul = makeMockTransport(() => jsonResponse(ckan(null)));
+  assert.equal(await clientWith(nul).action("status_show"), null);
+});
+
+test("typed methods check the top-level shape of the result", async () => {
+  const cases: Array<[string, (c: GovDataClient) => Promise<unknown>, unknown, string]> = [
+    ["package_search", (c) => c.packageSearch({ q: "x" }), { count: "3", results: [] }, "an object with a numeric count and a results array"],
+    ["package_search", (c) => c.packageSearch({ q: "x" }), { count: 3 }, "an object with a numeric count and a results array"],
+    ["package_show", (c) => c.packageShow("x"), [], "a JSON object"],
+    ["organization_show", (c) => c.organizationShow("x"), null, "a JSON object"],
+    ["group_show", (c) => c.groupShow("x"), "g", "a JSON object"],
+    ["resource_show", (c) => c.resourceShow("x"), 1, "a JSON object"],
+    ["package_list", (c) => c.packageList(), {}, "an array"],
+    ["organization_list", (c) => c.organizationList(), null, "an array"],
+    ["group_list", (c) => c.groupList({ all_fields: true }), { a: 1 }, "an array"],
+    ["tag_list", (c) => c.tagList(), "t", "an array"],
+  ];
+  for (const [name, call, result, expected] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan(result)));
+    await assert.rejects(
+      () => call(clientWith(mt)),
+      (err: unknown) =>
+        err instanceof GovDataParseError &&
+        err.message === `Unexpected response shape from /api/3/action/${name}: expected ${expected}.`,
+      name,
+    );
+  }
+  // The generic action passes any result through.
+  const any = makeMockTransport(() => jsonResponse(ckan("plain")));
+  assert.equal(await clientWith(any).action("package_search"), "plain");
 });
 
 test("action returns the unwrapped result", async () => {

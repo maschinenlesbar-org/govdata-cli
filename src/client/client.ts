@@ -8,7 +8,7 @@
 
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
-import { GovDataError } from "./errors.js";
+import { GovDataError, GovDataParseError } from "./errors.js";
 import type {
   CkanEnvelope,
   PackageSearchResult,
@@ -59,6 +59,23 @@ function assertLimit(limit: number | undefined): void {
   }
 }
 
+/** A JSON object (not null, not an array). */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A `package_search` result: an object with a numeric count and a results array. */
+function isSearchResult(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  const count = value["count"];
+  return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 && Array.isArray(value["results"]);
+}
+
+/** The error for an answer that does not have the shape the caller relies on. */
+function shapeError(name: string, expected: string): GovDataParseError {
+  return new GovDataParseError(`Unexpected response shape from ${ACTION}/${name}: expected ${expected}.`);
+}
+
 export class GovDataClient {
   private readonly engine: RequestEngine;
 
@@ -75,10 +92,15 @@ export class GovDataClient {
     if (!ACTION_NAME.test(action)) {
       throw new GovDataError(`Invalid CKAN action name: "${name}"`);
     }
-    const env = await this.engine.getJson<CkanEnvelope<T>>(
+    const env = await this.engine.getJson<CkanEnvelope<T> | null>(
       `${ACTION}/${encodeURIComponent(action)}`,
       params,
     );
+    // A proxy's JSON error page or another JSON API is not an envelope (`null`,
+    // an array, an object without `success`); say so rather than crash on it.
+    if (!isObject(env) || typeof env.success !== "boolean") {
+      throw shapeError(action, "a CKAN envelope (a JSON object with a boolean success)");
+    }
     if (!env.success) {
       // Surface CKAN's human-readable error.message; fall back to the raw JSON
       // only when no message is present (mirrors the HTTP-error detail path).
@@ -96,7 +118,26 @@ export class GovDataClient {
       // engine's error-detail sanitising: strip terminal controls here too.
       throw new GovDataError(`CKAN action "${name}" failed: ${sanitizeServerText(detail)}`);
     }
+    // `{"success": true}` without a result would print nothing useful (and the CLI
+    // would crash rendering `undefined`); CKAN always sends one, `null` included.
+    if (env.result === undefined) throw shapeError(action, "a result in the envelope");
     return env.result as T;
+  }
+
+  /**
+   * An action whose `result` must have a known top-level shape (never a deep
+   * schema): a broken or foreign answer becomes a GovDataParseError naming the
+   * action, not a TypeError further down.
+   */
+  private async typed<T>(
+    name: string,
+    params: QueryParams,
+    ok: (value: unknown) => boolean,
+    expected: string,
+  ): Promise<T> {
+    const result = await this.action<unknown>(name, params);
+    if (!ok(result)) throw shapeError(name, expected);
+    return result as T;
   }
 
   /**
@@ -116,7 +157,7 @@ export class GovDataClient {
   packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     const fq = (params.fq ?? []).filter((f) => f !== "");
     const facetFields = params.facet_field ?? [];
-    return this.action<PackageSearchResult>(
+    return this.typed<PackageSearchResult>(
       "package_search",
       prune({
         q: params.q,
@@ -126,56 +167,64 @@ export class GovDataClient {
         sort: params.sort,
         "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
       }),
+      isSearchResult,
+      "an object with a numeric count and a results array",
     );
   }
 
   /** A single dataset by id or name. */
   packageShow(id: string): Promise<Package> {
-    return this.action<Package>("package_show", { id });
+    return this.typed<Package>("package_show", { id }, isObject, "a JSON object");
   }
 
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
   async packageList(params: ListParams = {}): Promise<string[]> {
     assertLimit(params.limit);
-    return this.action<string[]>(
+    return this.typed<string[]>(
       "package_list",
       prune({ limit: params.limit, offset: params.offset }),
+      Array.isArray,
+      "an array",
     );
   }
 
   /** Organizations (names, or full objects with `all_fields`), paged with limit/offset. */
   async organizationList(params: ListParams = {}): Promise<JsonValue[]> {
     assertLimit(params.limit);
-    return this.action<JsonValue[]>(
+    return this.typed<JsonValue[]>(
       "organization_list",
       prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
+      Array.isArray,
+      "an array",
     );
   }
 
   organizationShow(id: string): Promise<Organization> {
-    return this.action<Organization>("organization_show", { id });
+    return this.typed<Organization>("organization_show", { id }, isObject, "a JSON object");
   }
 
   /** Groups (themes/categories), paged with limit/offset like organizationList. */
   async groupList(params: ListParams = {}): Promise<JsonValue[]> {
     assertLimit(params.limit);
-    return this.action<JsonValue[]>(
+    return this.typed<JsonValue[]>(
       "group_list",
       prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
+      Array.isArray,
+      "an array",
     );
   }
 
   groupShow(id: string): Promise<Group> {
-    return this.action<Group>("group_show", { id });
+    return this.typed<Group>("group_show", { id }, isObject, "a JSON object");
   }
 
   /** Tags, optionally filtered by a query substring. */
   tagList(query?: string): Promise<string[]> {
-    return this.action<string[]>("tag_list", prune({ query }));
+    return this.typed<string[]>("tag_list", prune({ query }), Array.isArray, "an array");
   }
 
   /** A single resource (distribution) by id. */
   resourceShow(id: string): Promise<Resource> {
-    return this.action<Resource>("resource_show", { id });
+    return this.typed<Resource>("resource_show", { id }, isObject, "a JSON object");
   }
 }

@@ -4,7 +4,7 @@ import { run } from "../src/cli/run.js";
 import { GovDataClient } from "../src/client/client.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse } from "./helpers.js";
+import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 
 const ACTION = "/api/3/action";
 
@@ -206,6 +206,27 @@ test("a success:false error on HTTP 200 reaches stderr without escape sequences"
   );
   assert.equal(await run(["package", "x"], cli.deps), 1);
   assert.deepEqual(cli.err, ['Error: CKAN action "package_show" failed: evil[31mRED]0;TITLE']);
+});
+
+test("malformed envelopes exit 1 with a clear error instead of an Unexpected error", async () => {
+  for (const body of [null, { success: true }, [1, 2]]) {
+    const cli = makeCli(() => jsonResponse(body));
+    assert.equal(await run(["--compact", "search", "x"], cli.deps), 1, JSON.stringify(body));
+    assert.match(cli.err.join("\n"), /^Error: Unexpected response shape from \/api\/3\/action\/package_search: /);
+  }
+});
+
+test("a deeply nested response is a clear error when pretty-printing", async () => {
+  const depth = 200_000;
+  const body = `{"success":true,"result":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+  const pretty = makeCli(() => rawResponse(body, "application/json"));
+  assert.equal(await run(["action", "x"], pretty.deps), 1);
+  assert.deepEqual(pretty.err, ["Error: The response is nested too deeply to pretty-print; try --compact."]);
+
+  const compact = makeCli(() => rawResponse(body, "application/json"));
+  const code = await run(["--compact", "action", "x"], compact.deps);
+  // V8 may manage the compact form; if not, the error is the compact one.
+  if (code !== 0) assert.deepEqual(compact.err, ["Error: The response is nested too deeply to print."]);
 });
 
 test("a success:false envelope exits non-zero", async () => {

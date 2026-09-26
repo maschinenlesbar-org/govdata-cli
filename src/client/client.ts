@@ -37,7 +37,9 @@ const ACTION_NAME = /^[a-z0-9_]+$/;
  * treated as "no filter" rather than forwarded as `query=`.
  */
 function prune(params: Record<string, unknown>): QueryParams {
-  const out: QueryParams = {};
+  // A null-prototype object, so a `__proto__` key is kept as a parameter instead
+  // of setting the prototype (and being lost).
+  const out = Object.create(null) as QueryParams;
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined || v === "") continue;
     out[k] = v as QueryParams[string];

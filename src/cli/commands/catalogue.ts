@@ -34,7 +34,14 @@ function collectKeyValue(
   if (Object.prototype.hasOwnProperty.call(previous, key)) {
     throw new InvalidArgumentError(`Duplicate --param key "${key}".`);
   }
-  return { ...previous, [key]: value.slice(eq + 1) };
+  // A blank value would be dropped (CKAN reads an empty parameter as unset), so
+  // `--param q=` would silently run the action unfiltered.
+  const paramValue = value.slice(eq + 1);
+  if (paramValue.trim() === "") {
+    throw new InvalidArgumentError(`Invalid --param "${value}". The value must not be blank.`);
+  }
+  // A computed key in a literal is an own data property, even for `__proto__`.
+  return { ...previous, [key]: paramValue };
 }
 
 export function registerCatalogueCommands(program: Command, deps: CliDeps): void {

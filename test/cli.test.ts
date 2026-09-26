@@ -114,6 +114,18 @@ test("action rejects an injecting name before any request", async () => {
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("action refuses a blank --param value and keeps a __proto__ key", async () => {
+  for (const param of ["q=", "q= "]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["action", "package_search", "--param", param], cli.deps), 1, param);
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /The value must not be blank\./);
+  }
+  const proto = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["action", "x", "--param", "__proto__=1", "--param", "constructor=2"], proto.deps), 0);
+  assert.equal(new URL(proto.mt.last().url).search, "?__proto__=1&constructor=2");
+});
+
 test("action rejects a malformed --param before any request", async () => {
   const cli = makeCli(() => jsonResponse(ckan({})));
   const code = await run(["action", "tag_list", "--param", "nope"], cli.deps);

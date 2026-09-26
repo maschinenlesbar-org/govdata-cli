@@ -170,7 +170,8 @@ govdata action package_search \
   | jq '.search_facets.res_format.items'
 ```
 
-`--param` is repeatable `key=value` (duplicate keys are rejected). With
+`--param` is repeatable `key=value` (duplicate keys and blank values such as
+`q=` are rejected: CKAN would read an empty value as "no filter"). With
 `rows=0` you pay only for the facet aggregation, not the documents.
 
 ### 10. Call any read action not wrapped by a dedicated command

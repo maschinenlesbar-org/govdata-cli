@@ -218,6 +218,25 @@ test("a leaf command still rejects an extra positional", async () => {
   assert.match(cli.err.join("\n"), /too many arguments for 'packages'/);
 });
 
+test("--user-agent refuses a blank value, control characters and non-Latin-1 before any request", async () => {
+  const cases: [string, RegExp][] = [
+    ["", /Expected a non-empty value\./],
+    ["  ", /Expected a non-empty value\./],
+    ["a\nX-Injected: 1", /Value contains control characters\./],
+    ["a" + String.fromCharCode(0x7f), /Value contains control characters\./],
+    ["bot \u2603", /Value contains characters outside Latin-1/],
+  ];
+  for (const [ua, message] of cases) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(["--user-agent", ua, "action", "status_show"], cli.deps), 1, JSON.stringify(ua));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), message);
+  }
+  const ok = makeCli(() => jsonResponse(ckan({})));
+  assert.equal(await run(["--user-agent", "Mein Bot\tü/1", "action", "status_show"], ok.deps), 0);
+  assert.equal(ok.mt.last().headers?.["User-Agent"], "Mein Bot\tü/1");
+});
+
 test("--timeout accepts up to the largest timer Node supports", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   assert.equal(await run(["--timeout", "2147483647", "search", "x"], cli.deps), 0);

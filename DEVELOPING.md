@@ -106,8 +106,9 @@ src/
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.
 - Redirects are followed up to `maxRedirects`; if a redirect crosses origin (scheme + host + port,
-  so a same-host `https:` -> `http:` downgrade counts), the request headers are dropped so nothing
-  (e.g. a future auth/cookie header) leaks to another host or crosses the wire in cleartext.
+  so a same-host `https:` -> `http:` downgrade counts), only the engine's own `Accept` and
+  `User-Agent` headers go along, so nothing else (e.g. a future auth/cookie header) leaks to
+  another host or crosses the wire in cleartext.
 
 ### Library / technical terms
 
@@ -156,9 +157,10 @@ backoff is linear (200 ms, 400 ms, …). A `Retry-After` above 30 s
 
 **Redirect credential-strip.** Redirects are followed up to `maxRedirects`; if
 a redirect crosses origin — comparing the full origin (scheme + host + port), so
-a same-host `https:` -> `http:` *downgrade* counts too — request headers are
-dropped so nothing (e.g. a future auth/cookie header) leaks to another host or
-crosses the wire in cleartext. Redirects to a non-`http(s)` scheme are rejected
+a same-host `https:` -> `http:` *downgrade* counts too — only the engine's own
+`Accept` and `User-Agent` are kept (an allowlist, not a list of credential
+headers, which is never complete), so nothing else (e.g. a future auth/cookie
+header) leaks to another host or crosses the wire in cleartext. Redirects to a non-`http(s)` scheme are rejected
 (the transport re-checks the scheme per hop). A redirect *is* still followed to
 any origin, including private/link-local addresses; because this CLI is keyless
 and only renders the response to the local user's terminal, that pivot yields an

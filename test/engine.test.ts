@@ -265,7 +265,7 @@ test("the redirect limit names the loop", async () => {
   );
 });
 
-test("a cross-origin redirect drops the request headers (credential-strip guard)", async () => {
+test("a cross-origin redirect keeps only Accept and User-Agent (credential-strip guard)", async () => {
   let calls = 0;
   const mt = makeMockTransport((req) => {
     calls += 1;
@@ -276,9 +276,8 @@ test("a cross-origin redirect drops the request headers (credential-strip guard)
         body: Buffer.from(""),
       };
     }
-    // Crossing origin: User-Agent must NOT be re-sent to the new host.
-    assert.equal(req.headers?.["User-Agent"], undefined);
-    assert.equal(req.headers?.["Accept"], "application/json");
+    // Crossing origin: only the engine's own Accept and User-Agent go along.
+    assert.deepEqual(req.headers, { Accept: "application/json", "User-Agent": "ua/1" });
     return jsonResponse({ ok: 1 });
   });
   const e = new RequestEngine({

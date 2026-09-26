@@ -19,8 +19,10 @@ and pipe straight into [`jq`](https://jqlang.github.io/jq/).
 - **Ten commands** — `search`, `package`, `packages`, `organizations`,
   `organization`, `groups`, `group`, `tags`, `resource`, and a generic `action`
   escape hatch.
-- **Everything is open** — every dataset this tool reaches is publicly licensed;
-  nothing to register for.
+- **Open access** — the catalogue API is public, nothing to register for. The
+  datasets carry their publishers' own licences, mostly open but not all (some
+  are `other-closed` or `official-work`); check each dataset's `license_id`
+  before reuse, see [DATA_LICENSE.md](DATA_LICENSE.md).
 
 > Want to use this as a TypeScript library or understand how it's built?
 > See **[DEVELOPING.md](DEVELOPING.md)**.

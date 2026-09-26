@@ -59,7 +59,7 @@ try {
 new GovDataClient({
   baseUrl: "https://ckan.govdata.de",
   timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried with linear backoff
+  maxRetries: 3,              // 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",
   transport: customTransport, // inject your own HTTP transport
@@ -148,8 +148,11 @@ extending `GovDataError`. The CLI maps a `404` to exit code `4`, other errors to
 `1`.
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are
-retried automatically with linear backoff, up to `maxRetries` (`--max-retries`,
-default `2`).
+retried automatically, up to `maxRetries` (`--max-retries`, `0`–`10`, default
+`2`). Each retry waits the response's `Retry-After` (delay-seconds or an
+IMF-fixdate, parsed strictly by `parseRetryAfter`); without a usable one the
+backoff is linear (200 ms, 400 ms, …). A `Retry-After` above 30 s
+(`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once.
 
 **Redirect credential-strip.** Redirects are followed up to `maxRedirects`; if
 a redirect crosses origin — comparing the full origin (scheme + host + port), so

@@ -177,6 +177,18 @@ test("userinfo in --base-url is sent but redacted in error messages", async () =
   assert.match(stderr, /HTTP 500 for GET http:\/\/\*\*\*@mirror\.test\/s500\/api\/3\/action\/x/);
 });
 
+test("--max-retries is bounded to 0..10", async () => {
+  for (const [value, ok] of [["0", true], ["10", true], ["11", false], ["9007199254740991", false]] as const) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    const code = await run(["--max-retries", value, "action", "status_show"], cli.deps);
+    assert.equal(code, ok ? 0 : 1, value);
+    if (!ok) {
+      assert.match(cli.err.join("\n"), /Must be <= 10\./);
+      assert.equal(cli.mt.calls.length, 0);
+    }
+  }
+});
+
 test("--timeout accepts up to the largest timer Node supports", async () => {
   const cli = makeCli(() => jsonResponse(ckan({ count: 0, results: [] })));
   assert.equal(await run(["--timeout", "2147483647", "search", "x"], cli.deps), 0);

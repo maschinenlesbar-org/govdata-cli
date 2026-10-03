@@ -4,6 +4,7 @@ export { GovDataClient } from "./client.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,
+  assertHeaderValue,
   MAX_RETRIES,
   MAX_RETRY_AFTER_MS,
   parseRetryAfter,

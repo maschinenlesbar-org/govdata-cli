@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid, isBlank, textProblem } from "../src/client/validate.js";
+import { assertValid, headerValueProblem, isBlank, textProblem } from "../src/client/validate.js";
 import { GovDataError, GovDataValidationError } from "../src/client/errors.js";
 import * as library from "../src/index.js";
 import { GovDataClient } from "../src/client/client.js";
@@ -66,4 +66,15 @@ test("textProblem: a string with non-whitespace content, else the reason", () =>
   assert.equal(textProblem("\t"), 'expected a non-empty string, got "\\t".');
   assert.equal(textProblem(undefined), "expected a non-empty string, got undefined.");
   assert.equal(textProblem(5), "expected a non-empty string, got 5.");
+});
+
+test("headerValueProblem: not blank, no control characters but tab, Latin-1 only", () => {
+  for (const v of ["govdata-cli", "caf\u00e9", "a\tb", "\u00ff"]) assert.equal(headerValueProblem(v), undefined, JSON.stringify(v));
+  for (const v of ["", " ", "\t"]) assert.equal(headerValueProblem(v), "Expected a non-empty value.", JSON.stringify(v));
+  for (const v of ["a\r\nb", "a\nb", "a\u0000b", "a\u007fb"]) {
+    assert.equal(headerValueProblem(v), "Value contains control characters.", JSON.stringify(v));
+  }
+  for (const v of ["\u20ac", "\u0100", "a\u2603"]) {
+    assert.equal(headerValueProblem(v), "Value contains characters outside Latin-1 (above U+00FF).", JSON.stringify(v));
+  }
 });

@@ -36,3 +36,35 @@ test("action: a non-blank parameter is sent the same way by the CLI and the libr
   );
   assertSameRequests(result);
 });
+
+test("--user-agent / userAgent: an unsendable value is refused by the CLI and the library", async () => {
+  const cases: Array<[string, RegExp]> = [
+    ["", /Expected a non-empty value\./],
+    ["  ", /Expected a non-empty value\./],
+    ["\t", /Expected a non-empty value\./],
+    ["a\r\nX-Injected: 1", /Value contains control characters\./],
+    ["a\nb", /Value contains control characters\./],
+    ["a" + String.fromCharCode(0x7f) + "b", /Value contains control characters\./],
+    ["€", /Value contains characters outside Latin-1 \(above U\+00FF\)\./],
+    ["agenté☃", /Value contains characters outside Latin-1 \(above U\+00FF\)\./],
+  ];
+  for (const [userAgent, message] of cases) {
+    const result = await parity(
+      ["--compact", "--user-agent", userAgent, "packages", "--limit", "1"],
+      (transport) => new GovDataClient({ transport, userAgent }).packageList({ limit: 1 }),
+      { responder: ok(["ds-1"]) },
+    );
+    assertBothReject(result, message);
+  }
+});
+
+test("--user-agent / userAgent: a Latin-1 value with a tab is sent the same way", async () => {
+  for (const userAgent of ["café", "Mein Bot\tü/1"]) {
+    const result = await parity(
+      ["--compact", "--user-agent", userAgent, "packages", "--limit", "1"],
+      (transport) => new GovDataClient({ transport, userAgent }).packageList({ limit: 1 }),
+      { responder: ok(["ds-1"]) },
+    );
+    assertSameRequests(result);
+  }
+});

@@ -42,6 +42,18 @@ test("rejects an unsupported protocol with GovDataNetworkError", async () => {
   );
 });
 
+test("a header Node cannot send rejects with GovDataNetworkError, not a raw TypeError", async () => {
+  await withServer(
+    (_req, res) => res.end("{}"),
+    async (baseUrl) => {
+      await assert.rejects(
+        () => nodeHttpTransport({ method: "GET", url: `${baseUrl}/x`, headers: { "User-Agent": "a\r\nb" } }),
+        (err: unknown) => err instanceof GovDataNetworkError && err.message.startsWith("Invalid request: "),
+      );
+    },
+  );
+});
+
 test("enforces a wall-clock deadline against a slow-drip response (GOV-04)", async () => {
   // The server flushes headers immediately, then trickles one byte every 15ms
   // and never ends. Each byte resets the socket-inactivity timer, so only the

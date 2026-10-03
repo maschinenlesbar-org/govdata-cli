@@ -76,42 +76,54 @@ export const nodeHttpTransport: Transport = (request) =>
       reject(err);
     };
 
-    const req = driver.request(
-      url,
-      {
-        method: request.method,
-        headers: request.headers,
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        let received = 0;
-        let aborted = false;
+    // Node validates the headers synchronously and throws a bare TypeError
+    // (ERR_INVALID_CHAR) for one it cannot send; report it as a typed failure.
+    let req: http.ClientRequest;
+    try {
+      req = driver.request(
+        url,
+        {
+          method: request.method,
+          headers: request.headers,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          let received = 0;
+          let aborted = false;
 
-        res.on("data", (chunk: Buffer) => {
-          if (aborted) return;
-          received += chunk.length;
-          if (maxBytes !== undefined && received > maxBytes) {
-            aborted = true;
-            res.destroy();
-            settleReject(new GovDataNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
-            return;
-          }
-          chunks.push(chunk);
-        });
-        res.on("end", () => {
-          if (aborted) return;
-          settleResolve({
-            status: res.statusCode ?? 0,
-            headers: res.headers,
-            body: Buffer.concat(chunks),
+          res.on("data", (chunk: Buffer) => {
+            if (aborted) return;
+            received += chunk.length;
+            if (maxBytes !== undefined && received > maxBytes) {
+              aborted = true;
+              res.destroy();
+              settleReject(new GovDataNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
+              return;
+            }
+            chunks.push(chunk);
           });
-        });
-        res.on("error", (err) => {
-          if (aborted) return; // we already rejected with the size-cap error
-          settleReject(new GovDataNetworkError(`Response stream error: ${err.message}`, { cause: err }));
-        });
-      },
-    );
+          res.on("end", () => {
+            if (aborted) return;
+            settleResolve({
+              status: res.statusCode ?? 0,
+              headers: res.headers,
+              body: Buffer.concat(chunks),
+            });
+          });
+          res.on("error", (err) => {
+            if (aborted) return; // we already rejected with the size-cap error
+            settleReject(new GovDataNetworkError(`Response stream error: ${err.message}`, { cause: err }));
+          });
+        },
+      );
+    } catch (err) {
+      reject(
+        new GovDataNetworkError(`Invalid request: ${err instanceof Error ? err.message : String(err)}`, {
+          cause: err,
+        }),
+      );
+      return;
+    }
 
     if (request.timeoutMs && request.timeoutMs > 0) {
       // Two complementary guards, both using timeoutMs:

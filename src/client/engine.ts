@@ -11,6 +11,7 @@ import {
   GovDataParseError,
   redactUrl,
 } from "./errors.js";
+import { assertValid, headerValueProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://ckan.govdata.de";
 const DEFAULT_USER_AGENT = "govdata-cli";
@@ -31,7 +32,11 @@ export interface EngineOptions {
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
-  /** Value of the User-Agent header. */
+  /**
+   * Value of the User-Agent header (default `govdata-cli`). Must be sendable (see
+   * `assertHeaderValue`): not blank, no control characters but tab, nothing above
+   * U+00FF; otherwise the constructor throws GovDataValidationError.
+   */
   userAgent?: string;
   /** Per-request timeout in milliseconds (default 30000; 0 disables; at most `MAX_TIMEOUT_MS`, 2^31 - 1 ms). */
   timeoutMs?: number;
@@ -63,6 +68,15 @@ export interface EngineOptions {
 }
 
 const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Check a value for an HTTP header (headerValueProblem: not blank, no control
+ * characters but tab, nothing above U+00FF) and return it, or throw
+ * GovDataValidationError `Invalid <name>: …`.
+ */
+export function assertHeaderValue(name: string, value: string): string {
+  return assertValid(name, value, headerValueProblem);
+}
 
 /** Most automatic retries a caller may ask for (the CLI's --max-retries shares it). */
 export const MAX_RETRIES = 10;
@@ -234,7 +248,9 @@ export class RequestEngine {
     // gating at all, and could be steered to a non-http(s) scheme.
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
-    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+    // Only undefined selects the default; a blank or unsendable value is refused.
+    this.userAgent =
+      options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
     this.timeoutMs = intOption("timeoutMs", options.timeoutMs, 30_000, MAX_TIMEOUT_MS);
     this.maxRetries = intOption("maxRetries", options.maxRetries, 2, MAX_RETRIES);
     this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, 200, MAX_RETRY_AFTER_MS);

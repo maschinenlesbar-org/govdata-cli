@@ -5,7 +5,10 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import type { CliDeps } from "./io.js";
-import { GovDataApiError, GovDataError } from "../client/errors.js";
+import { GovDataApiError, GovDataError, GovDataValidationError } from "../client/errors.js";
+
+/** The exit code of a usage error: commander's own for a rejected option value. */
+const USAGE_EXIT = 1;
 
 /**
  * Apply exitOverride + output redirection to every command in the tree.
@@ -32,6 +35,12 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
     if (err instanceof CommanderError) {
       // Help/version requests exit 0; genuine parse errors carry their own code.
       return err.exitCode;
+    }
+    if (err instanceof GovDataValidationError) {
+      // An input the library refused before any request (a rule the commander
+      // parsers do not see): a usage error.
+      deps.io.err(`Error: ${err.message}`);
+      return USAGE_EXIT;
     }
     if (err instanceof GovDataApiError) {
       deps.io.err(`Error: ${err.message}`);

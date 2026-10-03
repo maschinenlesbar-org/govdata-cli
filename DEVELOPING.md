@@ -80,7 +80,8 @@ src/
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
-    errors.ts    # GovDataError / GovDataApiError / GovDataNetworkError / GovDataParseError
+    errors.ts    # GovDataError / GovDataApiError / GovDataNetworkError / GovDataParseError / GovDataValidationError
+    validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # GovDataClient — CKAN actions over the engine (with result-unwrapping)
   cli/
     io.ts        # injectable I/O seam (stdout/stderr)
@@ -93,6 +94,13 @@ src/
 
 **Design notes**
 
+- **Input validation.** The library owns every input rule. The rules are pure `…Problem`
+  functions in `validate.ts` (the reason a value is invalid, or `undefined`); the library
+  enforces them with `assertValid` before any request and throws (a promise-returning method
+  rejects with) `GovDataValidationError`, a `GovDataError`, with the message
+  `Invalid <name>: <reason>`. The CLI's value parsers call the same functions, so the CLI and
+  the library refuse the same inputs, and `run.ts` reports a `GovDataValidationError` as a
+  usage error (exit 1).
 - The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
   uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
 - The client unwraps CKAN's `{ help, success, result }` envelope and raises `GovDataError`
@@ -196,6 +204,7 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry, redirects — mocked transport.
 - **`client.test.ts`** — action URL/param mapping, result unwrapping, `success:false` handling — mocked transport.
+- **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `GovDataValidationError`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
 
 ## Continuous integration

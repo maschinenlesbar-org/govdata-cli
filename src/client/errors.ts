@@ -89,3 +89,10 @@ export class GovDataNetworkError extends GovDataError {}
 
 /** The response body could not be parsed as the expected JSON shape. */
 export class GovDataParseError extends GovDataError {}
+
+/**
+ * An input the library refuses before sending any request: a client option or a
+ * method parameter that breaks one of the rules in `validate.ts`. The message is
+ * `Invalid <name>: <reason>`. The CLI reports it as a usage error.
+ */
+export class GovDataValidationError extends GovDataError {}

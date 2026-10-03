@@ -1,0 +1,55 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { assertValid } from "../src/client/validate.js";
+import { GovDataError, GovDataValidationError } from "../src/client/errors.js";
+import * as library from "../src/index.js";
+import { GovDataClient } from "../src/client/client.js";
+import { run } from "../src/cli/run.js";
+import type { CliDeps } from "../src/cli/io.js";
+import { assertSameRequests, jsonResponse, parity } from "./helpers.js";
+
+const positive = (n: number): string | undefined => (n > 0 ? undefined : "Expected a positive number.");
+
+test("assertValid returns a valid value unchanged", () => {
+  assert.equal(assertValid("rows", 5, positive), 5);
+});
+
+test("assertValid throws GovDataValidationError 'Invalid <name>: <reason>'", () => {
+  assert.throws(
+    () => assertValid("rows", 0, positive),
+    (err: unknown) =>
+      err instanceof GovDataValidationError &&
+      err instanceof GovDataError &&
+      err.name === "GovDataValidationError" &&
+      err.message === "Invalid rows: Expected a positive number.",
+  );
+});
+
+test("the package root exports GovDataValidationError and assertValid", () => {
+  assert.equal(library.GovDataValidationError, GovDataValidationError);
+  assert.equal(library.assertValid, assertValid);
+});
+
+test("run() reports a GovDataValidationError from an action as a usage error", async () => {
+  const out: string[] = [];
+  const err: string[] = [];
+  const deps: CliDeps = {
+    io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+    createClient: (): GovDataClient => {
+      throw new GovDataValidationError("Invalid rows: Expected a positive number.");
+    },
+  };
+  assert.equal(await run(["tags"], deps), 1);
+  assert.deepEqual(err, ["Error: Invalid rows: Expected a positive number."]);
+  assert.deepEqual(out, []);
+});
+
+test("parity() runs the CLI and the library on one transport and splits their requests", async () => {
+  const result = await parity(["--compact", "tags"], (transport) => new GovDataClient({ transport }).tagList(), {
+    responder: () => jsonResponse({ help: "h", success: true, result: ["a", "b"] }),
+  });
+  assert.equal(result.cli.out, '["a","b"]');
+  assert.deepEqual(result.lib.value, ["a", "b"]);
+  assert.equal(result.cli.requests.length, 1);
+  assertSameRequests(result);
+});

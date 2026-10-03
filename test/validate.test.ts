@@ -90,3 +90,12 @@ test("baseUrlProblem: no surrounding or embedded whitespace, no control characte
     assert.equal(baseUrlProblem(v), "A base URL cannot contain whitespace or control characters.", JSON.stringify(v));
   }
 });
+
+test("baseUrlProblem: an absolute http(s) URL without a query or fragment", () => {
+  assert.equal(baseUrlProblem(""), "Expected an absolute http(s) URL.");
+  assert.equal(baseUrlProblem("  "), "Expected an absolute http(s) URL.");
+  assert.equal(baseUrlProblem("not-a-url"), "Expected an absolute http(s) URL.");
+  assert.equal(baseUrlProblem("ftp://x"), 'Unsupported scheme "ftp:". Expected an http(s) URL.');
+  assert.equal(baseUrlProblem("https://x/?q=1"), "A base URL cannot have a query (?) or fragment (#).");
+  assert.equal(baseUrlProblem("https://x/#f"), "A base URL cannot have a query (?) or fragment (#).");
+});

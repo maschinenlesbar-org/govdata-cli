@@ -54,12 +54,24 @@ export function headerValueProblem(value: string): string | undefined {
 }
 
 /**
- * A base URL: no surrounding or embedded whitespace and no control characters.
- * `new URL()` trims and drops tab/newline silently, but the engine glues the raw
- * value into every request URL, so `https://ckan.govdata.de/ ` would request
- * `/%20/api/3/...` and a leading space would reach a custom transport as is.
+ * A base URL, checked in this order:
+ *
+ * - not blank;
+ * - no surrounding or embedded whitespace and no control characters: `new URL()`
+ *   trims and drops tab/newline silently, but the engine glues the raw value into
+ *   every request URL, so `https://ckan.govdata.de/ ` would request `/%20/api/3/...`
+ *   and a leading space would reach a custom transport as is;
+ * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
+ *   transport);
+ * - no query or fragment: request paths are appended as a string, so a `?` or `#`
+ *   would swallow every path (`http://h/#f` requests `/` for every command).
+ *
+ * Userinfo (`https://user:pw@host`) is allowed: Node sends it as Basic auth, e.g.
+ * for a mirror. The reasons never quote the value, so a credential in it cannot
+ * leak through them.
  */
 export function baseUrlProblem(value: string): string | undefined {
+  if (isBlank(value)) return "Expected an absolute http(s) URL.";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
   for (const ch of value) {
     const c = ch.codePointAt(0) ?? 0;
@@ -67,5 +79,15 @@ export function baseUrlProblem(value: string): string | undefined {
       return "A base URL cannot contain whitespace or control characters.";
     }
   }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "Expected an absolute http(s) URL.";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
+  }
+  if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
   return undefined;
 }

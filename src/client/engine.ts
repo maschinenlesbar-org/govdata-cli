@@ -7,7 +7,6 @@ import { buildQueryString, type QueryParams } from "./query.js";
 import {
   GovDataApiError,
   GovDataError,
-  GovDataNetworkError,
   GovDataParseError,
   redactUrl,
 } from "./errors.js";
@@ -191,30 +190,16 @@ export function sanitizeServerText(text: string): string {
 }
 
 /**
- * Reject a base URL whose scheme is not http(s), or that has a query or fragment.
- * The default transport already gates the scheme per hop, but the engine is
- * exported as a library and may be handed a custom transport that does no such
- * check, so gate the configured base URL here too (a `file:`/`ftp:` base URL fails
- * fast with a typed error). Request paths are appended to the base URL as a string,
- * so a `?` or `#` in it would swallow every path: `http://h/?x=1` requests
- * `/?x=1/api/...` and `http://h/#f` requests `/`. Userinfo is allowed (Node sends
- * it as Basic auth, e.g. for a mirror) but redacted in every message.
+ * Check a base URL (baseUrlProblem: not blank, no whitespace or control
+ * characters, an absolute http(s) URL, no query or fragment) and return it without
+ * trailing slashes. Throws GovDataValidationError `Invalid base URL: …` — a
+ * configuration mistake, not a GovDataNetworkError. The RequestEngine constructor
+ * calls it on the raw value, so a custom transport never sees a bad base URL; the
+ * default transport still re-checks the scheme on every hop. Userinfo is allowed
+ * (Node sends it as Basic auth, e.g. for a mirror) and never quoted in the message.
  */
-function assertHttpScheme(baseUrl: string): void {
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    throw new GovDataNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new GovDataNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
-    );
-  }
-  if (/[?#]/.test(baseUrl)) {
-    throw new GovDataNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
-  }
+export function validateBaseUrl(raw: string): string {
+  return assertValid("base URL", raw, baseUrlProblem).replace(/\/+$/, "");
 }
 
 // The headers the engine sets itself, under the exact keys it uses. They are the
@@ -246,14 +231,12 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    // The raw value, checked before the slash strip: the engine glues it into
-    // every request URL, and `.../ ` would otherwise keep its slash and space.
-    const baseUrl = assertValid("base URL", options.baseUrl ?? DEFAULT_BASE_URL, baseUrlProblem);
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
-    // Re-check the base-URL scheme here, not only in the default transport: a
-    // library consumer that injects a custom transport would otherwise get no
-    // gating at all, and could be steered to a non-http(s) scheme.
-    assertHttpScheme(this.baseUrl);
+    // The raw value, checked before the slash strip (the engine glues it into
+    // every request URL, and `.../ ` would otherwise keep its slash and space), and
+    // here rather than only in the default transport: a library consumer that
+    // injects a custom transport would otherwise get no gating at all, and could
+    // be steered to a non-http(s) scheme. Only undefined selects the default.
+    this.baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.transport = options.transport ?? nodeHttpTransport;
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =

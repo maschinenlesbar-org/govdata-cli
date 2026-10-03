@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_RETRY_AFTER_MS, RequestEngine, assertHeaderValue, parseRetryAfter } from "../src/client/engine.js";
+import {
+  MAX_RETRY_AFTER_MS,
+  RequestEngine,
+  assertHeaderValue,
+  parseRetryAfter,
+  validateBaseUrl,
+} from "../src/client/engine.js";
 import {
   GovDataApiError,
   GovDataError,
@@ -27,24 +33,36 @@ function hasControlChars(s: string): boolean {
   });
 }
 
-test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
-  assert.throws(
-    () => new RequestEngine({ baseUrl: "file:///etc/passwd" }),
-    GovDataNetworkError,
-  );
-  assert.throws(() => new RequestEngine({ baseUrl: "not-a-url" }), GovDataNetworkError);
+test("the constructor rejects a non-http(s) base URL as GovDataValidationError, not a network error (GOV-01)", () => {
+  for (const baseUrl of ["file:///etc/passwd", "ftp://x", "not-a-url", ""]) {
+    assert.throws(
+      () => new RequestEngine({ baseUrl }),
+      (err: unknown) =>
+        err instanceof GovDataValidationError &&
+        !(err instanceof GovDataNetworkError) &&
+        err.message.startsWith("Invalid base URL: "),
+      JSON.stringify(baseUrl),
+    );
+  }
 });
 
-test("the constructor rejects a base URL with a query or fragment, redacting userinfo", () => {
+test("the constructor rejects a base URL with a query or fragment, never echoing userinfo", () => {
   for (const baseUrl of ["https://u:pw@example.test/?x=1", "https://u:pw@example.test/#f"]) {
     assert.throws(
       () => new RequestEngine({ baseUrl }),
       (err: unknown) =>
-        err instanceof GovDataNetworkError &&
-        err.message.startsWith("Base URL must not contain a query or fragment: https://***@example.test/") &&
+        err instanceof GovDataValidationError &&
+        err.message === "Invalid base URL: A base URL cannot have a query (?) or fragment (#)." &&
         !err.message.includes("pw"),
     );
   }
+});
+
+test("validateBaseUrl returns the base URL without trailing slashes and is exported", () => {
+  assert.equal(validateBaseUrl("https://ckan.govdata.de//"), "https://ckan.govdata.de");
+  assert.equal(validateBaseUrl("http://u:p@mirror.test/ckan"), "http://u:p@mirror.test/ckan");
+  assert.throws(() => validateBaseUrl("ftp://x"), GovDataValidationError);
+  assert.equal(library.validateBaseUrl, validateBaseUrl);
 });
 
 test("the constructor refuses an unsendable userAgent with GovDataValidationError", () => {

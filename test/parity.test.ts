@@ -2,6 +2,8 @@
 // call the CLI makes, on one recording mock transport, gives the same outcome.
 
 import { test } from "node:test";
+import assert from "node:assert/strict";
+import { GovDataNetworkError } from "../src/client/errors.js";
 import { GovDataClient } from "../src/client/client.js";
 import type { QueryParams } from "../src/client/query.js";
 import { assertBothReject, assertSameRequests, jsonResponse, parity } from "./helpers.js";
@@ -97,5 +99,28 @@ test("--base-url / baseUrl: a clean base URL (trailing slash included) is used t
       { responder: ok(["ds-a"]) },
     );
     assertSameRequests(result);
+  }
+});
+
+test("--base-url / baseUrl: a malformed base URL is the same validation error on both sides", async () => {
+  const cases: Array<[string, RegExp]> = [
+    ["ftp://x", /Unsupported scheme "ftp:"\. Expected an http\(s\) URL\./],
+    ["file:///etc/passwd", /Unsupported scheme "file:"\. Expected an http\(s\) URL\./],
+    ["https://x/?q=1", /A base URL cannot have a query \(\?\) or fragment \(#\)\./],
+    ["https://x/#f", /A base URL cannot have a query \(\?\) or fragment \(#\)\./],
+    ["not-a-url", /Expected an absolute http\(s\) URL\./],
+    ["", /Expected an absolute http\(s\) URL\./],
+    ["   ", /Expected an absolute http\(s\) URL\./],
+  ];
+  for (const [baseUrl, message] of cases) {
+    const result = await parity(
+      ["--compact", "--base-url", baseUrl, "tags"],
+      (transport) => new GovDataClient({ transport, baseUrl }).tagList(),
+      { responder: ok(["a", "b"]) },
+    );
+    assertBothReject(result, message);
+    const error = result.lib.error as Error;
+    assert.ok(!(error instanceof GovDataNetworkError), "not a network error");
+    assert.match(error.message, /^Invalid base URL: /);
   }
 });

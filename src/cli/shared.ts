@@ -63,31 +63,12 @@ export function collectNonEmpty(value: string, previous: string[] = []): string[
 }
 
 /**
- * commander value-parser for --base-url: reject a non-http(s) scheme at parse
- * time so `file:`, `ftp:`, etc. fail fast with a usage error rather than only
- * being caught later in the transport. The default transport also re-checks the
- * scheme per hop (and RequestEngine.buildUrl guards it for custom transports),
- * but this surfaces the mistake up front and independently of the transport.
+ * commander value-parser for --base-url: the library's baseUrlProblem rule (not
+ * blank, no whitespace or control characters, an absolute http(s) URL, no query or
+ * fragment), reported as a usage error before the client is built. The default
+ * transport still re-checks the scheme on every hop.
  */
 export function parseBaseUrl(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new InvalidArgumentError(
-      `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`,
-    );
-  }
-  // Paths are appended to the base URL as a string, so a query or fragment would
-  // swallow every request path ("http://h/#f" requests "/" for every command).
-  if (/[?#]/.test(value)) {
-    throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
-  // The library's whitespace rule: new URL() trims and drops tab/newline
-  // silently, but the engine uses the raw value.
   const reason = baseUrlProblem(value);
   if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;

@@ -74,11 +74,15 @@ selects the default `govdata-cli`. Should a transport call still be handed a hea
 cannot send, the default transport rejects with `GovDataNetworkError` `Invalid request: …`,
 never a raw `TypeError`.
 
-`baseUrl` is checked as given, before its trailing slashes are stripped: whitespace around
-or in it, or a control character (`baseUrlProblem`, which `--base-url` uses too), throws
-`GovDataValidationError` `Invalid base URL: …` at construction. `new URL()` trims and drops
+`baseUrl` is checked as given, before its trailing slashes are stripped, by the exported
+`validateBaseUrl()` (the rule is `baseUrlProblem`, which `--base-url` uses too): a blank
+value, whitespace around or in it or a control character (`new URL()` trims and drops
 tab/newline silently, but the engine glues the raw value into every request URL, so
-`https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`.
+`https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`), anything but an
+absolute http(s) URL, and a query or fragment all throw `GovDataValidationError`
+`Invalid base URL: …` at construction — a configuration mistake, never a
+`GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
+Basic auth) and never quoted in a message.
 
 ### Methods
 
@@ -174,8 +178,11 @@ subprocess.
 
 **Error types.** [`errors.ts`](src/client/errors.ts): `GovDataApiError`
 (non-2xx, carries `status`/`detail`/`url`, with `isRetryable`),
-`GovDataNetworkError` (transport failure/timeout), `GovDataParseError` (bad
-JSON, or an answer that is not a CKAN envelope of the expected shape), and a `success: false` envelope surfacing the base `GovDataError` — all
+`GovDataNetworkError` (transport failure/timeout, including the default transport's
+per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a CKAN
+envelope of the expected shape), `GovDataValidationError` (an input refused before any
+request: a bad client option such as the base URL or User-Agent, or a bad method
+parameter), and a `success: false` envelope surfacing the base `GovDataError` — all
 extending `GovDataError`. The CLI maps a `404` to exit code `4`, other errors to
 `1`.
 

@@ -8,7 +8,8 @@
 
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
-import { GovDataError, GovDataParseError } from "./errors.js";
+import { GovDataError, GovDataParseError, GovDataValidationError } from "./errors.js";
+import { assertValid, textProblem } from "./validate.js";
 import type {
   CkanEnvelope,
   PackageSearchResult,
@@ -32,34 +33,49 @@ const ACTION = "/api/3/action";
 const ACTION_NAME = /^[a-z0-9_]+$/;
 
 /**
- * Drop undefined (and empty-string) values so only the parameters the caller
- * actually set are sent. The typed methods reject a blank filter before they get
- * here (assertText), so nothing is silently dropped.
+ * Drop undefined values so only the parameters the caller actually set are sent.
+ * The typed methods reject a blank filter before they get here (assertText), and
+ * `action()` refuses any blank parameter, so nothing is silently dropped.
  */
 function prune(params: Record<string, unknown>): QueryParams {
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
   // of setting the prototype (and being lost).
   const out = Object.create(null) as QueryParams;
   for (const [k, v] of Object.entries(params)) {
-    if (v === undefined || v === "") continue;
+    if (v === undefined) continue;
     out[k] = v as QueryParams[string];
   }
   return out;
 }
 
-function invalid(name: string, expected: string, value: unknown): GovDataError {
+function invalid(name: string, expected: string, value: unknown): GovDataValidationError {
   const shown = typeof value === "string" ? JSON.stringify(value) : String(value);
-  return new GovDataError(`Invalid ${name}: expected ${expected}, got ${shown}.`);
+  return new GovDataValidationError(`Invalid ${name}: expected ${expected}, got ${shown}.`);
 }
 
 /**
- * Throw unless `value` is a string with non-whitespace content. CKAN reads a blank
- * filter as no filter, so a blank `q`, `fq` or tag query would silently widen the
- * result, and a blank id is not an id.
+ * Throw GovDataValidationError unless `value` is a string with non-whitespace
+ * content (textProblem). CKAN reads a blank filter as no filter, so a blank `q`,
+ * `fq` or tag query would silently widen the result, and a blank id is not an id.
  */
 function assertText(name: string, value: unknown): void {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw invalid(name, "a non-empty string", value);
+  assertValid(name, value, textProblem);
+}
+
+/**
+ * Check the parameters of a generic `action()` call: a blank parameter name, a
+ * blank string value or a blank string in a list value throws
+ * GovDataValidationError. CKAN reads an empty parameter as unset, so `{ q: "" }`
+ * would run the action unfiltered. `undefined`/`null` still mean "not given";
+ * numbers, booleans and Dates pass.
+ */
+function assertParams(params: QueryParams): void {
+  for (const [k, v] of Object.entries(params)) {
+    assertText("parameter name", k);
+    const values = Array.isArray(v) ? v : [v];
+    for (const item of values) {
+      if (typeof item === "string") assertText(`parameter ${k}`, item);
+    }
   }
 }
 
@@ -79,7 +95,7 @@ function assertCount(name: string, value: number | undefined): void {
 function assertLimit(limit: number | undefined): void {
   if (limit === undefined) return;
   if (!Number.isSafeInteger(limit) || limit < 1) {
-    throw new GovDataError(
+    throw new GovDataValidationError(
       `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
     );
   }
@@ -111,13 +127,16 @@ export class GovDataClient {
 
   /**
    * Call any CKAN action by name and return its unwrapped `result`. Throws a
-   * GovDataError if the envelope reports `success: false`.
+   * GovDataError if the envelope reports `success: false`. An invalid action name,
+   * a blank parameter name or a blank parameter value (or list entry) rejects with
+   * GovDataValidationError before any request.
    */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
     const action = String(name).trim();
     if (!ACTION_NAME.test(action)) {
-      throw new GovDataError(`Invalid CKAN action name: "${name}"`);
+      throw new GovDataValidationError(`Invalid CKAN action name: "${name}"`);
     }
+    assertParams(params);
     const env = await this.engine.getJson<CkanEnvelope<T> | null>(
       `${ACTION}/${encodeURIComponent(action)}`,
       params,

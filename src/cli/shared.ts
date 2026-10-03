@@ -6,6 +6,7 @@ import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import { isBidiControl, type EngineOptions } from "../client/engine.js";
 import { GovDataError } from "../client/errors.js";
+import { isBlank } from "../client/validate.js";
 
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
@@ -34,11 +35,12 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
- * commander value-parser: a value that is not blank. A blank filter would
- * otherwise be dropped and the command would silently run unfiltered.
+ * commander value-parser: a value that is not blank (the library's isBlank). A
+ * blank filter would otherwise run the command unfiltered; the library refuses it
+ * too, and this reports it as a usage error before the client is built.
  */
 export function parseNonEmpty(value: string): string {
-  if (value.trim() === "") {
+  if (isBlank(value)) {
     throw new InvalidArgumentError("Expected a non-empty value.");
   }
   return value;

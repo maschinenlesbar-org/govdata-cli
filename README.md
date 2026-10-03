@@ -122,7 +122,7 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 
 | Flag | Meaning |
 | --- | --- |
-| `--param <key=value>` | query parameter (repeatable; duplicate keys and blank values are rejected) |
+| `--param <key=value>` | query parameter (repeatable; duplicate keys, blank keys and blank values are rejected) |
 
 > **Note on the `<name>`** — the action name is validated client-side against
 > `^[a-z0-9_]+$` (lowercase letters, digits and underscores). Names with dashes,

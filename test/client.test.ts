@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GovDataClient } from "../src/client/client.js";
-import { GovDataError, GovDataApiError, GovDataParseError } from "../src/client/errors.js";
+import {
+  GovDataError,
+  GovDataApiError,
+  GovDataParseError,
+  GovDataValidationError,
+} from "../src/client/errors.js";
+import type { QueryParams } from "../src/client/query.js";
 import { makeMockTransport, jsonResponse } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): GovDataClient {
@@ -186,6 +192,29 @@ test("library parameters are checked before any request", async () => {
     );
     assert.equal(mt.calls.length, 0, message);
   }
+});
+
+test("action refuses a blank parameter name, value or list entry before any request", async () => {
+  const cases: Array<[QueryParams, string]> = [
+    [{ q: "" }, 'Invalid parameter q: expected a non-empty string, got "".'],
+    [{ q: "  " }, 'Invalid parameter q: expected a non-empty string, got "  ".'],
+    [{ fq_list: ["a:b", "\t"] }, 'Invalid parameter fq_list: expected a non-empty string, got "\\t".'],
+    [{ "": "x" }, 'Invalid parameter name: expected a non-empty string, got "".'],
+    [{ " ": "x" }, 'Invalid parameter name: expected a non-empty string, got " ".'],
+  ];
+  for (const [params, message] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(ckan([])));
+    await assert.rejects(
+      () => clientWith(mt).action("package_search", params),
+      (err: unknown) => err instanceof GovDataValidationError && err.message === message,
+      message,
+    );
+    assert.equal(mt.calls.length, 0, message);
+  }
+  // undefined and null still mean "not given"; numbers, booleans and Dates pass.
+  const mt = makeMockTransport(() => jsonResponse(ckan([])));
+  await clientWith(mt).action("package_search", { q: undefined, fq: null, rows: 0, all: false });
+  assert.equal(new URL(mt.last().url).search, "?rows=0&all=false");
 });
 
 test("action returns the unwrapped result", async () => {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid } from "../src/client/validate.js";
+import { assertValid, isBlank, textProblem } from "../src/client/validate.js";
 import { GovDataError, GovDataValidationError } from "../src/client/errors.js";
 import * as library from "../src/index.js";
 import { GovDataClient } from "../src/client/client.js";
@@ -52,4 +52,18 @@ test("parity() runs the CLI and the library on one transport and splits their re
   assert.deepEqual(result.lib.value, ["a", "b"]);
   assert.equal(result.cli.requests.length, 1);
   assertSameRequests(result);
+});
+
+test("isBlank: empty or whitespace-only", () => {
+  for (const v of ["", " ", "\t", " \n "]) assert.equal(isBlank(v), true, JSON.stringify(v));
+  for (const v of ["x", " x ", "0"]) assert.equal(isBlank(v), false, JSON.stringify(v));
+});
+
+test("textProblem: a string with non-whitespace content, else the reason", () => {
+  assert.equal(textProblem("Klima"), undefined);
+  assert.equal(textProblem(" a "), undefined);
+  assert.equal(textProblem(""), 'expected a non-empty string, got "".');
+  assert.equal(textProblem("\t"), 'expected a non-empty string, got "\\t".');
+  assert.equal(textProblem(undefined), "expected a non-empty string, got undefined.");
+  assert.equal(textProblem(5), "expected a non-empty string, got 5.");
 });

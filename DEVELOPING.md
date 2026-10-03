@@ -111,8 +111,11 @@ src/
   the lists, `count` + `results` for `package_search`); the generic `action` passes any result
   through. A response nested too deeply to print is a clear error, not a stack overflow.
 - Library input is checked before any request, as the CLI checks its options: a blank `q`,
-  `sort`, `fq`/`facet_field` entry, tag query or id, or a paging value that is not a
-  non-negative integer throws `GovDataError` (`Invalid <name>: expected …, got …`), and the
+  `sort`, `fq`/`facet_field` entry, tag query or id, a blank `action()` parameter name or
+  value (or list entry), an invalid action name, or a paging value that is not a
+  non-negative integer throws `GovDataValidationError` (`Invalid <name>: expected …, got …`;
+  blank is `isBlank`/`textProblem` in `validate.ts`, which the CLI's `parseNonEmpty` and
+  `--param` use too; `undefined`/`null` still mean "not given"), and the
   engine's numeric options must be integers in range (`timeoutMs` 0..2^31 − 1, `maxRetries`
   0..10, `retryDelayMs` 0..30000, `maxRedirects` 0..20, `maxResponseBytes` ≥ 0; `0` disables
   the timeout, retries, redirects or size cap).
@@ -204,6 +207,7 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry, redirects — mocked transport.
 - **`client.test.ts`** — action URL/param mapping, result unwrapping, `success:false` handling — mocked transport.
+- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
 - **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `GovDataValidationError`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
 

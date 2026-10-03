@@ -98,7 +98,10 @@ Teilzeichenketten-Filter); eine Ressource per ID anzeigen. CLI: `tags`, `resourc
 
 **Generische Action (Notausgang).** `client.action(name, params)` bzw. der CLI-Befehl
 `action <name> [--param key=value …]` ruft **jede** lesende Action auf – auch solche ohne
-typisierte Komfortmethode – und liefert das ausgepackte `result`.
+typisierte Komfortmethode – und liefert das ausgepackte `result`. Ein leerer Parametername
+oder -wert (`q=`, `=x`) wird vor jeder Anfrage abgelehnt – in der CLI als Bedienfehler, in
+der Bibliothek als `GovDataValidationError` –, weil CKAN einen leeren Wert als „kein Filter“
+liest.
 
 ---
 

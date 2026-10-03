@@ -19,3 +19,19 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new GovDataValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/** True for an empty or whitespace-only string: CKAN reads it as "not given". */
+export function isBlank(value: string): boolean {
+  return value.trim() === "";
+}
+
+/**
+ * A string with non-whitespace content. CKAN reads an empty parameter as no
+ * filter, so a blank `q`, `fq`, tag query or `action()` parameter would silently
+ * widen the result, and a blank id is not an id.
+ */
+export function textProblem(value: unknown): string | undefined {
+  if (typeof value === "string" && !isBlank(value)) return undefined;
+  const shown = typeof value === "string" ? JSON.stringify(value) : String(value);
+  return `expected a non-empty string, got ${shown}.`;
+}

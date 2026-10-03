@@ -98,6 +98,9 @@ show one resource by id. CLI: `tags`, `resource`.
 **Generic action (escape hatch).** `client.action(name, params)` / the CLI
 `action <name> [--param key=value …]` command call **any** read action — even
 those without a typed convenience method — and return the unwrapped `result`.
+A blank parameter name or value (`q=`, `=x`) is refused before any request — a
+usage error in the CLI, a `GovDataValidationError` in the library — because CKAN
+would read an empty value as "no filter".
 
 ---
 

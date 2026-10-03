@@ -11,7 +11,7 @@ import {
   GovDataParseError,
   redactUrl,
 } from "./errors.js";
-import { assertValid, headerValueProblem } from "./validate.js";
+import { assertValid, baseUrlProblem, headerValueProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://ckan.govdata.de";
 const DEFAULT_USER_AGENT = "govdata-cli";
@@ -28,7 +28,11 @@ export interface RawResponse {
  * NaN, Infinity, too large) makes the constructor throw a GovDataError.
  */
 export interface EngineOptions {
-  /** Base URL of the API. Defaults to https://ckan.govdata.de */
+  /**
+   * Base URL of the API. Defaults to https://ckan.govdata.de (only `undefined`
+   * selects it). An http(s) URL without a query, fragment, whitespace or control
+   * characters; otherwise the constructor throws.
+   */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
@@ -242,7 +246,10 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    // The raw value, checked before the slash strip: the engine glues it into
+    // every request URL, and `.../ ` would otherwise keep its slash and space.
+    const baseUrl = assertValid("base URL", options.baseUrl ?? DEFAULT_BASE_URL, baseUrlProblem);
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     // Re-check the base-URL scheme here, not only in the default transport: a
     // library consumer that injects a custom transport would otherwise get no
     // gating at all, and could be steered to a non-http(s) scheme.

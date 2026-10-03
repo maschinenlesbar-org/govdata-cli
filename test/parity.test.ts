@@ -68,3 +68,34 @@ test("--user-agent / userAgent: a Latin-1 value with a tab is sent the same way"
     assertSameRequests(result);
   }
 });
+
+test("--base-url / baseUrl: whitespace around or in it is refused by the CLI and the library", async () => {
+  const cases: Array<[string, RegExp]> = [
+    ["https://ckan.govdata.de/ ", /A base URL cannot have surrounding whitespace\./],
+    [" https://ckan.govdata.de", /A base URL cannot have surrounding whitespace\./],
+    ["\thttp://h.test", /A base URL cannot have surrounding whitespace\./],
+    ["https://ckan.govdata.de\n", /A base URL cannot have surrounding whitespace\./],
+    ["http://h.test ", /A base URL cannot have surrounding whitespace\./],
+    ["https://ckan.gov\tdata.de", /A base URL cannot contain whitespace or control characters\./],
+    ["https://ckan.govdata.de/a b", /A base URL cannot contain whitespace or control characters\./],
+  ];
+  for (const [baseUrl, message] of cases) {
+    const result = await parity(
+      ["--compact", "--base-url", baseUrl, "packages", "--limit", "1"],
+      (transport) => new GovDataClient({ transport, baseUrl }).packageList({ limit: 1 }),
+      { responder: ok(["ds-a"]) },
+    );
+    assertBothReject(result, message);
+  }
+});
+
+test("--base-url / baseUrl: a clean base URL (trailing slash included) is used the same way", async () => {
+  for (const baseUrl of ["https://ckan.govdata.de/", "http://mirror.test/ckan"]) {
+    const result = await parity(
+      ["--compact", "--base-url", baseUrl, "packages", "--limit", "1"],
+      (transport) => new GovDataClient({ transport, baseUrl }).packageList({ limit: 1 }),
+      { responder: ok(["ds-a"]) },
+    );
+    assertSameRequests(result);
+  }
+});

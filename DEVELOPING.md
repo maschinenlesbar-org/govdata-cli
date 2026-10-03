@@ -74,6 +74,12 @@ selects the default `govdata-cli`. Should a transport call still be handed a hea
 cannot send, the default transport rejects with `GovDataNetworkError` `Invalid request: …`,
 never a raw `TypeError`.
 
+`baseUrl` is checked as given, before its trailing slashes are stripped: whitespace around
+or in it, or a control character (`baseUrlProblem`, which `--base-url` uses too), throws
+`GovDataValidationError` `Invalid base URL: …` at construction. `new URL()` trims and drops
+tab/newline silently, but the engine glues the raw value into every request URL, so
+`https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`.
+
 ### Methods
 
 `packageSearch`, `packageShow`, `packageList`, `organizationList`, `organizationShow`,

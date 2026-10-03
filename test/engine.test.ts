@@ -32,7 +32,7 @@ test("the constructor rejects a non-http(s) base URL (GOV-01)", () => {
     () => new RequestEngine({ baseUrl: "file:///etc/passwd" }),
     GovDataNetworkError,
   );
-  assert.throws(() => new RequestEngine({ baseUrl: "not a url" }), GovDataNetworkError);
+  assert.throws(() => new RequestEngine({ baseUrl: "not-a-url" }), GovDataNetworkError);
 });
 
 test("the constructor rejects a base URL with a query or fragment, redacting userinfo", () => {
@@ -57,6 +57,18 @@ test("the constructor refuses an unsendable userAgent with GovDataValidationErro
   }
   assert.equal(assertHeaderValue("User-Agent", "caf\u00e9"), "caf\u00e9");
   assert.equal(library.assertHeaderValue, assertHeaderValue);
+});
+
+test("the constructor refuses a base URL with whitespace before the trailing-slash strip", () => {
+  for (const baseUrl of ["https://ckan.govdata.de/ ", " https://ckan.govdata.de", "https://ckan.govdata.de\n", "https://h.test/a b"]) {
+    const mt = makeMockTransport(() => jsonResponse({}));
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: mt.transport }),
+      (err: unknown) => err instanceof GovDataValidationError && err.message.startsWith("Invalid base URL: "),
+      JSON.stringify(baseUrl),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
 });
 
 test("redactUrl hides userinfo and leaves other URLs alone", () => {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid, headerValueProblem, isBlank, textProblem } from "../src/client/validate.js";
+import { assertValid, baseUrlProblem, headerValueProblem, isBlank, textProblem } from "../src/client/validate.js";
 import { GovDataError, GovDataValidationError } from "../src/client/errors.js";
 import * as library from "../src/index.js";
 import { GovDataClient } from "../src/client/client.js";
@@ -76,5 +76,17 @@ test("headerValueProblem: not blank, no control characters but tab, Latin-1 only
   }
   for (const v of ["\u20ac", "\u0100", "a\u2603"]) {
     assert.equal(headerValueProblem(v), "Value contains characters outside Latin-1 (above U+00FF).", JSON.stringify(v));
+  }
+});
+
+test("baseUrlProblem: no surrounding or embedded whitespace, no control characters", () => {
+  for (const v of ["https://ckan.govdata.de", "https://ckan.govdata.de/", "http://u:p@h.test/ckan"]) {
+    assert.equal(baseUrlProblem(v), undefined, v);
+  }
+  for (const v of [" https://h.test", "https://h.test/ ", "https://h.test\n", "\thttps://h.test"]) {
+    assert.equal(baseUrlProblem(v), "A base URL cannot have surrounding whitespace.", JSON.stringify(v));
+  }
+  for (const v of ["https://h.test/a b", "https://h.\ttest", "https://h.test/a\u0000b", "https://h.test/\u007f", "https://h.test/a\u00a0b"]) {
+    assert.equal(baseUrlProblem(v), "A base URL cannot contain whitespace or control characters.", JSON.stringify(v));
   }
 });

@@ -197,6 +197,9 @@ thing.
 | `4` | dataset/resource not found (`404`) |
 | `1` | any other error — bad usage, CKAN `success:false`, network failure |
 
+A reader that stops early (`govdata packages | head`) ends the run quietly with exit `0`;
+a failed run keeps its exit code even when nobody reads stderr (`2>&1 | true`).
+
 ## Troubleshooting
 
 - **`command not found: govdata`** — the global npm bin directory isn't on your

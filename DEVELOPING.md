@@ -79,7 +79,8 @@ never a raw `TypeError`.
 value, whitespace around or in it or a control character (`new URL()` trims and drops
 tab/newline silently, but the engine glues the raw value into every request URL, so
 `https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`), anything but an
-absolute http(s) URL, and a query or fragment all throw `GovDataValidationError`
+absolute http(s) URL, a query or fragment, and a `%` in the user name or password that
+doesn't start an escape (write a literal `%` as `%25`) all throw `GovDataValidationError`
 `Invalid base URL: …` at construction — a configuration mistake, never a
 `GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`

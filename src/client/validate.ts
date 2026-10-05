@@ -66,8 +66,8 @@ export function headerValueProblem(value: string): string | undefined {
  * - no query or fragment: request paths are appended as a string, so a `?` or `#`
  *   would swallow every path (`http://h/#f` requests `/` for every command).
  *
- * Userinfo (`https://user:pw@host`) is allowed: Node sends it as Basic auth, e.g.
- * for a mirror. The reasons never quote the value, so a credential in it cannot
+ * Userinfo (`https://user:pw@host`) is allowed: the engine sends it as Basic auth,
+ * e.g. for a mirror; a `%` in it must start a valid escape (`%25` for a literal one). The reasons never quote the value, so a credential in it cannot
  * leak through them.
  */
 export function baseUrlProblem(value: string): string | undefined {
@@ -89,5 +89,14 @@ export function baseUrlProblem(value: string): string | undefined {
     return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  // The userinfo is percent-decoded for the Authorization header; a "%" that isn't an
+  // escape fails there ("URI malformed") at request time. Reject it here.
+  for (const part of [url.username, url.password]) {
+    try {
+      decodeURIComponent(part);
+    } catch {
+      return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
+    }
+  }
   return undefined;
 }

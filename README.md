@@ -33,7 +33,7 @@ and pipe straight into [`jq`](https://jqlang.github.io/jq/).
 npm i -g @maschinenlesbar.org/govdata-cli
 ```
 
-This installs the **`govdata`** command. Requires **Node.js 20+**.
+This installs the **`govdata`** command. Requires **Node.js 22.12+**.
 
 Check it works:
 
@@ -203,7 +203,8 @@ a failed run keeps its exit code even when nobody reads stderr (`2>&1 | true`).
 ## Troubleshooting
 
 - **`command not found: govdata`** — the global npm bin directory isn't on your
-  `PATH`. Run `npm bin -g` to find it and add it, or run via
+  `PATH`. Run `npm prefix -g` to find the prefix and add its `bin` directory
+  (`"$(npm prefix -g)/bin"`), or run via
   `npx @maschinenlesbar.org/govdata-cli …`.
 - **Exit `4` / "not found"** — the dataset or resource id doesn't exist or has
   been removed. Re-run a `search` to get a fresh name/id.

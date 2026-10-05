@@ -256,6 +256,11 @@ built-in transport aborts as soon as the body passes it; the engine checks the b
 transport returns. The message names the option and the CLI flag: `Response exceeded
 the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`.
 
+**Charset.** A JSON body is decoded by the charset its `Content-Type` declares
+(`TextDecoder`; UTF-8 when none is given), so a mirror or proxy that re-encodes to
+Latin-1 still gives `Straße`, not `Stra�e`. A leading byte-order mark is dropped. An
+unknown charset label is a `GovDataParseError`.
+
 **`RawResponse`.** The engine's raw-response shape (`data`/`contentType`/`status`)
 — exported for completeness; action endpoints return decoded JSON.
 

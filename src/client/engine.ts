@@ -2,6 +2,7 @@
 // requests via a Transport, applies retry/backoff for transient statuses
 // (429, 503), and decodes responses.
 
+import { TextDecoder } from "node:util";
 import {
   MAX_TIMEOUT_MS,
   nodeHttpTransport,
@@ -596,7 +597,7 @@ export class RequestEngine {
   /** Perform a GET expecting JSON and parse it into `T`. */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request("GET", path, { query, accept: "application/json" });
-    const text = res.data.toString("utf8");
+    const text = decodeBody(res.data, res.contentType, path);
     try {
       return JSON.parse(text) as T;
     } catch (cause) {
@@ -684,6 +685,25 @@ function withoutUserinfo(baseUrl: string): string {
   parsed.username = "";
   parsed.password = "";
   return parsed.href.replace(/\/+$/, "");
+}
+
+/**
+ * Decode a response body by the charset of its Content-Type (UTF-8 when none is
+ * given, as JSON requires). A leading byte-order mark is dropped: TextDecoder does
+ * that by default, where Buffer#toString kept it and JSON.parse then failed. GovData
+ * sends UTF-8; this matters for mirrors and proxies that re-encode (a Latin-1 body
+ * used to turn "Straße" into "Stra\uFFFDe" with exit 0). An unknown charset is a
+ * GovDataParseError.
+ */
+function decodeBody(body: Buffer, contentType: string, path: string): string {
+  const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    throw new GovDataParseError(`Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`);
+  }
+  return decoder.decode(body);
 }
 
 /** The origin (scheme, host, port) of a URL, or the value itself if it doesn't parse. */

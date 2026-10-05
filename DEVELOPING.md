@@ -96,6 +96,23 @@ text-based cut (`redactCredentials`, exported) for a value that doesn't parse as
 `packageSearch`, `packageShow`, `packageList`, `organizationList`, `organizationShow`,
 `groupList`, `groupShow`, `tagList`, `resourceShow`, and the generic `action(name, params)`.
 
+The typed methods take only the keys they document: `packageSearch` `q`, `fq`, `rows`,
+`start`, `sort`, `facet_field`; `packageList` `limit`, `offset`; `organizationList` and
+`groupList` those plus `all_fields`. CKAN ignores a parameter it doesn't know, so an
+unknown or misspelled key (`qq`, `FQ`, a JSON `__proto__`) would run the call unfiltered;
+it throws `GovDataValidationError` instead, naming the known keys. To send another CKAN
+parameter, call `action("package_search", params)`, which takes any key. `fq` and
+`facet_field` must be arrays of strings (a string used to be read character by
+character), `all_fields` a boolean. `action()` checks values instead of keys: a string,
+a finite number, a boolean or a valid `Date`, or a list of them; an object (which went
+out as `[object Object]`), `NaN`, `Infinity` or a nested list throws
+`GovDataValidationError`.
+
+In the CLI, `--fq` and `--param` are repeatable; every other option that takes a value
+(`--rows`, `--start`, `--sort`, `--limit`, `--offset`, `--query` and the global
+options) is a usage error when given twice (`once` in `cli/shared.ts`), where commander
+kept the last value.
+
 ## Architecture
 
 ```

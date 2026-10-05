@@ -57,6 +57,21 @@ export function parseHeaderValue(value: string): string {
   return value;
 }
 
+/**
+ * Wrap a commander value-parser for a single-valued option so that a second
+ * occurrence is a usage error. commander otherwise keeps only the last value, so
+ * `--rows 5 --rows 50` silently dropped the first. (The option must have no
+ * default: commander passes the default as `previous` on the first occurrence.)
+ */
+export function once<T>(parse: (value: string) => T): (value: string, previous: T | undefined) => T {
+  return (value, previous) => {
+    if (previous !== undefined) {
+      throw new InvalidArgumentError("Given more than once; this option takes a single value.");
+    }
+    return parse(value);
+  };
+}
+
 /** commander accumulator for a repeatable option whose values must not be blank. */
 export function collectNonEmpty(value: string, previous: string[] = []): string[] {
   return previous.concat([parseNonEmpty(value)]);

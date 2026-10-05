@@ -232,6 +232,10 @@ These apply to every command and may be given before *or* after it:
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly from 200 ms, or waits longer if the server's `Retry-After` asks (up to 30 s; a longer one is not retried, and the error names the requested wait) — never shorter |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
+Only `--fq` and `--param` may be given more than once. Any other option that takes a
+value is a usage error when repeated (`--rows 5 --rows 50`), rather than silently
+keeping the last value.
+
 ## Learn more
 
 - **[Usage.md](Usage.md)** — full use-case-driven cookbook.

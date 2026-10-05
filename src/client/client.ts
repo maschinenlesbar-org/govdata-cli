@@ -62,22 +62,93 @@ function assertText(name: string, value: unknown): void {
   assertValid(name, value, textProblem);
 }
 
+/** How a value is shown in a message: strings quoted, other values by type or value. */
+function describe(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return "an array";
+  if (value === null) return "null";
+  return typeof value === "object" ? "an object" : String(value);
+}
+
+/** GovDataValidationError `Invalid <name>: expected <expected>, got <value described>.` */
+function wrongType(name: string, expected: string, value: unknown): GovDataValidationError {
+  return new GovDataValidationError(`Invalid ${name}: expected ${expected}, got ${describe(value)}.`);
+}
+
+/** One scalar `action()` parameter value the query builder sends as written. */
+function isScalarParam(value: unknown): boolean {
+  if (typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
+
 /**
- * Check the parameters of a generic `action()` call: a blank parameter name, a
- * blank string value or a blank string in a list value throws
+ * Check the parameters of a generic `action()` call: a non-object, a blank parameter
+ * name, a blank string value or a blank string in a list value throws
  * GovDataValidationError. CKAN reads an empty parameter as unset, so `{ q: "" }`
- * would run the action unfiltered. `undefined`/`null` still mean "not given";
- * numbers, booleans and Dates pass.
+ * would run the action unfiltered. So does a value the query builder can't send as
+ * written: an object went out as `[object Object]`, NaN and Infinity as words, a
+ * nested array flattened. `undefined`/`null` still mean "not given"; strings, finite
+ * numbers, booleans and valid Dates pass, alone or in a list.
  */
-function assertParams(params: QueryParams): void {
+function assertParams(params: unknown): asserts params is QueryParams {
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw wrongType("action parameters", "an object", params);
+  }
   for (const [k, v] of Object.entries(params)) {
     assertText("parameter name", k);
-    const values = Array.isArray(v) ? v : [v];
+    if (v === undefined || v === null) continue;
+    const values: unknown[] = Array.isArray(v) ? v : [v];
     for (const item of values) {
+      if (item === undefined || item === null) continue;
+      if (!isScalarParam(item)) {
+        throw wrongType(`parameter ${k}`, "a string, finite number, boolean or Date, or a list of them", item);
+      }
       if (typeof item === "string") assertText(`parameter ${k}`, item);
     }
   }
 }
+
+/**
+ * Throw GovDataValidationError unless `params` is an object whose own keys are all in
+ * `known`. CKAN ignores a parameter it doesn't know, so a misspelled `qq` or a JSON
+ * `__proto__` key would run the search unfiltered over the whole catalogue. Other CKAN
+ * parameters go through `action(name, params)`, which sends any key.
+ */
+function assertKeys(method: string, action: string, params: unknown, known: readonly string[]): void {
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw wrongType(`${method} parameters`, "an object", params);
+  }
+  for (const key of Object.keys(params)) {
+    if (!known.includes(key)) {
+      throw new GovDataValidationError(
+        `Invalid ${method} parameter ${JSON.stringify(key)}: not a parameter of ${method}. ` +
+          `Known: ${known.join(", ")}. Use action("${action}", params) to send another CKAN parameter.`,
+      );
+    }
+  }
+}
+
+/**
+ * Throw GovDataValidationError unless `value` is undefined, null or an array of
+ * non-blank strings. A string was iterated character by character: `fq: "a OR b"`
+ * failed on its space, and `facet_field: "organization"` went out as a string CKAN
+ * rejects.
+ */
+function assertTextList(name: string, value: unknown): void {
+  if (value === undefined || value === null) return;
+  if (!Array.isArray(value)) throw wrongType(name, "an array of strings", value);
+  for (const item of value) assertText(`${name} entry`, item);
+}
+
+/** Throw unless `value` is undefined or a boolean. */
+function assertFlag(name: string, value: unknown): void {
+  if (value !== undefined && typeof value !== "boolean") throw wrongType(name, "a boolean", value);
+}
+
+const SEARCH_KEYS = ["q", "fq", "rows", "start", "sort", "facet_field"] as const;
+const PACKAGE_LIST_KEYS = ["limit", "offset"] as const;
+const GROUP_LIST_KEYS = ["limit", "offset", "all_fields"] as const;
 
 /** Throw unless `value` is undefined or a non-negative safe integer (paging values). */
 function assertCount(name: string, value: number | undefined): void {
@@ -200,14 +271,15 @@ export class GovDataClient {
    * `facet.field`; it rejects `facet_field` with HTTP 400.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    // Checked before any request: a blank text value or a NaN/negative number
-    // would otherwise go out as is.
+    // Checked before any request: an unknown key, a blank text value, a string where
+    // a list belongs or a NaN/negative number would otherwise go out (or be dropped).
+    assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
     if (params.q !== undefined) assertText("q", params.q);
     if (params.sort !== undefined) assertText("sort", params.sort);
+    assertTextList("fq", params.fq);
+    assertTextList("facet_field", params.facet_field);
     const fq = params.fq ?? [];
-    for (const f of fq) assertText("fq entry", f);
     const facetFields = params.facet_field ?? [];
-    for (const f of facetFields) assertText("facet_field entry", f);
     assertCount("rows", params.rows);
     assertCount("start", params.start);
     return this.typed<PackageSearchResult>(
@@ -232,7 +304,8 @@ export class GovDataClient {
   }
 
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
-  async packageList(params: ListParams = {}): Promise<string[]> {
+  async packageList(params: Pick<ListParams, "limit" | "offset"> = {}): Promise<string[]> {
+    assertKeys("packageList", "package_list", params, PACKAGE_LIST_KEYS);
     assertLimit(params.limit);
     assertCount("offset", params.offset);
     return this.typed<string[]>(
@@ -245,6 +318,8 @@ export class GovDataClient {
 
   /** Organizations (names, or full objects with `all_fields`), paged with limit/offset. */
   async organizationList(params: ListParams = {}): Promise<JsonValue[]> {
+    assertKeys("organizationList", "organization_list", params, GROUP_LIST_KEYS);
+    assertFlag("all_fields", params.all_fields);
     assertLimit(params.limit);
     assertCount("offset", params.offset);
     return this.typed<JsonValue[]>(
@@ -262,6 +337,8 @@ export class GovDataClient {
 
   /** Groups (themes/categories), paged with limit/offset like organizationList. */
   async groupList(params: ListParams = {}): Promise<JsonValue[]> {
+    assertKeys("groupList", "group_list", params, GROUP_LIST_KEYS);
+    assertFlag("all_fields", params.all_fields);
     assertLimit(params.limit);
     assertCount("offset", params.offset);
     return this.typed<JsonValue[]>(

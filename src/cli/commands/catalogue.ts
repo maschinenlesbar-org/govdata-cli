@@ -4,6 +4,7 @@ import type { CliDeps } from "../io.js";
 import {
   action,
   collectNonEmpty,
+  once,
   parseBoundedInt,
   parseIntArg,
   parseNonEmpty,
@@ -16,7 +17,7 @@ import { isBlank } from "../../client/validate.js";
  * commander value-parser for a list --limit: 1 or more. CKAN reads `limit=0` as
  * "no limit" and would send the whole list; leave --limit out for that.
  */
-const parseLimit = parseBoundedInt(1, Number.MAX_SAFE_INTEGER);
+const parseLimit = once(parseBoundedInt(1, Number.MAX_SAFE_INTEGER));
 
 /** commander accumulator for repeatable `key=value` pairs into a record. */
 function collectKeyValue(
@@ -52,9 +53,9 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .command("search")
     .argument("[query]", "Solr query", parseNonEmpty)
     .description("Search datasets (Solr query syntax)")
-    .option("--rows <n>", "max results", parseIntArg)
-    .option("--start <n>", "offset for paging", parseIntArg)
-    .option("--sort <expr>", 'e.g. "metadata_modified desc"', parseNonEmpty)
+    .option("--rows <n>", "max results", once(parseIntArg))
+    .option("--start <n>", "offset for paging", once(parseIntArg))
+    .option("--sort <expr>", 'e.g. "metadata_modified desc"', once(parseNonEmpty))
     .option(
       "--fq <filter>",
       "filter query, e.g. groups:tran (repeatable; all must match)",
@@ -90,7 +91,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .command("packages")
     .description("List dataset names")
     .option("--limit <n>", "max names (1 or more; omit for all)", parseLimit)
-    .option("--offset <n>", "offset for paging", parseIntArg)
+    .option("--offset <n>", "offset for paging", once(parseIntArg))
     .action(
       action(deps, async ({ client, global, opts }) => {
         renderJson(
@@ -155,7 +156,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
   program
     .command("tags")
     .description("List tags")
-    .option("--query <substring>", "filter tags by substring", parseNonEmpty)
+    .option("--query <substring>", "filter tags by substring", once(parseNonEmpty))
     .action(
       action(deps, async ({ client, global, opts }) => {
         renderJson(deps, global, await client.tagList(opts["query"] as string | undefined));

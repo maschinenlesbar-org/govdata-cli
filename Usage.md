@@ -207,6 +207,10 @@ subcommand (e.g. `govdata --compact search Haushalt` or
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `-h, --help` | Show help for the program or a command |
 
+Only `--fq` and `--param` may be given more than once. Any other option that takes a
+value is a usage error when repeated (`--rows 5 --rows 50`), rather than silently
+keeping the last value.
+
 **Exit codes:** `0` on success (and for `--help`/`--version`), `4` on a `404`
 from the API, `1` for any other error (including a CKAN `success: false`) and
 for usage/parse errors.

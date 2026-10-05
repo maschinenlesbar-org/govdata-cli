@@ -9,8 +9,8 @@ import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
 import { GovDataClient } from "../client/client.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
-import { MAX_RETRIES } from "../client/engine.js";
-import { parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
+import { DEFAULT_BASE_URL, MAX_RETRIES } from "../client/engine.js";
+import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 
 /**
@@ -46,22 +46,24 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
       "CLI for the open GovData CKAN catalogue API (https://ckan.govdata.de/api/3/action)",
     )
     .version(VERSION)
-    .option("--base-url <url>", "API base URL", parseBaseUrl, "https://ckan.govdata.de")
+    // No commander default: `once` would read it as a first occurrence. The library
+    // falls back to the same URL when the option is absent.
+    .option("--base-url <url>", `API base URL (default: "${DEFAULT_BASE_URL}")`, once(parseBaseUrl))
     .option(
       "--timeout <ms>",
       "per-request timeout in milliseconds (default 30000; 0 = no timeout)",
-      parseBoundedInt(0, MAX_TIMEOUT_MS),
+      once(parseBoundedInt(0, MAX_TIMEOUT_MS)),
     )
-    .option("--user-agent <ua>", "User-Agent header value", parseHeaderValue)
+    .option("--user-agent <ua>", "User-Agent header value", once(parseHeaderValue))
     .option(
       "--max-retries <n>",
       "retries for transient 429/503 responses and reset connections (0..10; linear backoff, longer if the server's Retry-After asks, up to 30 s)",
-      parseBoundedInt(0, MAX_RETRIES),
+      once(parseBoundedInt(0, MAX_RETRIES)),
     )
     .option(
       "--max-response-bytes <n>",
       "cap response body size in bytes (0 = unlimited; default 100 MiB)",
-      parseIntArg,
+      once(parseIntArg),
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .showHelpAfterError();

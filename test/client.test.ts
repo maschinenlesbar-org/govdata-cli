@@ -301,3 +301,38 @@ test("a 404 raises GovDataApiError with status 404", async () => {
     (err) => err instanceof GovDataApiError && err.status === 404,
   );
 });
+
+test("action() refuses values the query builder can't send as written (04 question 2)", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ help: "h", success: true, result: {} }));
+  const client = new GovDataClient({ transport: mt.transport });
+  for (const params of [
+    { q: {} },
+    { rows: Number.NaN },
+    { start: Number.POSITIVE_INFINITY },
+    { fq: [["nested"]] },
+    { when: new Date("not a date") },
+    [] as unknown,
+    "q=x" as unknown,
+  ]) {
+    await assert.rejects(() => client.action("package_search", params as never), GovDataValidationError, JSON.stringify(params));
+  }
+  assert.equal(mt.calls.length, 0);
+  await client.action("package_search", { q: "x", rows: 5, include_private: false, fq: ["a", "b"], unset: null });
+  assert.equal(mt.calls.length, 1);
+});
+
+test("packageSearch and the list calls refuse unknown keys and strings for lists (04 questions 1 and 2)", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ help: "h", success: true, result: [] }));
+  const client = new GovDataClient({ transport: mt.transport });
+  await assert.rejects(
+    () => client.packageSearch({ qq: "x" } as never),
+    (err) => err instanceof GovDataValidationError && /"qq".*action\("package_search"/.test(err.message),
+  );
+  await assert.rejects(
+    () => client.packageSearch({ fq: "organization:a OR groups:b" } as never),
+    (err) => err instanceof GovDataValidationError && /fq: expected an array of strings/.test(err.message),
+  );
+  await assert.rejects(() => client.packageList({ all_fields: true } as never), GovDataValidationError);
+  await assert.rejects(() => client.organizationList({ all_fields: "yes" } as never), GovDataValidationError);
+  assert.equal(mt.calls.length, 0);
+});

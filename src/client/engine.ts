@@ -54,10 +54,10 @@ export interface EngineOptions {
   /** Per-request timeout in milliseconds (default 30000; 0 disables; at most `MAX_TIMEOUT_MS`, 2^31 - 1 ms). */
   timeoutMs?: number;
   /**
-   * Number of automatic retries for transient (429/503) responses, 0..`MAX_RETRIES`
-   * (10; default 2). Each waits the
-   * response's `Retry-After` (up to `MAX_RETRY_AFTER_MS`; a longer one is not
-   * retried), or else `retryDelayMs * attempt`.
+   * Number of automatic retries for transient (429/503) responses and reset
+   * connections, 0..`MAX_RETRIES` (10; default 2). Each waits `retryDelayMs * attempt`,
+   * or longer if the response's `Retry-After` asks (up to `MAX_RETRY_AFTER_MS`; a longer
+   * one is not retried, and the error names the requested wait).
    */
   maxRetries?: number;
   /**
@@ -115,7 +115,7 @@ function intOption(name: string, value: number | undefined, fallback: number, ma
 /**
  * Longest `Retry-After` the engine waits out before retrying a 429/503. When the
  * server asks for longer, the engine does not retry at all and surfaces the error at
- * once: retrying early would only land inside the window the server asked us to wait
+ * once, naming the requested wait: retrying early would only land inside the window the server asked us to wait
  * out, and a hostile value must not stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
@@ -511,13 +511,16 @@ export class RequestEngine {
         throw new GovDataNetworkError(`${method} ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
+      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
       if (retryable && attempt < this.maxRetries) {
-        // Honour Retry-After; without a usable one, back off linearly. A Retry-After
-        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
+        // Back off linearly (retryDelayMs * attempt). A Retry-After can ask for longer, never
+        // for less: `Retry-After: 0` or a date in the past made a zero-delay burst against a
+        // server that had just asked for less load. A Retry-After beyond MAX_RETRY_AFTER_MS
+        // is not retried: the error below surfaces at once and names the requested wait.
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
-          await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
+          const backoff = this.retryDelayMs * attempt;
+          await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
           continue;
         }
       }
@@ -577,7 +580,12 @@ export class RequestEngine {
           body,
           location,
           undefined,
-          status === 401 || status === 403 ? dropped : undefined,
+          status === 401 || status === 403
+            ? dropped
+            : retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS
+              ? `the server asked to wait ${Math.ceil(retryAfter / 1000)} s (Retry-After), longer than the ` +
+                `${MAX_RETRY_AFTER_MS / 1000} s the client waits; retrying sooner won't help`
+              : undefined,
         );
       }
 

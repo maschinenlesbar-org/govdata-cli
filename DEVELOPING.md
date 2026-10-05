@@ -202,10 +202,13 @@ targets, transport error text and the `cause` chain. The CLI maps a `404` to exi
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are
 retried automatically, up to `maxRetries` (`--max-retries`, `0`–`10`, default
-`2`). Each retry waits the response's `Retry-After` (delay-seconds or an
-IMF-fixdate, parsed strictly by `parseRetryAfter`); without a usable one the
-backoff is linear (200 ms, 400 ms, …). A `Retry-After` above 30 s
-(`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once. A reset connection
+`2`). Each retry waits `retryDelayMs * attempt` (200 ms, 400 ms, …), or longer if the
+response's `Retry-After` — delay-seconds or an IMF-fixdate, parsed strictly by
+`parseRetryAfter` — asks for it, never shorter: `Retry-After: 0` or a date in the past
+still waits the backoff, so retries never burst. A `Retry-After` above 30 s
+(`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once, and its message names
+the requested wait ("the server asked to wait 120 s (Retry-After), longer than the 30 s
+the client waits; retrying sooner won't help"). A reset connection
 (`ECONNRESET`/`EPIPE`/`ECONNABORTED`, or undici's `UND_ERR_SOCKET`, anywhere in the
 error's `cause` chain — `isTransientNetworkError`, exported) is retried with the linear
 backoff too, whichever transport reported it. Only `GET` and `HEAD` are retried after a

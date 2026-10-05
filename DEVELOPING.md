@@ -189,8 +189,15 @@ per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a
 envelope of the expected shape), `GovDataValidationError` (an input refused before any
 request: a bad client option such as the base URL or User-Agent, or a bad method
 parameter), and a `success: false` envelope surfacing the base `GovDataError` — all
-extending `GovDataError`. The CLI maps a `404` to exit code `4`, other errors to
-`1`.
+extending `GovDataError`. Whatever an injected transport throws becomes a
+`GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the
+default transport's network errors read the same way, so they name the request. No
+error and no client shows the base URL's password: the engine keeps the base URL in a
+real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
+don't reveal it), every URL in a message goes through `redactUrl`, and the base URL's
+userinfo (raw and percent-decoded) is scrubbed from error bodies and details, redirect
+targets, transport error text and the `cause` chain. The CLI maps a `404` to exit code
+`4`, other errors to `1`.
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are
 retried automatically, up to `maxRetries` (`--max-retries`, `0`–`10`, default

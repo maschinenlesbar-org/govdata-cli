@@ -306,6 +306,15 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
 - **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `GovDataValidationError`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
+- **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands.
+- **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan
+  `.reviews/2026-10-05-exploratory/fix-plan.md` in the workspace), one file per pattern, the same
+  code in every repo apart from an adapter block at the top: P1 credential redaction in CLI output,
+  P2 in library objects and errors, P3 credentials across redirects, P4/P19 base-URL validation
+  (P19 skipped: govdata reads no environment variable), P5 the transport contract (timeout, size
+  cap, body types, header shapes, resets), P6 the retry floor, P7 pipes and exit codes (spawns the
+  built bin), P8/P9/P13 charset, 2xx body shapes and error classes, P10 strict parameters and
+  repeated flags.
 
 ## Continuous integration
 

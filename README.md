@@ -226,7 +226,7 @@ These apply to every command and may be given before *or* after it:
 | `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***` |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; at most `2147483647`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`). Each retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 ## Learn more

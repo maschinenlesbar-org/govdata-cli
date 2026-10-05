@@ -59,8 +59,8 @@ try {
 new GovDataClient({
   baseUrl: "https://ckan.govdata.de",
   timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried (Retry-After, else linear backoff)
-  maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
+  maxRetries: 3,              // 429 / 503 and resets are retried (Retry-After, else linear backoff)
+  maxResponseBytes: 50 << 20, // reject responses larger than 50 MiB (0 = unlimited), any transport
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   transport: customTransport, // inject your own HTTP transport
 });
@@ -205,7 +205,21 @@ retried automatically, up to `maxRetries` (`--max-retries`, `0`–`10`, default
 `2`). Each retry waits the response's `Retry-After` (delay-seconds or an
 IMF-fixdate, parsed strictly by `parseRetryAfter`); without a usable one the
 backoff is linear (200 ms, 400 ms, …). A `Retry-After` above 30 s
-(`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once.
+(`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once. A reset connection
+(`ECONNRESET`/`EPIPE`/`ECONNABORTED`, or undici's `UND_ERR_SOCKET`, anywhere in the
+error's `cause` chain — `isTransientNetworkError`, exported) is retried with the linear
+backoff too, whichever transport reported it. Only `GET` and `HEAD` are retried after a
+reset; a timeout, a refused connection or a DNS failure is not retried.
+
+**Transport contract.** The engine enforces its limits for every transport, not only
+the built-in one: each call runs under the `timeoutMs` deadline (the request carries
+an `AbortSignal` in `HttpRequest.signal`, which the built-in transport honours, and the
+engine rejects at the deadline whether the transport stops or not), and the body it
+gets back is checked against `maxResponseBytes`. It accepts any `ArrayBuffer` view
+(`Buffer`, a fetch `Uint8Array`, a `DataView`) or `ArrayBuffer` as the body, from any
+realm, and reads headers (`Retry-After`, `Location`, `Content-Type`) from a plain object
+in any case, a `Headers` object or a `Map`. A malformed response (no numeric status, no
+headers, a string body) and anything a transport throws become a `GovDataNetworkError`.
 
 **Redirect credential-strip.** The one credential the client can send is the
 userinfo of a base URL you set (`https://user:pw@mirror/`, for a mirror behind a
@@ -221,8 +235,10 @@ target then says so ("the server redirected http→https, which dropped the base
 credentials; use an https base URL"). Userinfo in a `Location` is never used.
 Transports are told `redirect: "manual"` (`HttpRequest.redirect`): the engine follows
 redirects itself, and a response whose `HttpResponse.url` lies on another origin (a
-fetch transport that followed one) is rejected as a `GovDataNetworkError`. Redirects to a non-`http(s)` scheme are rejected
-(the transport re-checks the scheme per hop). A redirect *is* still followed to
+fetch transport that followed one) is rejected as a `GovDataNetworkError`. A redirect
+to a non-`http(s)` scheme (`file:`, `data:`, `javascript:`) is refused by the engine
+with a `GovDataNetworkError` before any transport is called (the built-in transport
+re-checks the scheme per hop as well). A redirect *is* still followed to
 any origin, including private/link-local addresses; because this CLI is keyless
 and only renders the response to the local user's terminal, that pivot yields an
 attacker nothing, so no private-address block is imposed. Only 301/302/303/307/308
@@ -232,7 +248,10 @@ missing or malformed `Location` and the redirect limit surface as a
 not followed`, plus `(stopped after 5 redirects)` at the limit.
 
 **`maxResponseBytes`.** A hard cap on response body size (default 100 MiB; `0` =
-unlimited) defending against memory exhaustion from a hostile/buggy endpoint.
+unlimited) defending against memory exhaustion from a hostile/buggy endpoint. The
+built-in transport aborts as soon as the body passes it; the engine checks the body any
+transport returns. The message names the option and the CLI flag: `Response exceeded
+the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`.
 
 **`RawResponse`.** The engine's raw-response shape (`data`/`contentType`/`status`)
 — exported for completeness; action endpoints return decoded JSON.

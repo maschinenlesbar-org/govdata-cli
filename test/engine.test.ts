@@ -419,3 +419,68 @@ test("parseRetryAfter reads delay-seconds and IMF-fixdate HTTP-dates", () => {
   }
   assert.equal(MAX_RETRY_AFTER_MS, 30_000);
 });
+
+// Findings 04#1–#4 of the 2026-10-05 exploratory test: custom transports.
+
+test("custom transports: timeoutMs and maxResponseBytes hold (04#1)", async () => {
+  const slow = new RequestEngine({
+    timeoutMs: 100,
+    maxRetries: 0,
+    transport: () => new Promise((resolve) => setTimeout(() => resolve(jsonResponse({ success: true, result: 1 })), 3000).unref()),
+  });
+  const started = Date.now();
+  await assert.rejects(() => slow.getJson("/x"), GovDataNetworkError);
+  assert.ok(Date.now() - started < 2000);
+  const big = new RequestEngine({
+    maxResponseBytes: 1000,
+    transport: async () => rawResponse(Buffer.alloc(5_000_000, 0x20), "application/json"),
+  });
+  await assert.rejects(
+    () => big.getJson("/x"),
+    (err) => err instanceof GovDataNetworkError && /size limit of 1000 bytes .*--max-response-bytes/.test(err.message),
+  );
+});
+
+test("custom transports: Retry-After and Location in any case or a Headers object, byte-array bodies (04#2)", async () => {
+  for (const headers of [{ "Retry-After": "31" }, new Headers({ "Retry-After": "31" })]) {
+    const mt = makeMockTransport(() => ({ status: 429, headers: headers as unknown as HttpResponse["headers"], body: Buffer.from("{}") }));
+    await assert.rejects(() => new RequestEngine({ transport: mt.transport, sleep: async () => {} }).getJson("/x"), GovDataApiError);
+    assert.equal(mt.calls.length, 1, "a Retry-After above 30 s is not retried");
+  }
+  for (const headers of [{ Location: "/moved" }, new Headers({ Location: "/moved" })]) {
+    let n = 0;
+    const mt = makeMockTransport(() =>
+      n++ === 0
+        ? { status: 302, headers: headers as unknown as HttpResponse["headers"], body: Buffer.alloc(0) }
+        : { status: 200, headers: {}, body: new Uint8Array(Buffer.from('{"ok":1}')) as Buffer },
+    );
+    assert.deepEqual(await new RequestEngine({ baseUrl: "https://example.test", transport: mt.transport }).getJson("/x"), { ok: 1 });
+    assert.equal(new URL(mt.last().url).pathname, "/moved");
+  }
+});
+
+test("custom transports: a redirect to a non-http(s) URL is refused before the transport sees it (04#3)", async () => {
+  for (const target of ["file:///etc/passwd", "data:application/json,{}", "javascript:alert(1)"]) {
+    const mt = makeMockTransport(() => ({ status: 302, headers: { location: target }, body: Buffer.alloc(0) }));
+    await assert.rejects(
+      () => new RequestEngine({ transport: mt.transport }).getJson("/x"),
+      (err) => err instanceof GovDataNetworkError && /unsupported protocol/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 1, target);
+  }
+});
+
+test("custom transports: a malformed response or a thrown error is a GovDataNetworkError (04#4)", async () => {
+  for (const response of [
+    { headers: {}, body: Buffer.from("{}") },
+    { status: "200", headers: {}, body: Buffer.from("{}") },
+    { status: 200, body: Buffer.from("{}") },
+    { status: 200, headers: {} },
+    { status: 200, headers: {}, body: "{}" },
+  ]) {
+    const e = new RequestEngine({ transport: async () => response as unknown as HttpResponse });
+    await assert.rejects(() => e.getJson("/x"), GovDataNetworkError, JSON.stringify(response));
+  }
+  const thrower = new RequestEngine({ transport: async () => { throw new Error("boom"); } });
+  await assert.rejects(() => thrower.getJson("/x"), (err) => err instanceof GovDataNetworkError && /failed: boom/.test(err.message));
+});

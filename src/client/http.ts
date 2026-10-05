@@ -19,6 +19,12 @@ export interface HttpRequest {
   body?: string | Buffer;
   /** Per-request timeout in milliseconds. */
   timeoutMs?: number;
+  /**
+   * Aborted when the engine's overall deadline (`timeoutMs`) passes. A transport should stop
+   * the request then (`fetch(url, { signal })`); the engine rejects at the deadline either way,
+   * and enforces `maxResponseBytes` on the body it gets back, so neither limit depends on it.
+   */
+  signal?: AbortSignal;
   /** Hard cap on the response body size in bytes; the request aborts if exceeded. */
   maxResponseBytes?: number;
   /**
@@ -42,6 +48,11 @@ export interface HttpResponse {
 }
 
 export type Transport = (request: HttpRequest) => Promise<HttpResponse>;
+
+/** The message for a body over the size cap, naming the option on both sides. */
+export function sizeLimitMessage(maxBytes: number): string {
+  return `Response exceeded the size limit of ${maxBytes} bytes (maxResponseBytes; --max-response-bytes on the CLI)`;
+}
 
 /**
  * The longest delay Node's timers support (2^31 - 1 ms, about 24.8 days). A longer one
@@ -109,7 +120,7 @@ export const nodeHttpTransport: Transport = (request) =>
             if (maxBytes !== undefined && received > maxBytes) {
               aborted = true;
               res.destroy();
-              settleReject(new GovDataNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
+              settleReject(new GovDataNetworkError(sizeLimitMessage(maxBytes)));
               return;
             }
             chunks.push(chunk);
@@ -154,6 +165,15 @@ export const nodeHttpTransport: Transport = (request) =>
       }, delay);
       // Don't let a pending deadline timer keep the event loop alive on its own.
       deadline.unref?.();
+    }
+
+    if (request.signal !== undefined) {
+      // The engine's overall deadline: stop the request when it fires.
+      const abort = (): void => {
+        req.destroy(new GovDataNetworkError(`Request timed out after ${request.timeoutMs ?? 0}ms`));
+      };
+      if (request.signal.aborted) abort();
+      else request.signal.addEventListener("abort", abort, { once: true });
     }
 
     req.on("error", (err) => {

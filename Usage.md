@@ -202,7 +202,7 @@ subcommand (e.g. `govdata --compact search Haushalt` or
 | `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***` |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `-h, --help` | Show help for the program or a command |

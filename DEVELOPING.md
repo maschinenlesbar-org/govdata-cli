@@ -206,12 +206,21 @@ IMF-fixdate, parsed strictly by `parseRetryAfter`); without a usable one the
 backoff is linear (200 ms, 400 ms, …). A `Retry-After` above 30 s
 (`MAX_RETRY_AFTER_MS`) is not retried: the error surfaces at once.
 
-**Redirect credential-strip.** Redirects are followed up to `maxRedirects`; if
-a redirect crosses origin — comparing the full origin (scheme + host + port), so
-a same-host `https:` -> `http:` *downgrade* counts too — only the engine's own
-`Accept` and `User-Agent` are kept (an allowlist, not a list of credential
-headers, which is never complete), so nothing else (e.g. a future auth/cookie
-header) leaks to another host or crosses the wire in cleartext. Redirects to a non-`http(s)` scheme are rejected
+**Redirect credential-strip.** The one credential the client can send is the
+userinfo of a base URL you set (`https://user:pw@mirror/`, for a mirror behind a
+login). The engine never puts it into the URL a transport sees: it sends it as an
+`Authorization: Basic` header per hop. Redirects are followed up to `maxRedirects`; a
+redirect to the same origin, with a relative or an absolute `Location`, keeps the
+header. If a redirect crosses origin — comparing the full origin (scheme + host +
+port), so a same-host `https:` -> `http:` *downgrade* and an `http:` -> `https:`
+upgrade count too — only the engine's own `Accept` and `User-Agent` are kept (an
+allowlist, not a list of credential headers, which is never complete), so nothing
+else leaks to another host or crosses the wire in cleartext; a `401`/`403` from the
+target then says so ("the server redirected http→https, which dropped the base URL's
+credentials; use an https base URL"). Userinfo in a `Location` is never used.
+Transports are told `redirect: "manual"` (`HttpRequest.redirect`): the engine follows
+redirects itself, and a response whose `HttpResponse.url` lies on another origin (a
+fetch transport that followed one) is rejected as a `GovDataNetworkError`. Redirects to a non-`http(s)` scheme are rejected
 (the transport re-checks the scheme per hop). A redirect *is* still followed to
 any origin, including private/link-local addresses; because this CLI is keyless
 and only renders the response to the local user's terminal, that pivot yields an

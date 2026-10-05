@@ -318,10 +318,15 @@ test("the redirect limit names the loop", async () => {
     () => e.getJson("/loop"),
     (err: unknown) =>
       err instanceof GovDataApiError &&
+      // The base URL's userinfo travels as the Authorization header, never in a URL.
       err.message ===
-        "HTTP 302 for GET https://***@a.example/loop: redirect to https://***@a.example/loop not followed (stopped after 5 redirects)",
+        "HTTP 302 for GET https://a.example/loop: redirect to https://a.example/loop not followed (stopped after 5 redirects)",
   );
   assert.equal(mt.calls.length, 6);
+  for (const call of mt.calls) {
+    assert.equal(call.headers?.["Authorization"], `Basic ${Buffer.from("u:pw").toString("base64")}`);
+    assert.ok(!call.url.includes("pw"), call.url);
+  }
 
   const zero = makeMockTransport(() => redirect(302, "/loop"));
   await assert.rejects(

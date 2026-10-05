@@ -183,10 +183,12 @@ test("--base-url with a query, fragment or surrounding whitespace is a usage err
 test("userinfo in --base-url is sent but redacted in error messages", async () => {
   const cli = makeCli(() => jsonResponse({}, 500));
   assert.equal(await run(["--base-url", "http://user:secret@mirror.test/s500", "action", "x"], cli.deps), 1);
-  assert.equal(new URL(cli.mt.last().url).password, "secret");
+  // Sent as Basic auth by the engine, never inside the URL a transport sees.
+  assert.equal(cli.mt.last().headers?.["Authorization"], `Basic ${Buffer.from("user:secret").toString("base64")}`);
+  assert.equal(new URL(cli.mt.last().url).password, "");
   const stderr = cli.err.join("\n");
   assert.ok(!stderr.includes("secret"), stderr);
-  assert.match(stderr, /HTTP 500 for GET http:\/\/\*\*\*@mirror\.test\/s500\/api\/3\/action\/x/);
+  assert.match(stderr, /HTTP 500 for GET http:\/\/mirror\.test\/s500\/api\/3\/action\/x/);
 });
 
 test("usage errors never print a --base-url password (02#1, 06 C10)", async () => {

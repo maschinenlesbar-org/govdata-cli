@@ -298,11 +298,20 @@ export class RequestEngine {
     return copy;
   }
 
-  /** Build a fully-qualified URL from a path and optional query parameters. */
+  /**
+   * Build a fully-qualified URL from a path and optional query parameters. It keeps the
+   * base URL's userinfo (`http://user:pw@mirror/...`); request() leaves it out and sends
+   * it as an Authorization header instead (see basicAuthorization).
+   */
   buildUrl(path: string, query?: QueryParams): string {
+    return this.composeUrl(this.#baseUrl, path, query);
+  }
+
+  /** `base` + path + query string. */
+  private composeUrl(base: string, path: string, query: QueryParams | undefined): string {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
-    return `${this.#baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
+    return `${base}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
   /** Perform a request with Accept negotiation and transient-error retries. */
@@ -311,11 +320,19 @@ export class RequestEngine {
     path: string,
     options: { query?: QueryParams; accept: string } = { accept: "application/json" },
   ): Promise<RawResponse> {
-    let url = this.buildUrl(path, options.query);
+    // The transport never sees the base URL's userinfo: the engine sends it as an
+    // Authorization header, per hop, so a redirect to the same origin (relative or
+    // absolute) keeps it and one to another origin or scheme drops it. A transport such
+    // as fetch also refuses a URL with credentials outright.
+    let url = this.composeUrl(withoutUserinfo(this.#baseUrl), path, options.query);
     let headers: Record<string, string> = {
       Accept: options.accept,
       "User-Agent": this.userAgent,
     };
+    const authorization = basicAuthorization(this.#baseUrl);
+    if (authorization !== undefined) headers["Authorization"] = authorization;
+    /** Why a redirect dropped the base URL's credentials, for a 401/403 message. */
+    let dropped: string | undefined;
 
     let attempt = 0;
     let redirects = 0;
@@ -328,6 +345,7 @@ export class RequestEngine {
           url,
           headers,
           timeoutMs: this.timeoutMs,
+          redirect: "manual",
           ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
         });
       } catch (cause) {
@@ -340,6 +358,18 @@ export class RequestEngine {
         throw new GovDataNetworkError(
           `${method} ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`,
           { cause: this.scrubCause(cause) },
+        );
+      }
+
+      // A transport must not follow redirects itself (`redirect: "manual"`): one that did
+      // (fetch's default) may have carried the Authorization header to another host, and
+      // the answer is not the one asked for. Reject it when it says so (`url`).
+      const finalUrl = (response as { url?: unknown }).url;
+      if (typeof finalUrl === "string" && finalUrl !== "" && originOf(finalUrl) !== originOf(url)) {
+        throw new GovDataNetworkError(
+          `${method} ${redactUrl(url)} failed: the transport followed a redirect to another origin ` +
+            `(${sanitizeServerText(redactUrl(this.scrub(finalUrl)))}); a transport must not follow redirects ` +
+            `(HttpRequest.redirect is "manual").`,
         );
       }
 
@@ -365,12 +395,25 @@ export class RequestEngine {
         throw this.toApiError(method, url, status, response.body, location, redirects || undefined);
       }
       if (next !== undefined) {
+        // Userinfo in a Location is not used: credentials come from the base URL only,
+        // as the Authorization header, never from a server.
+        next.username = "";
+        next.password = "";
         // Credential-strip guard: if the redirect crosses origin (scheme + host +
         // port, so an https->http downgrade counts), keep only the engine's own
-        // non-credential headers, so any future auth/cookie header is never
-        // re-sent to a different host. The User-Agent stays: dropping it sent the
-        // redirected request without one and ignored --user-agent.
-        if (next.origin !== new URL(url).origin) {
+        // non-credential headers, so the base URL's Authorization (and any future
+        // auth/cookie header) is never re-sent to a different host. The same origin
+        // keeps them, whether the Location is relative or absolute. The User-Agent
+        // stays: dropping it sent the redirected request without one and ignored
+        // --user-agent.
+        const from = new URL(url);
+        if (next.origin !== from.origin) {
+          if (headers["Authorization"] !== undefined && dropped === undefined) {
+            dropped =
+              from.protocol === "http:" && next.protocol === "https:" && from.hostname === next.hostname
+                ? "the server redirected http→https, which dropped the base URL's credentials; use an https base URL"
+                : `the redirect to ${next.origin} dropped the base URL's credentials (they are sent to their own origin only)`;
+          }
           headers = engineHeadersOnly(headers);
         }
         url = next.toString();
@@ -382,7 +425,15 @@ export class RequestEngine {
 
       const contentType = String(response.headers["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(method, url, status, response.body, location);
+        throw this.toApiError(
+          method,
+          url,
+          status,
+          response.body,
+          location,
+          undefined,
+          status === 401 || status === 403 ? dropped : undefined,
+        );
       }
 
       return { data: response.body, contentType, status };
@@ -407,6 +458,7 @@ export class RequestEngine {
     body: Buffer,
     locationHeader?: string,
     redirectsFollowed?: number,
+    hint?: string,
   ): GovDataApiError {
     const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
@@ -445,6 +497,7 @@ export class RequestEngine {
     // `detail` came from the response body; strip control characters so a hostile
     // endpoint cannot inject terminal escape sequences via the stderr error message.
     if (detail !== undefined) detail = sanitizeServerText(detail);
+    if (hint !== undefined) detail = detail === undefined ? hint : `${detail}; ${hint}`;
     // Name the target of a redirect that was not followed.
     const location =
       status >= 300 && status < 400 && locationHeader ? redirectTarget(url, this.scrub(locationHeader)) : undefined;
@@ -457,6 +510,35 @@ export class RequestEngine {
       ...(location !== undefined ? { location } : {}),
       ...(redirectsFollowed !== undefined ? { redirectsFollowed } : {}),
     });
+  }
+}
+
+/**
+ * The `Authorization` header for a URL's userinfo (`Basic base64(user:password)`, both
+ * percent-decoded, as Node's own http client builds it), or undefined without userinfo.
+ */
+function basicAuthorization(url: string): string | undefined {
+  const parsed = new URL(url);
+  if (parsed.username === "" && parsed.password === "") return undefined;
+  const pair = `${decodeURIComponent(parsed.username)}:${decodeURIComponent(parsed.password)}`;
+  return `Basic ${Buffer.from(pair, "utf8").toString("base64")}`;
+}
+
+/** The base URL without its userinfo (unchanged when it has none), trailing slashes stripped. */
+function withoutUserinfo(baseUrl: string): string {
+  const parsed = new URL(baseUrl);
+  if (parsed.username === "" && parsed.password === "") return baseUrl;
+  parsed.username = "";
+  parsed.password = "";
+  return parsed.href.replace(/\/+$/, "");
+}
+
+/** The origin (scheme, host, port) of a URL, or the value itself if it doesn't parse. */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
   }
 }
 

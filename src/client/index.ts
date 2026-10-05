@@ -22,6 +22,8 @@ export {
   GovDataParseError,
   GovDataValidationError,
   redactUrl,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 
 export { assertValid } from "./validate.js";

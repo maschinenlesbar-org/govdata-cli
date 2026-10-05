@@ -82,7 +82,13 @@ tab/newline silently, but the engine glues the raw value into every request URL,
 absolute http(s) URL, and a query or fragment all throw `GovDataValidationError`
 `Invalid base URL: …` at construction — a configuration mistake, never a
 `GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
-Basic auth) and never quoted in a message.
+Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
+(`withRedactedOutput`) takes the exact userinfo of every argument (`credentialsIn`,
+exported) and replaces it with `***` in everything it prints — commander's usage errors,
+which echo rejected values (a `--base-url` with a query, an excess argument), and its own
+messages (unknown command, a rejected `--param`) — so a password with spaces, quotes, `#`,
+`?` or `/` is caught as well as an ordinary one. `redactUrl` falls back to the same
+text-based cut (`redactCredentials`, exported) for a value that doesn't parse as a URL.
 
 ### Methods
 

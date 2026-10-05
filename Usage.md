@@ -199,7 +199,7 @@ subcommand (e.g. `govdata --compact search Haushalt` or
 | Option | Description |
 | --- | --- |
 | `-V, --version` | Print the version and exit |
-| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth and shown as `***` in error messages |
+| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth and shown as `***` in everything the CLI prints — error messages, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |

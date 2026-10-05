@@ -189,6 +189,23 @@ test("userinfo in --base-url is sent but redacted in error messages", async () =
   assert.match(stderr, /HTTP 500 for GET http:\/\/\*\*\*@mirror\.test\/s500\/api\/3\/action\/x/);
 });
 
+test("usage errors never print a --base-url password (02#1, 06 C10)", async () => {
+  const url = "https://bob:hunter2@ckan.example.org/api/3/action/package_search?q=x";
+  for (const argv of [
+    ["--base-url", url, "search", "x"], // a pasted API URL: the query rule
+    [url], // forgot --base-url: unknown command
+    ["tags", url], // an excess argument
+    ["action", "status_show", "--param", "https://bob:hunter2@ckan.example.org/x"], // --param without key=
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    const text = [...cli.out, ...cli.err].join("\n");
+    assert.ok(!text.includes("hunter2"), text);
+    assert.match(text, /\*\*\*@ckan\.example\.org/, text);
+    assert.equal(cli.mt.calls.length, 0);
+  }
+});
+
 test("--max-retries is bounded to 0..10", async () => {
   for (const [value, ok] of [["0", true], ["10", true], ["11", false], ["9007199254740991", false]] as const) {
     const cli = makeCli(() => jsonResponse(ckan({})));

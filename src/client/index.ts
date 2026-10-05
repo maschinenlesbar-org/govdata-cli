@@ -25,6 +25,8 @@ export {
   redactUrl,
   credentialsIn,
   redactCredentials,
+  cutForMessage,
+  MAX_MESSAGE_VALUE_LENGTH,
 } from "./errors.js";
 
 export { assertValid } from "./validate.js";

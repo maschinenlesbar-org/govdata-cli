@@ -66,6 +66,19 @@ export function redactCredentials(text: string, credentials: readonly string[]):
   return out;
 }
 
+/**
+ * Longest server text or echoed value (in characters) an error message shows: an error
+ * `detail`, a CKAN `success: false` message, a redirect target, a rejected input. A
+ * 200 kB CKAN error message used to land on one stderr line. `GovDataApiError.body`
+ * keeps the full text.
+ */
+export const MAX_MESSAGE_VALUE_LENGTH = 500;
+
+/** `text` cut to MAX_MESSAGE_VALUE_LENGTH characters, ending in "…" when cut. */
+export function cutForMessage(text: string): string {
+  return text.length > MAX_MESSAGE_VALUE_LENGTH ? `${text.slice(0, MAX_MESSAGE_VALUE_LENGTH)}…` : text;
+}
+
 /** Base class for every error originating from this client. */
 export class GovDataError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {

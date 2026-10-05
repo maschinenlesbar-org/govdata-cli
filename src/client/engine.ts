@@ -17,7 +17,9 @@ import {
   GovDataError,
   GovDataNetworkError,
   GovDataParseError,
+  GovDataValidationError,
   credentialsIn,
+  cutForMessage,
   redactCredentials,
   redactUrl,
 } from "./errors.js";
@@ -100,14 +102,29 @@ const MAX_REDIRECTS = 20;
 
 /**
  * Read a numeric engine option: `undefined` gives the default; anything but an
- * integer in [0, max] throws. Without this a negative or NaN `timeoutMs` silently
- * disabled the timeout, and `maxResponseBytes: -1` the size cap.
+ * integer in [0, max] throws GovDataValidationError. Without this a negative or NaN
+ * `timeoutMs` silently disabled the timeout, and `maxResponseBytes: -1` the size cap.
  */
 function intOption(name: string, value: number | undefined, fallback: number, max: number): number {
   if (value === undefined) return fallback;
   if (!Number.isSafeInteger(value) || value < 0 || value > max) {
-    throw new GovDataError(
-      `Invalid option ${name}: expected an integer from 0 to ${max}, got ${String(value)}.`,
+    // A string or object is echoed by type, not value: it may be long or carry anything.
+    const shown = typeof value === "number" ? String(value) : value === null ? "null" : `a ${typeof value}`;
+    throw new GovDataValidationError(`Invalid option ${name}: expected an integer from 0 to ${max}, got ${shown}.`);
+  }
+  return value;
+}
+
+/**
+ * Read a function-valued option (`transport`, `sleep`): `undefined` gives the default,
+ * anything but a function throws a GovDataValidationError here rather than a raw
+ * TypeError ("this.transport is not a function") at request time.
+ */
+function functionOption<F extends (...args: never[]) => unknown>(name: string, value: F | undefined, fallback: F): F {
+  if (value === undefined) return fallback;
+  if (typeof value !== "function") {
+    throw new GovDataValidationError(
+      `Invalid option ${name}: expected a function, got ${value === null ? "null" : typeof value}.`,
     );
   }
   return value;
@@ -184,6 +201,9 @@ export function isBidiControl(code: number): boolean {
  * - Every run of whitespace — newlines, tabs, U+2028/U+2029 included — becomes one
  *   space and the ends are trimmed, so the text stays on one line and a server
  *   cannot forge an `Error:` line of its own.
+ * - The result is cut at MAX_MESSAGE_VALUE_LENGTH (500) characters, ending in "…", so
+ *   a hostile or broken body can't flood stderr or a CI log with one huge line (a
+ *   200 kB CKAN error message did). `GovDataApiError.body` keeps the full text.
  *
  * The CLI's JSON output is escaped separately (`escapeControlChars` in
  * cli/shared.ts): `JSON.stringify` alone leaves DEL, C1 and bidi characters raw.
@@ -197,7 +217,7 @@ export function sanitizeServerText(text: string): string {
     if (!whitespaceControl && (n <= 0x1f || (n >= 0x7f && n <= 0x9f) || isBidiControl(n))) continue;
     out += ch;
   }
-  return out.replace(/\s+/g, " ").trim();
+  return cutForMessage(out.replace(/\s+/g, " ").trim());
 }
 
 /**
@@ -323,6 +343,8 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
+    // A JavaScript caller may pass null for "no options"; treat it like undefined.
+    options = options ?? {};
     // The raw value, checked before the slash strip (the engine glues it into
     // every request URL, and `.../ ` would otherwise keep its slash and space), and
     // here rather than only in the default transport: a library consumer that
@@ -336,7 +358,7 @@ export class RequestEngine {
         return [raw];
       }
     });
-    this.transport = options.transport ?? nodeHttpTransport;
+    this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =
       options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
@@ -350,7 +372,7 @@ export class RequestEngine {
       DEFAULT_MAX_RESPONSE_BYTES,
       Number.MAX_SAFE_INTEGER,
     );
-    this.sleep = options.sleep ?? realSleep;
+    this.sleep = functionOption("sleep", options.sleep, realSleep);
   }
 
   /**
@@ -601,7 +623,15 @@ export class RequestEngine {
     try {
       return JSON.parse(text) as T;
     } catch (cause) {
-      throw new GovDataParseError(`Failed to parse JSON response from ${path}`, { cause });
+      // Name the status, the Content-Type and the parser's reason: an HTML maintenance
+      // page, an empty body and a truncated one otherwise all read the same. The reason
+      // can quote the body, so it is sanitised (and cut).
+      const type = res.contentType.trim() === "" ? "no Content-Type" : sanitizeServerText(res.contentType);
+      const reason = cause instanceof Error ? sanitizeServerText(cause.message) : "";
+      throw new GovDataParseError(
+        `Failed to parse JSON response from ${path} (HTTP ${res.status}, ${type})${reason ? `: ${reason}` : ""}`,
+        { cause },
+      );
     }
   }
 

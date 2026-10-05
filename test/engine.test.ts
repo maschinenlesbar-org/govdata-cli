@@ -484,3 +484,17 @@ test("custom transports: a malformed response or a thrown error is a GovDataNetw
   const thrower = new RequestEngine({ transport: async () => { throw new Error("boom"); } });
   await assert.rejects(() => thrower.getJson("/x"), (err) => err instanceof GovDataNetworkError && /failed: boom/.test(err.message));
 });
+
+test("a server error detail is cut at 500 characters; the body keeps it all (03#2)", async () => {
+  const body = { success: false, error: { __type: "Search Error", message: "x".repeat(200_000) } };
+  const e = new RequestEngine({ transport: async () => jsonResponse(body, 409) });
+  await assert.rejects(
+    () => e.getJson("/api/3/action/package_search"),
+    (err) =>
+      err instanceof GovDataApiError &&
+      err.message.length < 700 &&
+      err.message.endsWith("…") &&
+      err.detail!.length === 501 &&
+      err.body.length > 200_000,
+  );
+});

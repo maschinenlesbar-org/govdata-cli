@@ -160,7 +160,11 @@ src/
   `--param` use too; `undefined`/`null` still mean "not given"), and the
   engine's numeric options must be integers in range (`timeoutMs` 0..2^31 − 1, `maxRetries`
   0..10, `retryDelayMs` 0..30000, `maxRedirects` 0..20, `maxResponseBytes` ≥ 0; `0` disables
-  the timeout, retries, redirects or size cap).
+  the timeout, retries, redirects or size cap). Every rejected input is a
+  `GovDataValidationError`, whatever its type: a string or object where a number belongs, a
+  non-string `baseUrl`, `userAgent` or action name, a non-function `transport` or `sleep` —
+  never a raw `TypeError` and never the base `GovDataError`. Messages echo a rejected value
+  by type, or quoted and cut at 500 characters.
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.
@@ -207,7 +211,11 @@ per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a
 envelope of the expected shape), `GovDataValidationError` (an input refused before any
 request: a bad client option such as the base URL or User-Agent, or a bad method
 parameter), and a `success: false` envelope surfacing the base `GovDataError` — all
-extending `GovDataError`. Whatever an injected transport throws becomes a
+extending `GovDataError`. Server text in a message (an error `detail`, a `success: false`
+message, a redirect target, a parser's reason) is cut at 500 characters
+(`MAX_MESSAGE_VALUE_LENGTH`, ending in "…"); `GovDataApiError.body` keeps the full text.
+A parse error names the status and Content-Type (`Failed to parse JSON response from
+/api/3/action/x (HTTP 200, text/html): …`), so a proxy's maintenance page reads as one. Whatever an injected transport throws becomes a
 `GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the
 default transport's network errors read the same way, so they name the request. No
 error and no client shows the base URL's password: the engine keeps the base URL in a

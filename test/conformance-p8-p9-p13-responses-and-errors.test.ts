@@ -27,8 +27,29 @@ const malformedBodies: unknown[] = [
   null, {}, [], "text", 42, { error: "boom" }, { help: "h", success: "true", result: [] },
   { help: "h", success: true }, { help: "h", success: true, result: "x" }, { help: "h", success: true, result: null },
 ];
-/** Library calls with wrong-typed or out-of-range input (filled in by the P13 commit). */
-const badCalls: Array<[string, () => unknown]> = [];
+/** Library calls with wrong-typed or out-of-range input. */
+const badCalls: Array<[string, () => unknown]> = [
+  ["packageShow(5)", () => new Client().packageShow(5 as unknown as string)],
+  ["packageShow(null)", () => new Client().packageShow(null as unknown as string)],
+  ["organizationShow({})", () => new Client().organizationShow({} as unknown as string)],
+  ["tagList(5)", () => new Client().tagList(5 as unknown as string)],
+  ["action(5)", () => new Client().action(5 as unknown as string)],
+  ["action(null)", () => new Client().action(null as unknown as string)],
+  ["action('x', { q: {} })", () => new Client().action("x", { q: {} as unknown as string })],
+  ["packageSearch(null)", () => new Client().packageSearch(null as unknown as object)],
+  ["packageSearch({ fq: 'x' })", () => new Client().packageSearch({ fq: "x" as unknown as string[] })],
+  ["packageSearch({ rows: -1 })", () => new Client().packageSearch({ rows: -1 })],
+  ["packageList({ limit: 0 })", () => new Client().packageList({ limit: 0 })],
+  ["timeoutMs: 'x'", () => new Client({ timeoutMs: "x" as unknown as number })],
+  ["timeoutMs: -1", () => new Client({ timeoutMs: -1 })],
+  ["maxRetries: 1.5", () => new Client({ maxRetries: 1.5 })],
+  ["maxRedirects: 21", () => new Client({ maxRedirects: 21 })],
+  ["retryDelayMs: 3e9", () => new Client({ retryDelayMs: 3_000_000_000 })],
+  ["baseUrl: 5", () => new Client({ baseUrl: 5 as unknown as string })],
+  ["userAgent: {}", () => new Client({ userAgent: {} as unknown as string })],
+  ["transport: 'x'", () => new Client({ transport: "x" as never })],
+  ["sleep: 1", () => new Client({ sleep: 1 as never })],
+];
 // --------------------------------------------------------------------------------------
 
 const respond = (body: Buffer, contentType: string) => async (): Promise<HttpResponse> => ({

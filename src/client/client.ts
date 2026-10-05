@@ -8,7 +8,7 @@
 
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
-import { GovDataError, GovDataParseError, GovDataValidationError } from "./errors.js";
+import { GovDataError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
 import { assertValid, textProblem } from "./validate.js";
 import type {
   CkanEnvelope,
@@ -203,9 +203,13 @@ export class GovDataClient {
    * GovDataValidationError before any request.
    */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
-    const action = String(name).trim();
+    if (typeof name !== "string") {
+      // `String(name)` made `action(5)` call an action named "5" and `action(null)` one named "null".
+      throw wrongType("CKAN action name", "a string", name);
+    }
+    const action = name.trim();
     if (!ACTION_NAME.test(action)) {
-      throw new GovDataValidationError(`Invalid CKAN action name: "${name}"`);
+      throw new GovDataValidationError(`Invalid CKAN action name: ${cutForMessage(JSON.stringify(name))}`);
     }
     assertParams(params);
     const env = await this.engine.getJson<CkanEnvelope<T> | null>(
@@ -232,7 +236,7 @@ export class GovDataClient {
               : "unknown error";
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
-      throw new GovDataError(`CKAN action "${name}" failed: ${sanitizeServerText(detail)}`);
+      throw new GovDataError(`CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(detail)}`);
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
     // would crash rendering `undefined`); CKAN always sends one, `null` included.

@@ -3,7 +3,7 @@
 // enforce them with `assertValid` before any request; the CLI's value parsers call
 // the same functions, so a rule is written once and the CLI and the library agree.
 
-import { GovDataValidationError } from "./errors.js";
+import { GovDataValidationError, cutForMessage } from "./errors.js";
 
 /** A rule: the reason `value` is invalid (one sentence), or `undefined` when it is valid. */
 export type Problem<T = unknown> = (value: T) => string | undefined;
@@ -32,7 +32,14 @@ export function isBlank(value: string): boolean {
  */
 export function textProblem(value: unknown): string | undefined {
   if (typeof value === "string" && !isBlank(value)) return undefined;
-  const shown = typeof value === "string" ? JSON.stringify(value) : String(value);
+  const shown =
+    typeof value === "string"
+      ? cutForMessage(JSON.stringify(value))
+      : value === null || typeof value !== "object"
+        ? String(value)
+        : Array.isArray(value)
+          ? "an array"
+          : "an object";
   return `expected a non-empty string, got ${shown}.`;
 }
 
@@ -43,7 +50,8 @@ export function textProblem(value: unknown): string | undefined {
  * custom transport might send a CR/LF on as a forged header. Checked by char code
  * so the source stays free of control bytes.
  */
-export function headerValueProblem(value: string): string | undefined {
+export function headerValueProblem(value: unknown): string | undefined {
+  if (typeof value !== "string") return "Expected a string.";
   if (isBlank(value)) return "Expected a non-empty value.";
   for (let i = 0; i < value.length; i++) {
     const c = value.charCodeAt(i);
@@ -70,7 +78,8 @@ export function headerValueProblem(value: string): string | undefined {
  * e.g. for a mirror; a `%` in it must start a valid escape (`%25` for a literal one). The reasons never quote the value, so a credential in it cannot
  * leak through them.
  */
-export function baseUrlProblem(value: string): string | undefined {
+export function baseUrlProblem(value: unknown): string | undefined {
+  if (typeof value !== "string") return "Expected a string.";
   if (isBlank(value)) return "Expected an absolute http(s) URL.";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
   for (const ch of value) {

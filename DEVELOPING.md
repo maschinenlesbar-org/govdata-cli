@@ -172,6 +172,11 @@ src/
   so a same-host `https:` -> `http:` downgrade counts), only the engine's own `Accept` and
   `User-Agent` headers go along, so nothing else (e.g. a future auth/cookie header) leaks to
   another host or crosses the wire in cleartext.
+- A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`)
+  gets one `warning: <sentence>` line on stderr per run, before the first request (`action()` in
+  `src/cli/shared.ts`). The sentence comes from the exported `cleartextProblem(baseUrl,
+  secrets?)`: it names the host and, for a `user:password@`, "the base URL's credentials" (never
+  the value). Help, version and usage errors never warn; stdout and the exit code are untouched.
 
 ### Library / technical terms
 
@@ -314,7 +319,8 @@ npm test          # builds, then runs `node --test` over dist/test
   (P19 skipped: govdata reads no environment variable), P5 the transport contract (timeout, size
   cap, body types, header shapes, resets), P6 the retry floor, P7 pipes and exit codes (spawns the
   built bin), P8/P9/P13 charset, 2xx body shapes and error classes, P10 strict parameters and
-  repeated flags.
+  repeated flags; from the follow-up round 2026-10-06, P20 the stderr warning for a plain-`http:`
+  base URL (environment and API-key cases skipped: no variable, no key).
 
 ## Continuous integration
 

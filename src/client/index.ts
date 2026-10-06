@@ -5,6 +5,7 @@ export {
   RequestEngine,
   DEFAULT_BASE_URL,
   assertHeaderValue,
+  cleartextProblem,
   MAX_RETRIES,
   MAX_RETRY_AFTER_MS,
   parseRetryAfter,

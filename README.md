@@ -25,7 +25,7 @@ and pipe straight into [`jq`](https://jqlang.github.io/jq/).
   before reuse, see [DATA_LICENSE.md](DATA_LICENSE.md).
 
 > Want to use this as a TypeScript library or understand how it's built?
-> See **[DEVELOPING.md](DEVELOPING.md)**.
+> See **[DEVELOPING.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/DEVELOPING.md)**.
 
 ## Install
 
@@ -130,12 +130,12 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 > the escape hatch from injecting extra path segments into the request URL. Use the
 > exact CKAN action name, e.g. `package_search`, `organization_list`, `status_show`.
 
-The **[Glossary](GLOSSARY.md)** decodes every CKAN term and search-parameter
+The **[Glossary](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/GLOSSARY.md)** decodes every CKAN term and search-parameter
 name.
 
 ## Common tasks
 
-A few recipes to get going — see **[Usage.md](Usage.md)** for the full,
+A few recipes to get going — see **[Usage.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/Usage.md)** for the full,
 use-case-driven set.
 
 ```bash
@@ -239,12 +239,12 @@ keeping the last value.
 
 ## Learn more
 
-- **[Usage.md](Usage.md)** — full use-case-driven cookbook.
-- **[GLOSSARY.md](GLOSSARY.md)** — every CKAN term, search parameter and domain
+- **[Usage.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/Usage.md)** — full use-case-driven cookbook.
+- **[GLOSSARY.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/GLOSSARY.md)** — every CKAN term, search parameter and domain
   concept explained.
-- **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, architecture,
+- **[DEVELOPING.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/DEVELOPING.md)** — TypeScript library usage, architecture,
   testing, CI.
-- **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills bundled with this repo
+- **[SKILLS.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/SKILLS.md)** — Claude Code Agent Skills bundled with this repo
   (dataset finder, catalogue stats, resource harvest), installable as a plugin.
 
 ## Data license

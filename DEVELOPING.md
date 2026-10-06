@@ -320,7 +320,9 @@ npm test          # builds, then runs `node --test` over dist/test
   cap, body types, header shapes, resets), P6 the retry floor, P7 pipes and exit codes (spawns the
   built bin), P8/P9/P13 charset, 2xx body shapes and error classes, P10 strict parameters and
   repeated flags; from the follow-up round 2026-10-06, P20 the stderr warning for a plain-`http:`
-  base URL (environment and API-key cases skipped: no variable, no key).
+  base URL (environment and API-key cases skipped: no variable, no key), and P21 README links (a
+  relative link must point at a file `files` ships, since npmjs.com shows the README; anything
+  else is an absolute GitHub URL).
 
 ## Continuous integration
 

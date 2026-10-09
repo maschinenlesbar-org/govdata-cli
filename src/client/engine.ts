@@ -20,7 +20,9 @@ import {
   GovDataValidationError,
   credentialsIn,
   cutForMessage,
+  echoedCredentialForms,
   redactCredentials,
+  redactSecrets,
   redactUrl,
 } from "./errors.js";
 import { assertValid, baseUrlProblem, headerValueProblem } from "./validate.js";
@@ -372,6 +374,12 @@ export class RequestEngine {
   readonly #baseUrl: string;
   /** The base URL's userinfo, raw and percent-decoded, for scrubbing server and transport text. */
   readonly #credentials: string[];
+  /**
+   * The forms a server echoes that userinfo back in (the Basic value, the decoded
+   * `user:password`, the password alone; `echoedCredentialForms`), longest first, so a
+   * password never leaves half of the `user:password` around it.
+   */
+  readonly #echoed: string[];
   private readonly transport: Transport;
   private readonly userAgent: string;
   private readonly timeoutMs: number;
@@ -397,6 +405,9 @@ export class RequestEngine {
         return [raw];
       }
     });
+    this.#echoed = credentialsIn(this.#baseUrl)
+      .flatMap(echoedCredentialForms)
+      .sort((a, b) => b.length - a.length);
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =
@@ -415,12 +426,15 @@ export class RequestEngine {
   }
 
   /**
-   * `text` without the base URL's credentials: server text (an error body that echoes the
-   * request URL) and transport text (fetch's "Request cannot be constructed from a URL that
-   * includes credentials: <url>") can carry them.
+   * `text` without the base URL's credentials (raw and percent-decoded, and the forms a
+   * server echoes them back in: `echoedCredentialForms`): server text (an error body that
+   * echoes the request URL or the Authorization header) and transport text (fetch's
+   * "Request cannot be constructed from a URL that includes credentials: <url>") can carry
+   * them. The client uses it for its own messages built from server text (a CKAN
+   * `success: false` envelope).
    */
-  private scrub(text: string): string {
-    return this.#credentials.length === 0 ? text : redactCredentials(text, this.#credentials);
+  scrub(text: string): string {
+    return this.#credentials.length === 0 ? text : redactSecrets(redactCredentials(text, this.#credentials), this.#echoed);
   }
 
   /**

@@ -546,3 +546,29 @@ test("an action name, a scheme and a rejected string are quoted at most 500 char
     return true;
   });
 });
+
+test("credentials a server echoes are scrubbed from the error: Basic, user:password, password (L13)", async () => {
+  const basic = Buffer.from("alice:pa ss-pw", "utf8").toString("base64");
+  const body = JSON.stringify({ success: false, error: { message: `no: Basic ${basic} / alice:pa ss-pw / pa ss-pw` } });
+  const engine = new RequestEngine({
+    baseUrl: "https://alice:pa%20ss-pw@mirror.example",
+    transport: async () => ({ status: 403, headers: { "content-type": "application/json" }, body: Buffer.from(body) }),
+  });
+  await assert.rejects(engine.getJson("/api/3/action/organization_list"), (err: GovDataApiError) => {
+    for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) {
+      assert.ok(!err.message.includes(form), err.message);
+      assert.ok(!err.body.includes(form), err.body);
+    }
+    assert.match(err.message, /no: Basic \*\*\* \/ \*\*\* \/ \*\*\*/);
+    return true;
+  });
+  // The same echo in a success:false envelope on HTTP 200.
+  const client = new GovDataClient({
+    baseUrl: "https://alice:pa%20ss-pw@mirror.example",
+    transport: async () => ({ status: 200, headers: { "content-type": "application/json" }, body: Buffer.from(body) }),
+  });
+  await assert.rejects(client.organizationList(), (err: Error) => {
+    for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) assert.ok(!err.message.includes(form), err.message);
+    return true;
+  });
+});

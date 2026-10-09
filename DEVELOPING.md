@@ -91,7 +91,10 @@ excess argument), and its own messages (unknown command, a rejected `--param`) â
 password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. The
 log replaces it in each record's *message*, before the record is cut and escaped, and
 writes it to the raw stderr: the frame (time, level, topic) is never touched, and a
-password with DEL, C1 or bidi characters is matched in its raw form. `redactUrl` falls back to the same
+password with DEL, C1 or bidi characters is matched in its raw form. The forms a server
+echoes a userinfo back in are replaced too: the `Basic` value and the decoded
+`user:password` on stdout and stderr, the password alone (4 characters or more) on stderr
+only, since it may well occur in the data. `redactUrl` falls back to the same
 text-based cut (`redactCredentials`, exported) for a value that doesn't parse as a URL.
 
 ### Methods
@@ -235,8 +238,11 @@ default transport's network errors read the same way, so they name the request. 
 error and no client shows the base URL's password: the engine keeps the base URL in a
 real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
 don't reveal it), every URL in a message goes through `redactUrl`, and the base URL's
-userinfo (raw and percent-decoded) is scrubbed from error bodies and details, redirect
-targets, transport error text and the `cause` chain. The CLI maps a `404` to exit code
+userinfo (raw and percent-decoded) and the forms a server echoes it back in (the `Basic`
+value, the decoded `user:password`, the password alone from 4 characters:
+`echoedCredentialForms`) are scrubbed from error bodies and details, a CKAN
+`success: false` message, redirect targets, transport error text and the `cause` chain
+(`RequestEngine.scrub`). The CLI maps a `404` to exit code
 `4`, other errors to `1`.
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are

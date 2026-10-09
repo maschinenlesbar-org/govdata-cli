@@ -236,7 +236,7 @@ export class GovDataClient {
               : "unknown error";
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
-      throw new GovDataError(`CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(detail)}`);
+      throw new GovDataError(`CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`);
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
     // would crash rendering `undefined`); CKAN always sends one, `null` included.

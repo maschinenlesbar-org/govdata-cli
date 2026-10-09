@@ -168,6 +168,21 @@ govdata action package_search --param q=Verkehr --param rows=3
 Every command prints the **unwrapped `result`** as pretty JSON to stdout.
 Errors and diagnostics go to stderr, so piping stdout into `jq` stays clean.
 
+Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
+`INFO`) and a topic, the program and the area it comes from (`govdata.cli` for usage
+errors and answers the CLI can't use, `govdata.api` for the API's error answers,
+`govdata.http` for the connection). By default it is written log4j style; `--log-format
+jsonl` writes one JSON object per line instead:
+
+```text
+2026-10-09T14:03:12.481Z WARN  [govdata.http] requests to mirror.example are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.902Z ERROR [govdata.api] HTTP 404 for GET https://ckan.govdata.de/api/3/action/package_show?id=nope: …
+```
+
+```bash
+govdata --log-format jsonl package nope 2>log.jsonl   # {"ts":"…","level":"ERROR","topic":"govdata.api","msg":"HTTP 404 …"}
+```
+
 ```bash
 # Total datasets in the catalogue
 govdata action package_search --param rows=0 | jq '.count'
@@ -227,7 +242,8 @@ These apply to every command and may be given before *or* after it:
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
-| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***`. Plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`) prints one `warning: … sent unencrypted to <host> (http:, not https:)` line on stderr per run, naming the base URL's credentials when it carries some (never their value); stdout and the exit code are unchanged |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [govdata.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
+| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***`. Plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`) prints one warning record (`WARN  [govdata.http] … sent unencrypted to <host> (http:, not https:)`) on stderr per run, naming the base URL's credentials when it carries some (never their value); stdout and the exit code are unchanged |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; at most `2147483647`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly from 200 ms, or waits longer if the server's `Retry-After` asks (up to 30 s; a longer one is not retried, and the error names the requested wait) — never shorter |

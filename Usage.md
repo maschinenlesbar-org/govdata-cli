@@ -199,12 +199,13 @@ subcommand (e.g. `govdata --compact search Haushalt` or
 | Option | Description |
 | --- | --- |
 | `-V, --version` | Print the version and exit |
-| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***`. Plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`) prints one `warning: … sent unencrypted to <host> (http:, not https:)` line on stderr per run, naming the base URL's credentials when it carries some (never their value); stdout and the exit code are unchanged |
+| `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***`. Plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`) prints one warning record (`WARN  [govdata.http] … sent unencrypted to <host> (http:, not https:)`) on stderr per run, naming the base URL's credentials when it carries some (never their value); stdout and the exit code are unchanged |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`; each backs off linearly from 200 ms, or waits longer if the server's `Retry-After` asks, up to 30 s — never shorter) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [govdata.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `-h, --help` | Show help for the program or a command |
 
 Only `--fq` and `--param` may be given more than once. Any other option that takes a

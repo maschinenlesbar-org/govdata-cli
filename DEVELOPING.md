@@ -126,7 +126,8 @@ src/
     validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # GovDataClient — CKAN actions over the engine (with result-unwrapping)
   cli/
-    io.ts        # injectable I/O seam (stdout/stderr)
+    io.ts        # injectable I/O seam (stdout/stderr), the logger and the clock
+    log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
     commands/    # search / package / organizations / groups / tags / resource / action
     program.ts   # assembles the commander program from injectable deps
@@ -142,7 +143,7 @@ src/
   rejects with) `GovDataValidationError`, a `GovDataError`, with the message
   `Invalid <name>: <reason>`. The CLI's value parsers call the same functions, so the CLI and
   the library refuse the same inputs, and `run.ts` reports a `GovDataValidationError` as a
-  usage error (exit 1).
+  usage error (exit 1, an `ERROR` record of `govdata.cli`).
 - The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
   uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
 - The client unwraps CKAN's `{ help, success, result }` envelope and raises `GovDataError`
@@ -173,7 +174,7 @@ src/
   `User-Agent` headers go along, so nothing else (e.g. a future auth/cookie header) leaks to
   another host or crosses the wire in cleartext.
 - A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`)
-  gets one `warning: <sentence>` line on stderr per run, before the first request (`action()` in
+  gets one `WARN` record of `govdata.http` on stderr per run, before the first request (`action()` in
   `src/cli/shared.ts`). The sentence comes from the exported `cleartextProblem(baseUrl,
   secrets?)`: it names the host and, for a `user:password@`, "the base URL's credentials" (never
   the value). Help, version and usage errors never warn; stdout and the exit code are untouched.
@@ -322,7 +323,8 @@ npm test          # builds, then runs `node --test` over dist/test
   repeated flags; from the follow-up round 2026-10-06, P20 the stderr warning for a plain-`http:`
   base URL (environment and API-key cases skipped: no variable, no key), and P21 README links (a
   relative link must point at a file `files` ships, since npmjs.com shows the README; anything
-  else is an absolute GitHub URL).
+  else is an absolute GitHub URL), and P23 the log on stderr (records with timestamp, level and
+  topic; `--log-format text|jsonl`).
 
 ## Continuous integration
 
@@ -362,3 +364,21 @@ npm run serve                        # http://127.0.0.1:4000/govdata-cli/
 Dual-licensed under **[AGPL-3.0-or-later](LICENSE)** or a commercial license — see
 **[LICENSING.md](LICENSING.md)**. This project does **not** accept external code
 contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+## The log on stderr
+
+Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic, `govdata.<area>`. `--log-format text` (the default)
+writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
+`--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
+and `msg`. The areas are `cli` (usage errors, commander's messages and the help it shows
+after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape —, unexpected
+errors), `api` (the API's HTTP error answers) and `http` (the connection, the cleartext
+warning). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+directly. `run()` builds the logger from argv before commander parses it, so commander's
+own usage errors are records too, and on top of the redacted `io.err`, so a secret is kept
+out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
+carries data only. The one line that is not a record is `Output error: …`, which
+`handleOutputErrors` writes straight to `process.stderr` when stdout itself fails, outside
+any run. Conformance test P23 checks all of this, and its body is shared across the *-cli
+repos.

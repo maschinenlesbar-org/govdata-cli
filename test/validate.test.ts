@@ -6,7 +6,7 @@ import * as library from "../src/index.js";
 import { GovDataClient } from "../src/client/client.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { assertSameRequests, jsonResponse, parity } from "./helpers.js";
+import { assertSameRequests, jsonResponse, parity, untimed } from "./helpers.js";
 
 const positive = (n: number): string | undefined => (n > 0 ? undefined : "Expected a positive number.");
 
@@ -40,7 +40,7 @@ test("run() reports a GovDataValidationError from an action as a usage error", a
     },
   };
   assert.equal(await run(["tags"], deps), 1);
-  assert.deepEqual(err, ["Error: Invalid rows: Expected a positive number."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [govdata.cli] Invalid rows: Expected a positive number."]);
   assert.deepEqual(out, []);
 });
 

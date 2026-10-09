@@ -345,7 +345,11 @@ npm test          # builds, then runs `node --test` over dist/test
   base URL (environment and API-key cases skipped: no variable, no key), and P21 README links (a
   relative link must point at a file `files` ships, since npmjs.com shows the README; anything
   else is an absolute GitHub URL), and P23 the log on stderr (records with timestamp, level and
-  topic; `--log-format text|jsonl`).
+  topic; `--log-format text|jsonl`; since the 2026-10-09 fix plan also one line with
+  nothing raw, well-formed and bounded, the secret replaced in the message only,
+  commander's help one record per line, the format commander parsed, a malformed answer
+  under `api`, echoed credentials replaced, an `a:b@c` value left alone; adapter switches
+  `USAGE_EXIT` 1, `OUTPUT_OPTION` undefined: govdata has no `-o`).
 
 ## Continuous integration
 

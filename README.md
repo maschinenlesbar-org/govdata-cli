@@ -171,7 +171,7 @@ Errors and diagnostics go to stderr, so piping stdout into `jq` stays clean.
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`govdata.cli` for usage
 errors and answers the CLI can't use, `govdata.api` for the API's error answers,
-`govdata.http` for the connection). By default it is written log4j style; `--log-format
+`govdata.http` for the connection, `govdata.output` when stdout can't be written). By default it is written log4j style; `--log-format
 jsonl` writes one JSON object per line instead. A record is always one line: a line break,
 a control character or a bidi control in a message (a server's text, a value you typed) is
 written as an escape (`\n`, `\u001b`, `\u202e`), so it can neither split a record nor

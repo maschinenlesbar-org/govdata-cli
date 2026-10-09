@@ -330,7 +330,7 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
 - **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
-- **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands.
+- **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands, any other stdout error is an ERROR record of `govdata.output`.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan
   `.reviews/2026-10-05-exploratory/fix-plan.md` in the workspace), one file per pattern, the same
   code in every repo apart from an adapter block at the top: P1 credential redaction in CLI output,
@@ -398,8 +398,8 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape —, unexpected
-errors), `api` (the API's HTTP error answers) and `http` (the connection, the cleartext
-warning). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+errors), `api` (the API's HTTP error answers), `http` (the connection, the cleartext
+warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of every option that takes one and takes the
 first `--log-format`, used only for the records of a parse error; the program's `preAction`
@@ -413,7 +413,7 @@ an error without one (`govdata help <unknown>`) an ERROR "missing command: `govd
 which replaces a secret (a password in `--base-url`) in the message only, before it is
 escaped: the frame is never touched, and the secret is kept out of the log in either
 format. `CliDeps.now` makes the timestamps testable. stdout
-carries data only. The one line that is not a record is `Output error: …`, which
-`handleOutputErrors` writes straight to `process.stderr` when stdout itself fails, outside
-any run. Conformance test P23 checks all of this, and its body is shared across the *-cli
+carries data only. What happens outside `run()`, in the bin shim, is logged too: a failed
+stdout write is an ERROR record of `govdata.output` (`handleOutputErrors`, through
+`processLogger(argv)`, in the format argv asks for, with the run's redaction). Conformance test P23 checks all of this, and its body is shared across the *-cli
 repos.

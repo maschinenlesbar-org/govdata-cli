@@ -84,12 +84,14 @@ doesn't start an escape (write a literal `%` as `%25`) all throw `GovDataValidat
 `Invalid base URL: …` at construction — a configuration mistake, never a
 `GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
-(`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every argument
+(`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every URL argument
 (`credentialsIn`, exported) and replaces it with `***` in everything it prints —
 commander's usage errors, which echo rejected values (a `--base-url` with a query, an
 excess argument), and its own messages (unknown command, a rejected `--param`) — so a
-password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. The
-log replaces it in each record's *message*, before the record is cut and escaped, and
+password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only
+a value that starts with a scheme counts (a bare `a:b@c` is a dataset id, a search text or
+a User-Agent as often as a credential), except as the `--base-url` value, where a
+`user:password@host` without its scheme is still a credential. The log replaces it in each record's *message*, before the record is cut and escaped, and
 writes it to the raw stderr: the frame (time, level, topic) is never touched, and a
 password with DEL, C1 or bidi characters is matched in its raw form. The forms a server
 echoes a userinfo back in are replaced too: the `Basic` value and the decoded

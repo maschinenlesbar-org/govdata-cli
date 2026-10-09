@@ -213,5 +213,5 @@ value is a usage error when repeated (`--rows 5 --rows 50`), rather than silentl
 keeping the last value.
 
 **Exit codes:** `0` on success (and for `--help`/`--version`), `4` on a `404`
-from the API, `1` for any other error (including a CKAN `success: false`) and
+from the API or CKAN's `Not Found Error` sent with HTTP 200, `1` for any other error (including any other CKAN `success: false`) and
 for usage/parse errors.

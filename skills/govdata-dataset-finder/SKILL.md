@@ -26,7 +26,7 @@ This skill drives the `govdata` command. **Before anything else, validate it is 
 
 This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
-Data comes from the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`) over the open GovData CKAN Action API. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. A search that matches nothing returns `{"count":0,"results":[]}` and exits `0` — that is **not** an error, it means "nothing in the catalogue on that topic"; report it plainly and suggest a broader term. Exit `4` means a named dataset id wasn't found; exit `1` is a real error (bad `--fq` syntax, network). Bump `--timeout 60000` if a call is slow.
+Data comes from the `govdata` CLI (`@maschinenlesbar.org/govdata-cli`) over the open GovData CKAN Action API. It is read-only and needs **no API key**. Always pass `--compact` so each result is one line to pipe into `jq`. A search that matches nothing returns `{"count":0,"results":[]}` and exits `0` — that is **not** an error, it means "nothing in the catalogue on that topic"; report it plainly and suggest a broader term. Exit `4` means a named dataset id wasn't found (an HTTP 404, or CKAN's `Not Found Error` sent with HTTP 200); exit `1` is a real error (bad `--fq` syntax, network). Bump `--timeout 60000` if a call is slow.
 
 ## Step 1 — Search the topic
 

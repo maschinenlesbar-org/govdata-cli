@@ -213,8 +213,8 @@ thing.
 | Code | Meaning |
 | --- | --- |
 | `0` | success (also `--help` / `--version`) |
-| `4` | dataset/resource not found (`404`) |
-| `1` | any other error — bad usage, CKAN `success:false`, network failure |
+| `4` | dataset/resource not found (`404`, or CKAN's `Not Found Error` sent with HTTP `200`) |
+| `1` | any other error — bad usage, any other CKAN `success:false`, network failure |
 
 A reader that stops early (`govdata packages | head`) ends the run quietly with exit `0`;
 a failed run keeps its exit code even when nobody reads stderr (`2>&1 | true`).

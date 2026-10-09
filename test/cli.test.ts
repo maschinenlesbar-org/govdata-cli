@@ -468,3 +468,14 @@ test("a subcommand's value option does not swallow the program's --log-format, i
   assert.ok(cli.err.length > 0 && cli.err.every((line) => line.startsWith("{")), cli.err.join("\n"));
   assert.match((JSON.parse(cli.err[0] ?? "") as Record<string, unknown>)["msg"] as string, / <[a-z]+>' argument missing/);
 });
+
+test("CKAN's Not Found Error sent with HTTP 200 exits 4, like the same error on a 404", async () => {
+  const notFound = makeCli(() => jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }));
+  assert.equal(await run(["package", "no-such-id"], notFound.deps), 4);
+  assert.deepEqual(notFound.err.map(untimed), ['ERROR [govdata.api] CKAN action "package_show" failed: Not found']);
+  // Any other CKAN error on HTTP 200 stays 1.
+  for (const error of [{ __type: "Authorization Error", message: "Access denied" }, { message: "Not found" }]) {
+    const cli = makeCli(() => jsonResponse({ success: false, error }));
+    assert.equal(await run(["package", "x"], cli.deps), 1, JSON.stringify(error));
+  }
+});

@@ -104,7 +104,7 @@ encode the non-obvious parts of this catalogue, for example:
   WMS/WFS/`view` "formats" are map service endpoints, not files, and some harvested
   `resources[].url` values are templates, landing pages or truncated links;
 - an empty search is `{"count":0,"results":[]}` at exit `0` (a valid "nothing matched"),
-  exit `4` is a not-found id, exit `1` is a real error.
+  exit `4` is a not-found id (HTTP 404 or CKAN's `Not Found Error`), exit `1` is a real error.
 
 ## Contributing
 

@@ -247,8 +247,8 @@ userinfo (raw and percent-decoded) and the forms a server echoes it back in (the
 value, the decoded `user:password`, the password alone from 4 characters:
 `echoedCredentialForms`) are scrubbed from error bodies and details, a CKAN
 `success: false` message, redirect targets, transport error text and the `cause` chain
-(`RequestEngine.scrub`). The CLI maps a `404` to exit code
-`4`, other errors to `1`.
+(`RequestEngine.scrub`). The CLI maps a `404` and CKAN's `Not Found Error` sent with HTTP 200
+(`GovDataActionError.isNotFound`) to exit code `4`, other errors to `1`.
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are
 retried automatically, up to `maxRetries` (`--max-retries`, `0`–`10`, default

@@ -346,6 +346,7 @@ test("a success:false envelope is a GovDataActionError naming the action and CKA
     assert.ok(err instanceof GovDataActionError && err instanceof GovDataError);
     assert.equal(err.action, "package_show");
     assert.equal(err.errorType, "Not Found Error");
+    assert.equal(err.isNotFound, true);
     assert.equal(err.message, 'CKAN action "package_show" failed: Not found');
     return true;
   });
@@ -355,6 +356,7 @@ test("a success:false envelope is a GovDataActionError naming the action and CKA
     await assert.rejects(clientWith(other).packageShow("x"), (err: unknown) => {
       assert.ok(err instanceof GovDataActionError);
       assert.equal(err.errorType, undefined);
+      assert.equal(err.isNotFound, false);
       return true;
     });
   }

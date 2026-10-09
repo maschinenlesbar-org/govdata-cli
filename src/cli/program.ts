@@ -46,6 +46,48 @@ function parseLogFormat(value: string): string {
   return value;
 }
 
+/**
+ * commander's hint for a mistyped command, `\n(Did you mean search?)` (or `one of a, b`),
+ * or "" when nothing is close: the same rule as commander's own (an optimal-string-
+ * alignment distance below 3 that keeps more than 40 % of the word). The root action
+ * reports an unknown command itself, so commander's suggestion is rebuilt here.
+ */
+export function suggestSimilar(word: string, candidates: readonly string[]): string {
+  let similar: string[] = [];
+  let best = 3;
+  for (const candidate of new Set(candidates)) {
+    if (candidate.length <= 1) continue;
+    const distance = editDistance(word, candidate, best);
+    const length = Math.max(word.length, candidate.length);
+    if ((length - distance) / length <= 0.4) continue;
+    if (distance < best) {
+      best = distance;
+      similar = [candidate];
+    } else if (distance === best) {
+      similar.push(candidate);
+    }
+  }
+  similar.sort((a, b) => a.localeCompare(b));
+  if (similar.length > 1) return `\n(Did you mean one of ${similar.join(", ")}?)`;
+  return similar.length === 1 ? `\n(Did you mean ${similar[0]}?)` : "";
+}
+
+/** Optimal-string-alignment distance between `a` and `b`; at least `cap` when it is that far. */
+function editDistance(a: string, b: string, cap: number): number {
+  if (Math.abs(a.length - b.length) >= cap) return Math.max(a.length, b.length);
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, d[i - 2]![j - 2]! + 1);
+      d[i]![j] = v;
+    }
+  }
+  return d[a.length]![b.length]!;
+}
+
 export function buildProgram(deps: CliDeps = defaultDeps): Command {
   const program = new Command();
 
@@ -96,7 +138,10 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     if (unknown !== undefined) {
       // The name is the user's: cut, after its credentials are redacted (a cut could
       // otherwise leave part of a password without the "@" the redaction keys on).
-      program.error(`error: unknown command '${cutForMessage(redactUrl(unknown))}'`, { code: "commander.unknownCommand" });
+      const names = program.commands.map((c) => c.name()).filter((name) => name !== "help");
+      program.error(`error: unknown command '${cutForMessage(redactUrl(unknown))}'${suggestSimilar(unknown, names)}`, {
+        code: "commander.unknownCommand",
+      });
     }
     program.help();
   });

@@ -410,7 +410,7 @@ malformed answer, a `GovDataParseError`: bad JSON, not JSON, not a CKAN envelope
 unknown charset), `http` (the connection, the cleartext
 warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
-(`logFormatFromArgv`, which skips the value of every option that takes one and takes the
+(`logFormatFromArgv`, which skips the value of one of the program's own value options and takes the
 first `--log-format`, used only for the records of a parse error; the program's `preAction`
 hook then sets the format commander parsed, so `--user-agent --log-format=jsonl` logs
 text), so commander's own usage errors are records too: its `error: …` an ERROR of `cli` (a `(Did you mean …?)`

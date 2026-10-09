@@ -459,3 +459,12 @@ test("a malformed answer is an ERROR record of govdata.api: bad JSON, not JSON, 
     assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.api\] /, cli.err.join("\n"));
   }
 });
+
+test("a subcommand's value option does not swallow the program's --log-format, in a parse error too (L6)", async () => {
+  // commander takes the program's --log-format out of argv first;  is left without its value.
+  const cli = makeCli(() => jsonResponse({}));
+  const code = await run(["search", "--rows", "--log-format", "jsonl"], cli.deps);
+  assert.notEqual(code, 0);
+  assert.ok(cli.err.length > 0 && cli.err.every((line) => line.startsWith("{")), cli.err.join("\n"));
+  assert.match((JSON.parse(cli.err[0] ?? "") as Record<string, unknown>)["msg"] as string, / <[a-z]+>' argument missing/);
+});

@@ -158,9 +158,12 @@ export function logFormatProblem(value: string): string | undefined {
  * error is logged in the first one's format. This scan is only for the records of a
  * parse error: once commander has parsed argv, its value is the format (the program's
  * preAction hook), so `--user-agent --log-format=jsonl` (a User-Agent) logs text.
- * `valueOptions` names the options that take a value (`--user-agent`): the token after
+ * `valueOptions` names the program's options that take a value (`--user-agent`): the token after
  * one is its value, never an option, as commander reads it, so `--user-agent
- * --log-format jsonl` agrees with commander in a parse error too.
+ * --log-format jsonl` agrees with commander in a parse error too. A subcommand's value option (`--rows`)
+ * does not count: commander takes the program's own options out of argv first, so
+ * `search --rows --log-format jsonl` is jsonl and a `--rows` without its
+ * value.
  */
 export function logFormatFromArgv(argv: readonly string[], valueOptions: ReadonlySet<string> = new Set()): LogFormat {
   let format: string | undefined;

@@ -84,11 +84,14 @@ doesn't start an escape (write a literal `%` as `%25`) all throw `GovDataValidat
 `Invalid base URL: …` at construction — a configuration mistake, never a
 `GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
-(`withRedactedOutput`) takes the exact userinfo of every argument (`credentialsIn`,
-exported) and replaces it with `***` in everything it prints — commander's usage errors,
-which echo rejected values (a `--base-url` with a query, an excess argument), and its own
-messages (unknown command, a rejected `--param`) — so a password with spaces, quotes, `#`,
-`?` or `/` is caught as well as an ordinary one. `redactUrl` falls back to the same
+(`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every argument
+(`credentialsIn`, exported) and replaces it with `***` in everything it prints —
+commander's usage errors, which echo rejected values (a `--base-url` with a query, an
+excess argument), and its own messages (unknown command, a rejected `--param`) — so a
+password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. The
+log replaces it in each record's *message*, before the record is cut and escaped, and
+writes it to the raw stderr: the frame (time, level, topic) is never touched, and a
+password with DEL, C1 or bidi characters is matched in its raw form. `redactUrl` falls back to the same
 text-based cut (`redactCredentials`, exported) for a value that doesn't parse as a URL.
 
 ### Methods
@@ -390,8 +393,10 @@ after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape 
 errors), `api` (the API's HTTP error answers) and `http` (the connection, the cleartext
 warning). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it, so commander's
-own usage errors are records too, and on top of the redacted `io.err`, so a secret is kept
-out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
+own usage errors are records too, and with the run's redaction (`withRedactedOutput`),
+which replaces a secret (a password in `--base-url`) in the message only, before it is
+escaped: the frame is never touched, and the secret is kept out of the log in either
+format. `CliDeps.now` makes the timestamps testable. stdout
 carries data only. The one line that is not a record is `Output error: …`, which
 `handleOutputErrors` writes straight to `process.stderr` when stdout itself fails, outside
 any run. Conformance test P23 checks all of this, and its body is shared across the *-cli

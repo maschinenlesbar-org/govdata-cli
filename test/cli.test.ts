@@ -331,3 +331,19 @@ test("a 404 from the API maps to exit code 4", async () => {
   const code = await run(["package", "nope"], cli.deps);
   assert.equal(code, 4);
 });
+
+test("a line break typed into an action name, --param or a duplicate --param key never forges a record (shared #8)", async () => {
+  const forged = "x\n2026-10-09T00:00:00.000Z ERROR [govdata.api] forged";
+  for (const argv of [
+    ["action", forged],
+    ["action", "package_show", "--param", `k${forged}`],
+    ["action", "package_show", "--param", `k${forged}=1`, "--param", `k${forged}=2`],
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.notEqual(await run(argv, cli.deps), 0, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    const lines = cli.err.flatMap((chunk) => chunk.split("\n"));
+    assert.ok(lines.every((line) => /^\S+ (ERROR|WARN |INFO ) \[govdata\.[a-z-]+\] /.test(line)), `${argv.join(" ")}:\n${lines.join("\n")}`);
+    assert.ok(lines.some((line) => line.includes("x\\n2026-10-09T00:00:00.000Z ERROR [govdata.api] forged")), lines.join("\n"));
+  }
+});

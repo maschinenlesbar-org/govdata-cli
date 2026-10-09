@@ -102,6 +102,14 @@ A blank parameter name or value (`q=`, `=x`) is refused before any request — a
 usage error in the CLI, a `GovDataValidationError` in the library — because CKAN
 would read an empty value as "no filter".
 
+**Log record.** Every diagnostic line the CLI writes to stderr: a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic `govdata.<area>`, as text (log4j style) or with
+`--log-format jsonl` as one JSON object per line. The areas: `cli` (usage errors,
+commander's messages, unexpected errors), `api` (the API's answers: an error status,
+and a malformed answer — bad JSON, not JSON, not a CKAN envelope, the wrong result
+shape), `http` (the connection, the cleartext warning) and `output` (stdout failures). A
+record is always one line; control characters in it are escaped.
+
 ---
 
 ## Search parameters (Solr)

@@ -10,6 +10,7 @@ import {
   GovDataApiError,
   GovDataError,
   GovDataNetworkError,
+  GovDataParseError,
   GovDataValidationError,
   credentialsIn,
   echoedCredentialForms,
@@ -194,6 +195,19 @@ export function processLogger(argv: readonly string[]): Logger {
   });
 }
 
+/**
+ * The log area of a `GovDataError` that is neither an API error nor a usage error: the
+ * connection (`http`), a malformed answer (`api`: bad JSON, not JSON, not a CKAN
+ * envelope, the wrong result shape, an unknown charset — the API's answer as much as an
+ * error status is), else `cli` (a response nested too deeply to print is about printing
+ * the answer, not its shape).
+ */
+function areaOf(err: GovDataError): string {
+  if (err instanceof GovDataNetworkError) return "http";
+  if (err instanceof GovDataParseError) return "api";
+  return "cli";
+}
+
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
   // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
@@ -226,7 +240,7 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       return 1;
     }
     if (err instanceof GovDataError) {
-      log.error(err instanceof GovDataNetworkError ? "http" : "cli", err.message);
+      log.error(areaOf(err), err.message);
       return 1;
     }
     log.error("cli", `Unexpected error: ${err instanceof Error ? err.message : String(err)}`);

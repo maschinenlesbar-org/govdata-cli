@@ -103,6 +103,15 @@ oder -wert (`q=`, `=x`) wird vor jeder Anfrage abgelehnt – in der CLI als Bedi
 der Bibliothek als `GovDataValidationError` –, weil CKAN einen leeren Wert als „kein Filter“
 liest.
 
+**Log-Eintrag (log record).** Jede Diagnosezeile, die die CLI nach stderr schreibt: ein
+Zeitstempel, eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `govdata.<Bereich>`, als
+Text (im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die
+Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die
+Antworten der API: ein Fehlerstatus und eine fehlerhafte Antwort — ungültiges JSON, kein
+JSON, keine CKAN-Hülle, die falsche Form des Ergebnisses), `http` (die Verbindung, die
+Klartext-Warnung) und `output` (Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile;
+Steuerzeichen darin werden maskiert.
+
 ---
 
 ## Suchparameter (Solr)

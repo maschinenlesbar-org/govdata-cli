@@ -304,7 +304,7 @@ test("malformed envelopes exit 1 with a clear error instead of an Unexpected err
   for (const body of [null, { success: true }, [1, 2]]) {
     const cli = makeCli(() => jsonResponse(body));
     assert.equal(await run(["--compact", "search", "x"], cli.deps), 1, JSON.stringify(body));
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.cli\] Unexpected response shape from \/api\/3\/action\/package_search: /);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.api\] Unexpected response shape from \/api\/3\/action\/package_search: /);
   }
 });
 
@@ -443,4 +443,19 @@ test("the log format is commander's: in a parse error, and after a value that lo
   assert.equal(await run(["--user-agent", "--log-format=jsonl", "organizations", "--max-retries", "0"], value.deps), 1);
   assert.equal(value.mt.last().headers?.["User-Agent"], "--log-format=jsonl");
   assert.ok(value.err.length > 0 && value.err.every((line) => !isJsonl(line)), value.err.join("\n"));
+});
+
+test("a malformed answer is an ERROR record of govdata.api: bad JSON, not JSON, not an envelope, a wrong shape, a bad charset (L9)", async () => {
+  const answers: HttpResponse[] = [
+    rawResponse("{not json", "application/json"),
+    rawResponse("<html></html>", "text/html"),
+    jsonResponse({ hello: "world" }),
+    jsonResponse(ckan({})),
+    rawResponse("{}", "application/json; charset=x-unknown"),
+  ];
+  for (const answer of answers) {
+    const cli = makeCli(() => answer);
+    assert.equal(await run(["organizations"], cli.deps), 1);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.api\] /, cli.err.join("\n"));
+  }
 });

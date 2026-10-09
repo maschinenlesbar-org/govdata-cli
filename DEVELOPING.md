@@ -397,8 +397,10 @@ forge another one or steer the terminal. Before that a lone surrogate (half a
 character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
-after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape —, unexpected
-errors), `api` (the API's HTTP error answers), `http` (the connection, the cleartext
+after one, a CKAN `success: false` answer, unexpected errors, a response nested too deeply
+to print), `api` (the API's answers: an error status, and a malformed answer, a
+`GovDataParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong result shape, an
+unknown charset), `http` (the connection, the cleartext
 warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of every option that takes one and takes the

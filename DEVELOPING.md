@@ -400,8 +400,11 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape —, unexpected
 errors), `api` (the API's HTTP error answers) and `http` (the connection, the cleartext
 warning). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
-directly. `run()` builds the logger from argv before commander parses it, so commander's
-own usage errors are records too: its `error: …` an ERROR of `cli` (a `(Did you mean …?)`
+directly. `run()` builds the logger from argv before commander parses it
+(`logFormatFromArgv`, which skips the value of every option that takes one and takes the
+first `--log-format`, used only for the records of a parse error; the program's `preAction`
+hook then sets the format commander parsed, so `--user-agent --log-format=jsonl` logs
+text), so commander's own usage errors are records too: its `error: …` an ERROR of `cli` (a `(Did you mean …?)`
 line joined to it; the root action's own unknown-command error carries the same hint,
 `suggestSimilar`), the help it shows after one an INFO record per line, and help shown as
 an error without one (`govdata help <unknown>`) an ERROR "missing command: `govdata

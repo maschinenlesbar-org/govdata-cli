@@ -13,7 +13,7 @@ import { DEFAULT_BASE_URL, MAX_RETRIES } from "../client/engine.js";
 import { cutForMessage, redactUrl } from "../client/errors.js";
 import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
-import { DEFAULT_LOG_FORMAT, logFormatProblem } from "./log.js";
+import { DEFAULT_LOG_FORMAT, logFormatProblem, type LogFormat } from "./log.js";
 
 /**
  * Single source of truth for the version: read from package.json at runtime
@@ -133,6 +133,13 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
   // action receives the stray operand (allowExcessArguments below) and reports
   // it, instead of commander's "too many arguments".
   program.helpCommand(true);
+  // One source for the log format once commander has parsed argv: its value, not the
+  // scan of argv (an option's value can look like --log-format; `--` ends the scan, not
+  // commander's parse of a value).
+  program.hook("preAction", (_program, actionCommand) => {
+    const format = (actionCommand.optsWithGlobals() as { logFormat?: LogFormat }).logFormat;
+    if (deps.log !== undefined) deps.log.format = format ?? DEFAULT_LOG_FORMAT;
+  });
   program.action(() => {
     const [unknown] = program.args;
     if (unknown !== undefined) {

@@ -422,3 +422,25 @@ test("help for an unknown command, and the help after a usage error, are records
   await run(["organizations", "--all-field"], typo.deps);
   assert.match(untimed(typo.err[0] ?? ""), /^ERROR \[govdata\.cli\] unknown option '--all-field' \(Did you mean --all-fields\?\)$/);
 });
+
+test("the log format is commander's: in a parse error, and after a value that looks like --log-format (L6)", async () => {
+  const isJsonl = (line: string): boolean => line.startsWith("{");
+  // The token after --user-agent is its value: "unknown command 'jsonl'", logged in text.
+  const ua = makeCli(() => jsonResponse(ckan([])));
+  assert.equal(await run(["--user-agent", "--log-format", "jsonl", "organizations"], ua.deps), 1);
+  assert.match(ua.err[0] ?? "", /^\S+ ERROR \[govdata\.cli\] unknown command 'jsonl'/);
+  // The first --log-format is the one commander keeps; the second is the error.
+  for (const [argv, jsonl] of [
+    [["--log-format", "jsonl", "--log-format", "text", "organizations"], true],
+    [["--log-format", "text", "--log-format", "jsonl", "organizations"], false],
+  ] as const) {
+    const twice = makeCli(() => jsonResponse(ckan([])));
+    assert.equal(await run([...argv], twice.deps), 1);
+    assert.ok(twice.err.length > 0 && twice.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${twice.err.join("\n")}`);
+  }
+  // A User-Agent that looks like the option: the run's error is logged in text.
+  const value = makeCli(() => jsonResponse({ success: false, error: { message: "boom" } }, 500));
+  assert.equal(await run(["--user-agent", "--log-format=jsonl", "organizations", "--max-retries", "0"], value.deps), 1);
+  assert.equal(value.mt.last().headers?.["User-Agent"], "--log-format=jsonl");
+  assert.ok(value.err.length > 0 && value.err.every((line) => !isJsonl(line)), value.err.join("\n"));
+});

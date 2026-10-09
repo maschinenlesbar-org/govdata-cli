@@ -408,3 +408,17 @@ test("an unknown command suggests the closest known one, as commander does for i
   await run(["xyzzy"], far.deps);
   assert.doesNotMatch(far.err.join("\n"), /Did you mean/);
 });
+
+test("help for an unknown command, and the help after a usage error, are records one per line with an ERROR first (shared #2)", async () => {
+  for (const argv of [["help", "nonexist"], ["organizations", "--all-field"]]) {
+    const cli = makeCli(() => jsonResponse(ckan([])));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    const lines = cli.err.flatMap((chunk) => chunk.split("\n"));
+    assert.ok(lines.length > 2, lines.join("\n"));
+    assert.match(lines[0] ?? "", /^\S+ ERROR \[govdata\.cli\] /, lines.join("\n"));
+    assert.ok(lines.every((line) => /^\S+ (ERROR|WARN |INFO ) \[govdata\.cli\] .*\S/.test(line) && !line.includes("\\n")), lines.join("\n"));
+  }
+  const typo = makeCli(() => jsonResponse(ckan([])));
+  await run(["organizations", "--all-field"], typo.deps);
+  assert.match(untimed(typo.err[0] ?? ""), /^ERROR \[govdata\.cli\] unknown option '--all-field' \(Did you mean --all-fields\?\)$/);
+});

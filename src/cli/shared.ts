@@ -4,7 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
-import { DEFAULT_BASE_URL, cleartextProblem, isBidiControl, type EngineOptions } from "../client/engine.js";
+import { DEFAULT_BASE_URL, cleartextProblem, isBidiControl, type EngineOptions, type RetryEvent } from "../client/engine.js";
 import { GovDataError } from "../client/errors.js";
 import { baseUrlProblem, headerValueProblem, isBlank } from "../client/validate.js";
 
@@ -166,6 +166,19 @@ export interface ActionContext {
   opts: Record<string, unknown>;
 }
 
+/** `HTTP 503 from host: retry 1 of 3 in 2 s` (host only; whole seconds, ms under 1 s). */
+export function retryMessage(event: RetryEvent): string {
+  let host: string;
+  try {
+    host = new URL(event.url).host;
+  } catch {
+    host = "the server";
+  }
+  const why = event.status === undefined ? "connection reset" : `HTTP ${event.status}`;
+  const wait = event.delayMs < 1000 ? `${event.delayMs} ms` : `${Math.round(event.delayMs / 1000)} s`;
+  return `${why} from ${host}: retry ${event.retry} of ${event.maxRetries} in ${wait}`;
+}
+
 /**
  * Wrap an async command action with consistent global-option resolution and
  * client construction. The callback receives a context (client + resolved global
@@ -182,7 +195,9 @@ export function action(
     const command = args[args.length - 1] as Command;
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
-    const client = deps.createClient(toEngineOptions(global));
+    const options = toEngineOptions(global);
+    options.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    const client = deps.createClient(options);
     // One warning per run, before the first request, when the base URL is plain http: to
     // a host other than loopback. Help, version and usage errors never get here.
     const cleartext = cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);

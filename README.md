@@ -180,6 +180,7 @@ and ends in `… (N more characters)`:
 
 ```text
 2026-10-09T14:03:12.481Z WARN  [govdata.http] requests to mirror.example are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.700Z WARN  [govdata.http] HTTP 503 from ckan.govdata.de: retry 1 of 2 in 200 ms
 2026-10-09T14:03:12.902Z ERROR [govdata.api] HTTP 404 for GET https://ckan.govdata.de/api/3/action/package_show?id=nope: …
 ```
 
@@ -250,7 +251,7 @@ These apply to every command and may be given before *or* after it:
 | `--base-url <url>` | API base URL (default `https://ckan.govdata.de`); http(s) only, no query, fragment or whitespace. A `user:password@` part is sent as Basic auth to that origin only (a redirect to the same origin keeps it, one to another origin or from `http` to `https` drops it) and never printed: error messages show the URL without it, and the usage error for a rejected `--base-url`, a URL typed where a command goes or given to `--param` shows it as `***`. Plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`) prints one warning record (`WARN  [govdata.http] … sent unencrypted to <host> (http:, not https:)`) on stderr per run, naming the base URL's credentials when it carries some (never their value); stdout and the exit code are unchanged |
 | `--timeout <ms>` | Per-request timeout in milliseconds (default `30000`; at most `2147483647`; `0` = no timeout, wait indefinitely) |
 | `--user-agent <ua>` | `User-Agent` header value (not blank; Latin-1, no control characters) |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly from 200 ms, or waits longer if the server's `Retry-After` asks (up to 30 s; a longer one is not retried, and the error names the requested wait) — never shorter |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly from 200 ms, or waits longer if the server's `Retry-After` asks (up to 30 s; a longer one is not retried, and the error names the requested wait) — never shorter. Each retry logs one WARN record of `govdata.http` before it waits (`HTTP 503 from host: retry 1 of 3 in 2 s`) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 Only `--fq` and `--param` may be given more than once. Any other option that takes a

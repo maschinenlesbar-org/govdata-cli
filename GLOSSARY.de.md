@@ -110,7 +110,7 @@ Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `ap
 Antworten der API: ein Fehlerstatus, die CKAN-Hülle mit `success: false` auch bei HTTP
 200 und eine fehlerhafte Antwort — ungültiges JSON, kein
 JSON, keine CKAN-Hülle, die falsche Form des Ergebnisses), `http` (die Verbindung, die
-Klartext-Warnung) und `output` (Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile;
+Klartext-Warnung und je Wiederholung eine WARN-Zeile vor dem Warten) und `output` (Schreibfehler auf stdout). Ein Eintrag ist immer eine Zeile;
 Steuerzeichen darin werden maskiert.
 
 ---

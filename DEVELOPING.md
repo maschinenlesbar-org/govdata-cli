@@ -263,6 +263,12 @@ the client waits; retrying sooner won't help"). A reset connection
 error's `cause` chain — `isTransientNetworkError`, exported) is retried with the linear
 backoff too, whichever transport reported it. Only `GET` and `HEAD` are retried after a
 reset; a timeout, a refused connection or a DNS failure is not retried.
+Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
+`{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
+redacted) `}`) is called once per retry right before the sleep, never when there is none, and
+a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
+`govdata.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
+seconds, ms under 1 s). Tests: `test/engine.test.ts`, `test/retry-log.test.ts`.
 
 **Transport contract.** The engine enforces its limits for every transport, not only
 the built-in one: each call runs under the `timeoutMs` deadline (the request carries

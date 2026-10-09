@@ -523,3 +523,26 @@ test("a server message cut at 500 characters keeps the message well-formed (erro
     }
   }
 });
+
+test("an action name, a scheme and a rejected string are quoted at most 500 characters long (L3)", async () => {
+  const name = "a".repeat(5000);
+  for (const body of [{ success: false, error: { message: "denied" } }, { hello: "world" }, { success: true }]) {
+    const client = new GovDataClient({ transport: async () => jsonResponse(body) });
+    await assert.rejects(client.action(name), (err: Error) => {
+      assert.ok(err.message.length < 800, `${err.message.length}: ${err.message.slice(0, 100)}`);
+      assert.match(err.message, /a…/);
+      return true;
+    });
+  }
+  assert.throws(() => validateBaseUrl(`${"x".repeat(5000)}://host`), (err: Error) => {
+    assert.ok(err.message.length < 800, `${err.message.length}`);
+    assert.match(err.message, /x…/);
+    return true;
+  });
+  const client = new GovDataClient({ transport: async () => jsonResponse({ success: true, result: [] }) });
+  await assert.rejects(client.packageList({ limit: "y".repeat(5000) as unknown as number }), (err: Error) => {
+    assert.ok(err.message.length < 800, `${err.message.length}`);
+    assert.match(err.message, /y…/);
+    return true;
+  });
+});

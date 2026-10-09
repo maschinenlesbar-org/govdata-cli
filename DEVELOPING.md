@@ -220,7 +220,11 @@ parameter), and a `success: false` envelope surfacing the base `GovDataError` �
 extending `GovDataError`. Server text in a message (an error `detail`, a `success: false`
 message, a redirect target, a parser's reason) is cut at 500 characters
 (`MAX_MESSAGE_VALUE_LENGTH`, ending in "…"), never inside a surrogate pair (`cutText`), so a
-message stays well-formed; `GovDataApiError.body` keeps the full text.
+message stays well-formed. Every other value an own message quotes from a server answer or
+the user's input (an action name or parameter key, a scheme, a rejected string, a `--param`
+value or key, an unknown command) is cut there too, so `err.message` stays bounded for a
+library caller (a typed value after its userinfo is redacted, so a cut never leaves part of
+a password); `GovDataApiError.body` keeps the full text.
 A parse error names the status and Content-Type (`Failed to parse JSON response from
 /api/3/action/x (HTTP 200, text/html): …`), so a proxy's maintenance page reads as one. Whatever an injected transport throws becomes a
 `GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the
@@ -379,8 +383,9 @@ the message (text) or the whole JSON object (jsonl), which writes CR and LF as `
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
 forge another one or steer the terminal. Before that a lone surrogate (half a
-character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
-The areas are `cli` (usage errors, commander's messages and the help it shows
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
+and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
+code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, answers the CLI can't use — a CKAN `success: false`, a wrong shape —, unexpected
 errors), `api` (the API's HTTP error answers) and `http` (the connection, the cleartext
 warning). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`

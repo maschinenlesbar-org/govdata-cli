@@ -49,7 +49,7 @@ function prune(params: Record<string, unknown>): QueryParams {
 }
 
 function invalid(name: string, expected: string, value: unknown): GovDataValidationError {
-  const shown = typeof value === "string" ? JSON.stringify(value) : String(value);
+  const shown = typeof value === "string" ? cutForMessage(JSON.stringify(value)) : String(value);
   return new GovDataValidationError(`Invalid ${name}: expected ${expected}, got ${shown}.`);
 }
 
@@ -64,7 +64,7 @@ function assertText(name: string, value: unknown): void {
 
 /** How a value is shown in a message: strings quoted, other values by type or value. */
 function describe(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "string") return cutForMessage(JSON.stringify(value));
   if (Array.isArray(value)) return "an array";
   if (value === null) return "null";
   return typeof value === "object" ? "an object" : String(value);
@@ -102,9 +102,9 @@ function assertParams(params: unknown): asserts params is QueryParams {
     for (const item of values) {
       if (item === undefined || item === null) continue;
       if (!isScalarParam(item)) {
-        throw wrongType(`parameter ${k}`, "a string, finite number, boolean or Date, or a list of them", item);
+        throw wrongType(`parameter ${cutForMessage(k)}`, "a string, finite number, boolean or Date, or a list of them", item);
       }
-      if (typeof item === "string") assertText(`parameter ${k}`, item);
+      if (typeof item === "string") assertText(`parameter ${cutForMessage(k)}`, item);
     }
   }
 }
@@ -122,7 +122,7 @@ function assertKeys(method: string, action: string, params: unknown, known: read
   for (const key of Object.keys(params)) {
     if (!known.includes(key)) {
       throw new GovDataValidationError(
-        `Invalid ${method} parameter ${JSON.stringify(key)}: not a parameter of ${method}. ` +
+        `Invalid ${method} parameter ${cutForMessage(JSON.stringify(key))}: not a parameter of ${method}. ` +
           `Known: ${known.join(", ")}. Use action("${action}", params) to send another CKAN parameter.`,
       );
     }
@@ -167,7 +167,7 @@ function assertLimit(limit: number | undefined): void {
   if (limit === undefined) return;
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new GovDataValidationError(
-      `Invalid limit: expected a positive integer, got ${String(limit)}. Leave it out for the whole list.`,
+      `Invalid limit: expected a positive integer, got ${cutForMessage(String(limit))}. Leave it out for the whole list.`,
     );
   }
 }
@@ -186,7 +186,7 @@ function isSearchResult(value: unknown): boolean {
 
 /** The error for an answer that does not have the shape the caller relies on. */
 function shapeError(name: string, expected: string): GovDataParseError {
-  return new GovDataParseError(`Unexpected response shape from ${ACTION}/${name}: expected ${expected}.`);
+  return new GovDataParseError(`Unexpected response shape from ${ACTION}/${cutForMessage(name)}: expected ${expected}.`);
 }
 
 export class GovDataClient {

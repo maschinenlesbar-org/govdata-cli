@@ -347,3 +347,23 @@ test("a line break typed into an action name, --param or a duplicate --param key
     assert.ok(lines.some((line) => line.includes("x\\n2026-10-09T00:00:00.000Z ERROR [govdata.api] forged")), lines.join("\n"));
   }
 });
+
+test("the CLI's own usage errors quote a typed value at most 500 characters long (L3)", async () => {
+  // Short enough that commander's own echo leaves room for govdata's quote within the record cap.
+  const long = "x".repeat(3000);
+  for (const argv of [
+    [long],
+    ["action", "package_show", "--param", long],
+    ["action", "package_show", "--param", `${long}= `],
+    ["action", "package_show", "--param", `${long}=1`, "--param", `${long}=2`],
+  ]) {
+    const cli = makeCli(() => jsonResponse(ckan({})));
+    assert.equal(await run(argv, cli.deps), 1);
+    assert.equal(cli.mt.calls.length, 0);
+    const record = cli.err[0] ?? "";
+    // govdata's own quote is cut; commander's echo of a rejected option value
+    // (`argument '…' is invalid.`) is bounded by the record cap only.
+    assert.match(record, /["']x{500}…["']/, record.slice(0, 200));
+    if (argv[0] === long) assert.ok(record.length < 700, `${record.length}`);
+  }
+});

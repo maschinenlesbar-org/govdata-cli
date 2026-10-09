@@ -185,7 +185,7 @@ export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliD
 
 /**
  * The log for what happens outside `run()`, in the bin shim: a stdout write error
- * (`handleOutputErrors`). Its format is the one argv asks for (`logFormatFromArgv`), and
+ * (`handleOutputErrors`) and Node's process warnings (`installWarningLog`). Its format is the one argv asks for (`logFormatFromArgv`), and
  * it replaces the secrets of argv like the run's own log; it writes to the raw stderr.
  */
 export function processLogger(argv: readonly string[]): Logger {

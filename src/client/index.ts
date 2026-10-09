@@ -20,6 +20,7 @@ export type { QueryParams, QueryValue } from "./query.js";
 export {
   GovDataError,
   GovDataApiError,
+  GovDataActionError,
   GovDataNetworkError,
   GovDataParseError,
   GovDataValidationError,

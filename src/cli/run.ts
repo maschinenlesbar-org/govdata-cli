@@ -7,6 +7,7 @@ import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
 import { createLogger, logFormatFromArgv, type Logger } from "./log.js";
 import {
+  GovDataActionError,
   GovDataApiError,
   GovDataError,
   GovDataNetworkError,
@@ -199,12 +200,13 @@ export function processLogger(argv: readonly string[]): Logger {
  * The log area of a `GovDataError` that is neither an API error nor a usage error: the
  * connection (`http`), a malformed answer (`api`: bad JSON, not JSON, not a CKAN
  * envelope, the wrong result shape, an unknown charset — the API's answer as much as an
- * error status is), else `cli` (a response nested too deeply to print is about printing
- * the answer, not its shape).
+ * error status is), CKAN's own error answer on HTTP 200 (`api`: a `success: false`
+ * envelope, `GovDataActionError`), else `cli` (a response nested too deeply to print is
+ * about printing the answer, not its shape).
  */
 function areaOf(err: GovDataError): string {
   if (err instanceof GovDataNetworkError) return "http";
-  if (err instanceof GovDataParseError) return "api";
+  if (err instanceof GovDataParseError || err instanceof GovDataActionError) return "api";
   return "cli";
 }
 

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GovDataClient } from "../src/client/client.js";
 import {
+  GovDataActionError,
   GovDataError,
   GovDataApiError,
   GovDataParseError,
@@ -335,4 +336,26 @@ test("packageSearch and the list calls refuse unknown keys and strings for lists
   await assert.rejects(() => client.packageList({ all_fields: true } as never), GovDataValidationError);
   await assert.rejects(() => client.organizationList({ all_fields: "yes" } as never), GovDataValidationError);
   assert.equal(mt.calls.length, 0);
+});
+
+test("a success:false envelope is a GovDataActionError naming the action and CKAN's error type", async () => {
+  const mt = makeMockTransport(() =>
+    jsonResponse({ help: "h", success: false, error: { __type: "Not Found Error", message: "Not found" } }),
+  );
+  await assert.rejects(clientWith(mt).packageShow("x"), (err: unknown) => {
+    assert.ok(err instanceof GovDataActionError && err instanceof GovDataError);
+    assert.equal(err.action, "package_show");
+    assert.equal(err.errorType, "Not Found Error");
+    assert.equal(err.message, 'CKAN action "package_show" failed: Not found');
+    return true;
+  });
+  // Without a __type (or with one that is no string) the type is undefined.
+  for (const error of [{ message: "x" }, { __type: 5, message: "x" }, "plain text"]) {
+    const other = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
+    await assert.rejects(clientWith(other).packageShow("x"), (err: unknown) => {
+      assert.ok(err instanceof GovDataActionError);
+      assert.equal(err.errorType, undefined);
+      return true;
+    });
+  }
 });

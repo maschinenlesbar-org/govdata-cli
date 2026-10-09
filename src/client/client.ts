@@ -8,7 +8,7 @@
 
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
-import { GovDataError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
+import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
 import { assertValid, textProblem } from "./validate.js";
 import type {
   CkanEnvelope,
@@ -198,7 +198,7 @@ export class GovDataClient {
 
   /**
    * Call any CKAN action by name and return its unwrapped `result`. Throws a
-   * GovDataError if the envelope reports `success: false`. An invalid action name,
+   * GovDataActionError if the envelope reports `success: false`. An invalid action name,
    * a blank parameter name or a blank parameter value (or list entry) rejects with
    * GovDataValidationError before any request.
    */
@@ -236,7 +236,11 @@ export class GovDataClient {
               : "unknown error";
       // A success:false envelope can come with HTTP 200, so it never passes the
       // engine's error-detail sanitising: strip terminal controls here too.
-      throw new GovDataError(`CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`);
+      const type = (e as { __type?: unknown } | null | undefined)?.__type;
+      throw new GovDataActionError(
+        `CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`,
+        { action, errorType: typeof type === "string" ? sanitizeServerText(type) : undefined },
+      );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
     // would crash rendering `undefined`); CKAN always sends one, `null` included.

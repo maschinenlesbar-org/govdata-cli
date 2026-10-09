@@ -47,6 +47,8 @@ const MALFORMED_ANSWERS: HttpResponse[] = [
   // Not a CKAN answer at all, and an envelope whose result has the wrong shape.
   { status: 200, headers: { "content-type": "text/html" }, body: Buffer.from("<!doctype html><html>a catalogue</html>") },
   { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from(JSON.stringify({ success: true, result: {} })) },
+  // CKAN's error envelope with HTTP 200 (decision of 2026-10-09: api, like a malformed answer).
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from(JSON.stringify({ success: false, error: { message: "denied" } })) },
 ];
 /** Builds the CliDeps for a run, on a transport that answers `okBody` (or `answer`) and a fixed clock. */
 function makeDeps(out: string[], err: string[], now: () => Date, answer?: HttpResponse): CliDeps {

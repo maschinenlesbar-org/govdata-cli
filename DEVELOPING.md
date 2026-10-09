@@ -130,7 +130,7 @@ src/
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, redirects, JSON decoding, error mapping
-    errors.ts    # GovDataError / GovDataApiError / GovDataNetworkError / GovDataParseError / GovDataValidationError
+    errors.ts    # GovDataError / GovDataApiError / GovDataActionError / GovDataNetworkError / GovDataParseError / GovDataValidationError
     validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # GovDataClient — CKAN actions over the engine (with result-unwrapping)
   cli/
@@ -154,8 +154,11 @@ src/
   usage error (exit 1, an `ERROR` record of `govdata.cli`).
 - The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
   uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
-- The client unwraps CKAN's `{ help, success, result }` envelope and raises `GovDataError`
-  when `success` is false, so callers work directly with `result`. A body that is not an
+- The client unwraps CKAN's `{ help, success, result }` envelope and raises
+  `GovDataActionError` (a `GovDataError` with `action` and CKAN's `__type` as `errorType`)
+  when `success` is false, so callers work directly with `result`: CKAN can send its error
+  envelope with HTTP 200, and the CLI logs it under `api` like the same error on an error
+  status. A body that is not an
   envelope (`null`, an array, no boolean `success`) or has no `result` is a
   `GovDataParseError` (`Unexpected response shape from /api/3/action/<name>: expected …`), and
   the typed methods check the result's top-level shape (an object for `*_show`, an array for
@@ -224,8 +227,8 @@ subprocess.
 per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a CKAN
 envelope of the expected shape), `GovDataValidationError` (an input refused before any
 request: a bad client option such as the base URL or User-Agent, or a bad method
-parameter), and a `success: false` envelope surfacing the base `GovDataError` — all
-extending `GovDataError`. Server text in a message (an error `detail`, a `success: false`
+parameter), and `GovDataActionError` (a `success: false` envelope on a 2xx status, with
+`action` and CKAN's `__type` as `errorType`) — all extending `GovDataError`. Server text in a message (an error `detail`, a `success: false`
 message, a redirect target, a parser's reason) is cut at 500 characters
 (`MAX_MESSAGE_VALUE_LENGTH`, ending in "…"), never inside a surrogate pair (`cutText`), so a
 message stays well-formed. Every other value an own message quotes from a server answer or
@@ -397,9 +400,9 @@ forge another one or steer the terminal. Before that a lone surrogate (half a
 character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
-after one, a CKAN `success: false` answer, unexpected errors, a response nested too deeply
-to print), `api` (the API's answers: an error status, and a malformed answer, a
-`GovDataParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong result shape, an
+after one, unexpected errors, a response nested too deeply to print), `api` (the API's
+answers: an error status, CKAN's error envelope on HTTP 200, a `GovDataActionError`, and a
+malformed answer, a `GovDataParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong result shape, an
 unknown charset), `http` (the connection, the cleartext
 warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it

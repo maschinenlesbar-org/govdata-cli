@@ -14,7 +14,10 @@ import {
   GovDataParseError,
   GovDataValidationError,
   redactUrl,
+  cutText,
+  toWellFormed,
 } from "../src/client/errors.js";
+import { GovDataClient } from "../src/client/client.js";
 import * as library from "../src/index.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 import type { HttpResponse } from "../src/client/http.js";
@@ -497,4 +500,26 @@ test("a server error detail is cut at 500 characters; the body keeps it all (03#
       err.detail!.length === 501 &&
       err.body.length > 200_000,
   );
+});
+
+test("cutText never cuts inside a surrogate pair; toWellFormed replaces half a character", () => {
+  assert.equal(cutText("ab\u{1f600}cd", 3), "ab");
+  assert.equal(cutText("ab\u{1f600}cd", 4), "ab\u{1f600}");
+  assert.equal(cutText("short", 10), "short");
+  assert.equal(toWellFormed("a\ud83d b\ude00 \u{1f600}"), "a\ufffd b\ufffd \u{1f600}");
+});
+
+test("a server message cut at 500 characters keeps the message well-formed (error answer and success:false)", async () => {
+  for (const message of ["\u{1f600}".repeat(400), "a" + "\u{1f600}".repeat(400)]) {
+    const error = { __type: "Search Error", message };
+    for (const status of [409, 200]) {
+      const body = Buffer.from(JSON.stringify({ success: false, error }));
+      const client = new GovDataClient({ maxRetries: 0, transport: async () => ({ status, headers: { "content-type": "application/json" }, body }) });
+      await assert.rejects(client.organizationList(), (err: Error) => {
+        assert.equal(toWellFormed(err.message), err.message);
+        assert.match(err.message, /…$/);
+        return true;
+      });
+    }
+  }
 });

@@ -1,0 +1,196 @@
+import type { Command } from "commander";
+import { InvalidArgumentError } from "commander";
+import type { CliDeps } from "../io.js";
+import {
+  action,
+  collectNonEmpty,
+  once,
+  parseBoundedInt,
+  parseIntArg,
+  parseNonEmpty,
+  renderJson,
+} from "../shared.js";
+import type { QueryParams } from "@maschinenlesbar.org/govdata-client/internal/query";
+import { isBlank } from "@maschinenlesbar.org/govdata-client/internal/validate";
+import { cutForMessage, redactUrl } from "@maschinenlesbar.org/govdata-client/internal/errors";
+
+/**
+ * A typed value as a message quotes it: cut at MAX_MESSAGE_VALUE_LENGTH, after its
+ * credentials are redacted (a cut could otherwise leave part of a password without the
+ * "@" the argv redaction keys on).
+ */
+function shown(value: string): string {
+  return cutForMessage(redactUrl(value));
+}
+
+/**
+ * commander value-parser for a list --limit: 1 or more. CKAN reads `limit=0` as
+ * "no limit" and would send the whole list; leave --limit out for that.
+ */
+const parseLimit = once(parseBoundedInt(1, Number.MAX_SAFE_INTEGER));
+
+/** commander accumulator for repeatable `key=value` pairs into a record. */
+function collectKeyValue(
+  value: string,
+  previous: Record<string, string> = {},
+): Record<string, string> {
+  const eq = value.indexOf("=");
+  // Throw commander's InvalidArgumentError (not a GovDataError) so the failure
+  // is formatted as a usage error with `error:` prefix and help, consistent
+  // with other parse-time flag validation (e.g. `--rows abc`).
+  const key = value.slice(0, Math.max(eq, 0));
+  // A blank key (`=x`, ` =x`) names no parameter: the library refuses it too.
+  if (eq < 0 || isBlank(key)) {
+    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". Expected key=value.`);
+  }
+  // Reject a duplicated key rather than silently overwriting the earlier value.
+  if (Object.prototype.hasOwnProperty.call(previous, key)) {
+    throw new InvalidArgumentError(`Duplicate --param key "${shown(key)}".`);
+  }
+  // A blank value is refused by the library as well (CKAN reads an empty
+  // parameter as unset, so `--param q=` would run the action unfiltered); here it
+  // is a usage error that names the flag.
+  const paramValue = value.slice(eq + 1);
+  if (isBlank(paramValue)) {
+    throw new InvalidArgumentError(`Invalid --param "${shown(value)}". The value must not be blank.`);
+  }
+  // A computed key in a literal is an own data property, even for `__proto__`.
+  return { ...previous, [key]: paramValue };
+}
+
+export function registerCatalogueCommands(program: Command, deps: CliDeps): void {
+  program
+    .command("search")
+    .argument("[query]", "Solr query", parseNonEmpty)
+    .description("Search datasets (Solr query syntax)")
+    .option("--rows <n>", "max results", once(parseIntArg))
+    .option("--start <n>", "offset for paging", once(parseIntArg))
+    .option("--sort <expr>", 'e.g. "metadata_modified desc"', once(parseNonEmpty))
+    .option(
+      "--fq <filter>",
+      "filter query, e.g. groups:tran (repeatable; all must match)",
+      collectNonEmpty,
+    )
+    .action(
+      action(deps, async ({ client, global, opts }, [query]) => {
+        renderJson(
+          deps,
+          global,
+          await client.packageSearch({
+            q: query,
+            rows: opts["rows"] as number | undefined,
+            start: opts["start"] as number | undefined,
+            sort: opts["sort"] as string | undefined,
+            fq: opts["fq"] as string[] | undefined,
+          }),
+        );
+      }),
+    );
+
+  program
+    .command("package")
+    .argument("<id>", "dataset id or name", parseNonEmpty)
+    .description("Show one dataset by id or name")
+    .action(
+      action(deps, async ({ client, global }, [id]) => {
+        renderJson(deps, global, await client.packageShow(id!));
+      }),
+    );
+
+  program
+    .command("packages")
+    .description("List dataset names")
+    .option("--limit <n>", "max names (1 or more; omit for all)", parseLimit)
+    .option("--offset <n>", "offset for paging", once(parseIntArg))
+    .action(
+      action(deps, async ({ client, global, opts }) => {
+        renderJson(
+          deps,
+          global,
+          await client.packageList({
+            limit: opts["limit"] as number | undefined,
+            offset: opts["offset"] as number | undefined,
+          }),
+        );
+      }),
+    );
+
+  program
+    .command("organizations")
+    .description("List organizations (data publishers)")
+    .option("--all-fields", "return full objects instead of names")
+    .action(
+      action(deps, async ({ client, global, opts }) => {
+        renderJson(
+          deps,
+          global,
+          await client.organizationList({ all_fields: opts["allFields"] as boolean | undefined }),
+        );
+      }),
+    );
+
+  program
+    .command("organization")
+    .argument("<id>", "organization id or name", parseNonEmpty)
+    .description("Show one organization")
+    .action(
+      action(deps, async ({ client, global }, [id]) => {
+        renderJson(deps, global, await client.organizationShow(id!));
+      }),
+    );
+
+  program
+    .command("groups")
+    .description("List groups (themes/categories)")
+    .option("--all-fields", "return full objects instead of names")
+    .action(
+      action(deps, async ({ client, global, opts }) => {
+        renderJson(
+          deps,
+          global,
+          await client.groupList({ all_fields: opts["allFields"] as boolean | undefined }),
+        );
+      }),
+    );
+
+  program
+    .command("group")
+    .argument("<id>", "group id or name", parseNonEmpty)
+    .description("Show one group")
+    .action(
+      action(deps, async ({ client, global }, [id]) => {
+        renderJson(deps, global, await client.groupShow(id!));
+      }),
+    );
+
+  program
+    .command("tags")
+    .description("List tags")
+    .option("--query <substring>", "filter tags by substring", once(parseNonEmpty))
+    .action(
+      action(deps, async ({ client, global, opts }) => {
+        renderJson(deps, global, await client.tagList(opts["query"] as string | undefined));
+      }),
+    );
+
+  program
+    .command("resource")
+    .argument("<id>", "resource id", parseNonEmpty)
+    .description("Show one resource (distribution) by id")
+    .action(
+      action(deps, async ({ client, global }, [id]) => {
+        renderJson(deps, global, await client.resourceShow(id!));
+      }),
+    );
+
+  program
+    .command("action <name>")
+    .description("Call any CKAN action by name (generic escape hatch)")
+    .option("--param <key=value>", "query parameter (repeatable)", collectKeyValue)
+    .action(
+      action(deps, async ({ client, global, opts }, [name]) => {
+        const params = (opts["param"] as Record<string, string> | undefined) ?? {};
+        renderJson(deps, global, await client.action(name!, params as QueryParams));
+      }),
+    );
+}

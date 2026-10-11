@@ -1,0 +1,68 @@
+{
+  "name": "@maschinenlesbar.org/govdata-cli",
+  "version": "0.5.0",
+  "description": "TypeScript API client and CLI for the open GovData CKAN catalogue API (ckan.govdata.de)",
+  "type": "module",
+  "bin": {
+    "govdata": "dist/src/cli/index.js"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "!dist/src/**/*.map",
+    "LICENSING.md",
+    "CONTRIBUTING.md",
+    "DATA_LICENSE.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "prepack": "tsc -b ../../tsconfig.json && node ../../tools/pack/prepack.mjs",
+    "postpack": "node ../../tools/pack/postpack.mjs",
+    "test": "node --test $(node -p \"+process.versions.node.split('.')[0] >= 24 ? '--test-timeout=5000' : ''\") dist/test/*.test.js"
+  },
+  "keywords": [
+    "govdata",
+    "ckan",
+    "open-data",
+    "opendata",
+    "catalogue",
+    "germany",
+    "cli",
+    "api-client"
+  ],
+  "author": "Sebastian Schürmann <sebs@2xs.org>",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maschinenlesbar-org/govdata-cli.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/maschinenlesbar-org/govdata-cli/issues"
+  },
+  "homepage": "https://maschinenlesbar-org.github.io/govdata-cli/",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/sebs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@maschinenlesbar.org/govdata-client": "0.0.1",
+    "commander": "15.0.0"
+  },
+  "bundleDependencies": [
+    "@maschinenlesbar.org/govdata-client",
+    "commander"
+  ]
+}

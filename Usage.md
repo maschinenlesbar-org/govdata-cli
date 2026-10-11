@@ -16,7 +16,7 @@ npm i -g @maschinenlesbar.org/govdata-cli
 ```
 
 This installs the **`govdata`** binary. Without a global install you can run it
-straight from the build output: `node dist/src/cli/index.js <command>`. The
+straight from the build output: `node apps/cli/dist/src/cli/index.js <command>`. The
 examples use `govdata`.
 
 ## Use cases

@@ -21,14 +21,14 @@ The package ships both a CLI (`govdata`) and a typed API client
 
 ```bash
 npm install
-npm run build        # compiles TypeScript to dist/
+npm run build        # compiles every workspace (tsc -b) to its dist/
 ```
 
 Run the locally built CLI without a global install:
 
 ```bash
-node dist/src/cli/index.js --help
-# or, after `npm link`:
+node apps/cli/dist/src/cli/index.js --help    # or: npm start -- --help
+# or, after `npm link --workspace apps/cli`:
 govdata --help
 ```
 
@@ -123,9 +123,46 @@ kept the last value.
 
 ## Architecture
 
+The repository is an **npm workspace** with two folders: `apps/` holds the programs it
+publishes, `packages/` the libraries they are built from.
+
 ```
-src/
-  client/
+package.json         # private workspace manifest: no version, never packed
+apps/cli/            # @maschinenlesbar.org/govdata-cli — the published package
+  package.json       # its version, bin, files, bundleDependencies
+  src/index.ts       # library entry: re-exports @maschinenlesbar.org/govdata-client
+  src/cli/           # the CLI (below)
+  test/              # CLI tests and every conformance-*.test.ts
+packages/client/     # @maschinenlesbar.org/govdata-client — private, bundled into the CLI
+  src/               # the API client (below)
+  test/              # tests that only touch the client, + the transport helpers
+tools/pack/          # prepack/postpack: bundle the client and commander into the tarball
+tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
+```
+
+- **The client is its own package** so a later MCP app can share it with the CLI. It is
+  never published on its own: `apps/cli`'s `prepack` copies it (and commander) into the
+  app's `node_modules`, and `bundleDependencies` ships it inside the tarball. The library
+  entry re-exports the client's `"."`, so `import { GovDataClient } from
+  "@maschinenlesbar.org/govdata-cli"` is unchanged.
+- **The client's exports:** `"."` is the public library surface (`src/index.ts`);
+  `"./internal/*"` maps to any module (`…/govdata-client/internal/engine`) for what the
+  CLI needs beyond that; `"./test/*"` reaches the client's test helpers from the CLI's
+  tests (not bundled). Only `"."` is part of the library.
+- **Dependencies point one way:** the app depends on the client, the client on nothing
+  in the workspace.
+- **The version lives in `apps/cli/package.json`.** The root has none; a plain
+  `npm version` at the root is refused. Release with `npm run bump -- <patch|minor|major>`,
+  which bumps the app, commits (the bare version as the message) and tags `vX.Y.Z`.
+- **TypeScript:** `tsconfig.base.json` holds the compiler options; every workspace has a
+  `tsconfig.json` (`src/`) and a `tsconfig.test.json` (`test/`), and the root
+  `tsconfig.json`/`tsconfig.test.json` reference them, built with `tsc -b`.
+
+The client (`packages/client/src/`) and the CLI (`apps/cli/src/`):
+
+```
+packages/client/src/
     types.ts     # CkanEnvelope, PackageSearchResult + parameter objects
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
@@ -133,7 +170,8 @@ src/
     errors.ts    # GovDataError / GovDataApiError / GovDataActionError / GovDataNetworkError / GovDataParseError / GovDataValidationError
     validate.ts  # the input rules (`…Problem` functions) and assertValid
     client.ts    # GovDataClient — CKAN actions over the engine (with result-unwrapping)
-  cli/
+    index.ts     # the client's public surface (the library entry re-exports it)
+apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
@@ -186,26 +224,26 @@ src/
   another host or crosses the wire in cleartext.
 - A base URL on plain `http:` to a host other than loopback (`localhost`, `127.0.0.0/8`, `::1`)
   gets one `WARN` record of `govdata.http` on stderr per run, before the first request (`action()` in
-  `src/cli/shared.ts`). The sentence comes from the exported `cleartextProblem(baseUrl,
+  `apps/cli/src/cli/shared.ts`). The sentence comes from the exported `cleartextProblem(baseUrl,
   secrets?)`: it names the host and, for a `user:password@`, "the base URL's credentials" (never
   the value). Help, version and usage errors never warn; stdout and the exit code are untouched.
 
 ### Library / technical terms
 
-**API client.** [`GovDataClient`](src/client/client.ts) — the typed wrapper over
+**API client.** [`GovDataClient`](packages/client/src/client.ts) — the typed wrapper over
 the CKAN Action API, with result-unwrapping and a generic `action` escape hatch.
 Usable as a library independently of the CLI.
 
-**Request engine.** [`RequestEngine`](src/client/engine.ts) — builds URLs,
+**Request engine.** [`RequestEngine`](packages/client/src/engine.ts) — builds URLs,
 serialises queries, applies retry/backoff, follows redirects, decodes JSON and
 maps errors. Sits between the client's action methods and the transport.
 `DEFAULT_BASE_URL` is `https://ckan.govdata.de`.
 
 **Transport.** A single function `(HttpRequest) => Promise<HttpResponse>`
-([`http.ts`](src/client/http.ts)). The default (`nodeHttpTransport`) uses Node's
+([`http.ts`](packages/client/src/http.ts)). The default (`nodeHttpTransport`) uses Node's
 built-in `http`/`https`; tests inject a mock. This is the only HTTP seam.
 
-**Query builder.** [`query.ts`](src/client/query.ts) — a dependency-free
+**Query builder.** [`query.ts`](packages/client/src/query.ts) — a dependency-free
 query-string serialiser: omits `undefined`/`null`, repeats arrays as repeated
 keys (`?fq_list=a&fq_list=b`), stringifies booleans/Dates, and encodes spaces as
 `%20`. CKAN does not accept every parameter repeated: a repeated `fq` fails with
@@ -217,11 +255,11 @@ matches nothing for a nested `(-organization:x)`). Facet fields go out as the
 JSON list `facet.field` expects.
 
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
-([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`).
+([`io.ts`](apps/cli/src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`).
 Lets the whole CLI run in tests with a mocked client and captured output — no
 subprocess.
 
-**Error types.** [`errors.ts`](src/client/errors.ts): `GovDataApiError`
+**Error types.** [`errors.ts`](packages/client/src/errors.ts): `GovDataApiError`
 (non-2xx, carries `status`/`detail`/`url`, with `isRetryable`),
 `GovDataNetworkError` (transport failure/timeout, including the default transport's
 per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a CKAN
@@ -268,7 +306,7 @@ Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exporte
 redacted) `}`) is called once per retry right before the sleep, never when there is none, and
 a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
 `govdata.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
-seconds, ms under 1 s). Tests: `test/engine.test.ts`, `test/retry-log.test.ts`.
+seconds, ms under 1 s). Tests: `packages/client/test/engine.test.ts`, `apps/cli/test/retry-log.test.ts`.
 
 **Transport contract.** The engine enforces its limits for every transport, not only
 the built-in one: each call runs under the `timeoutMs` deadline (the request carries
@@ -327,17 +365,22 @@ unknown charset label is a `GovDataParseError`.
 ## Testing
 
 ```bash
-npm test          # builds, then runs `node --test` over dist/test
+npm test          # builds, then runs `node --test` over each workspace's dist/test
+npm run coverage  # the same tests in one run, with a coverage report
+node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
+
+The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`),
+everything that drives the CLI is in `apps/cli/test/`.
 
 - **`query.test.ts`** — query-string serialisation.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry, redirects — mocked transport.
 - **`client.test.ts`** — action URL/param mapping, result unwrapping, `success:false` handling — mocked transport.
-- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `helpers.ts`), same outcome on both sides.
+- **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `apps/cli/test/helpers.ts`), same outcome on both sides.
 - **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `GovDataValidationError`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
-- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+- **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands, any other stdout error is an ERROR record of `govdata.output`.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan
@@ -361,9 +404,13 @@ npm test          # builds, then runs `node --test` over dist/test
 
 GitHub Actions workflows under `.github/workflows/`:
 
-- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, and create a GitHub Release with the tarball.
-- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
+- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR; then pack the
+  real tarball, check the pack left nothing behind, install it globally with the registry out
+  of reach and run the bin.
+- **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
+  `apps/cli/package.json`, test, write the SBOMs (scoped to the `apps/cli` workspace), then
+  `npm pack --workspace apps/cli`, and create a GitHub Release with the tarball.
+- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — build the project website (`site/`, English and German) with the TypeDoc API docs
   under `/api/`, and deploy both to GitHub Pages on each `v*` tag.
   TypeDoc runs from the isolated, lockfile-pinned `tools/docs/` toolchain because it
@@ -379,7 +426,9 @@ The project website — <https://maschinenlesbar-org.github.io/govdata-cli/> in 
 reference under `/api/`. Its content comes from this repository: the README intro and quick
 start, the command tree of the built CLI (`site/scripts/cli-reference.mjs`), `Usage.md`,
 `GLOSSARY.md` and its German version `GLOSSARY.de.md`, the skills, and the skill examples in
-`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` and
+`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` (which
+also says where the published manifest and the built program are: `manifest:
+apps/cli/package.json`, `program: apps/cli/dist/src/cli/program.js`) and
 `site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
 identical in every maschinenlesbar.org CLI, so change it in all of them together. When the
 README intro changes, update the German intro in `site/_data/project.yml`.
@@ -398,7 +447,7 @@ contributions; see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## The log on stderr
 
-Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+Every diagnostic line on stderr is a log record (`apps/cli/src/cli/log.ts`): a timestamp, a level
 (`ERROR`, `WARN`, `INFO`) and a topic, `govdata.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`

@@ -66,6 +66,12 @@ new GovDataClient({
 });
 ```
 
+Every optional field of the exported option and parameter types (`EngineOptions`,
+`PackageSearchParams`, `ListParams`) is typed `?: T | undefined`, so a consumer compiled with
+`exactOptionalPropertyTypes` can pass `{ baseUrl: process.env.GOVDATA_BASE_URL }`: an option
+given as `undefined` means its default, as an omitted one does
+(`packages/client/test/types.test.ts`).
+
 `userAgent` goes through `assertHeaderValue` (exported; the rule is `headerValueProblem`,
 which `--user-agent` uses too): a blank value, a C0 control other than tab (CR/LF
 included), DEL or a character above U+00FF throws `GovDataValidationError` at
@@ -378,13 +384,14 @@ npm run coverage  # the same tests in one run, with a coverage report
 node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
 
-The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`),
+The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`, `types`),
 everything that drives the CLI is in `apps/cli/test/`.
 
 - **`query.test.ts`** — query-string serialisation.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry, redirects — mocked transport.
 - **`client.test.ts`** — action URL/param mapping, result unwrapping, `success:false` handling — mocked transport.
+- **`types.test.ts`** — the exported option types: a consumer compiled by `tsc` with `exactOptionalPropertyTypes` (starts a process, 30 s), and every option given as `undefined` means its default.
 - **`parity.test.ts`** — CLI ↔ library parity: one input through `run()` and through the library on one mock transport (`parity()` in `apps/cli/test/helpers.ts`), same outcome on both sides.
 - **`validate.test.ts`** — `assertValid`, the `…Problem` rules, and how `run.ts` reports a `GovDataValidationError`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.

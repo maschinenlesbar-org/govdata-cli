@@ -86,47 +86,47 @@ export interface EngineOptions {
    * selects it). An http(s) URL without a query, fragment, whitespace or control
    * characters; otherwise the constructor throws.
    */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
-  transport?: Transport;
+  transport?: Transport | undefined;
   /**
    * Value of the User-Agent header (default `govdata-cli`). Must be sendable (see
    * `assertHeaderValue`): not blank, no control characters but tab, nothing above
    * U+00FF; otherwise the constructor throws GovDataValidationError.
    */
-  userAgent?: string;
+  userAgent?: string | undefined;
   /** Per-request timeout in milliseconds (default 30000; 0 disables; at most `MAX_TIMEOUT_MS`, 2^31 - 1 ms). */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /**
    * Number of automatic retries for transient (429/503) responses and reset
    * connections, 0..`MAX_RETRIES` (10; default 2). Each waits `retryDelayMs * attempt`,
    * or longer if the response's `Retry-After` asks (up to `MAX_RETRY_AFTER_MS`; a longer
    * one is not retried, and the error names the requested wait).
    */
-  maxRetries?: number;
+  maxRetries?: number | undefined;
   /**
    * Base backoff between retries in milliseconds (grows linearly); used without a
    * Retry-After. Default 200, at most `MAX_RETRY_AFTER_MS`.
    */
-  retryDelayMs?: number;
+  retryDelayMs?: number | undefined;
   /**
    * Number of HTTP redirects (301/302/303/307/308) to follow, 0..20. Defaults to 5. Any
    * other 3xx, one with a missing or malformed Location, and one past this limit
    * surface as a GovDataApiError naming the target.
    */
-  maxRedirects?: number;
+  maxRedirects?: number | undefined;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
    * from a hostile/buggy endpoint). Defaults to 100 MiB; set to 0 for no limit.
    */
-  maxResponseBytes?: number;
+  maxResponseBytes?: number | undefined;
   /** Injectable sleep, primarily for deterministic tests. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: ((ms: number) => Promise<void>) | undefined;
   /**
    * Called once per retry, right before the backoff sleep, for each retried 429/503
    * and reset connection; never when there is no retry. A throw is swallowed.
    */
-  onRetry?: (event: RetryEvent) => void;
+  onRetry?: ((event: RetryEvent) => void) | undefined;
 }
 
 /** What `EngineOptions.onRetry` is told about one retry. */

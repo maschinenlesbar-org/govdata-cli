@@ -41,22 +41,22 @@ export type Resource = JsonObject;
 /** Parameters for `package_search`. */
 export interface PackageSearchParams {
   /** Solr query string, e.g. `title:Haushalt`. */
-  q?: string;
+  q?: string | undefined;
   /**
    * Filter queries, e.g. `["organization:statistisches-bundesamt"]`. All must
    * match. Sent as CKAN's `fq_list` (a single filter twice), each its own Solr
    * filter, so a top-level `OR` inside one filter works as written.
    */
-  fq?: string[];
-  rows?: number;
-  start?: number;
+  fq?: string[] | undefined;
+  rows?: number | undefined;
+  start?: number | undefined;
   /** e.g. `"metadata_modified desc"`. */
-  sort?: string;
+  sort?: string | undefined;
   /**
    * Facet fields to compute, e.g. `["organization", "res_format"]`. Sent as
    * CKAN's `facet.field` JSON list; counts come back in `search_facets`.
    */
-  facet_field?: string[];
+  facet_field?: string[] | undefined;
 }
 
 /** Parameters for the `*_list` endpoints. */
@@ -65,8 +65,8 @@ export interface ListParams {
    * Most entries to return: a positive integer (CKAN reads 0 as "no limit", so 0
    * is refused). Leave it out for the whole list.
    */
-  limit?: number;
-  offset?: number;
+  limit?: number | undefined;
+  offset?: number | undefined;
   /** Return full objects instead of just names (organization/group lists). */
-  all_fields?: boolean;
+  all_fields?: boolean | undefined;
 }

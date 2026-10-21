@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
 import {
   MAX_RETRY_AFTER_MS,
@@ -806,4 +807,33 @@ test("bigIntegerKeys: a declared member's number is its exact literal as a strin
   // Without declarations the scan is the plain number check.
   assert.equal(firstInexactNumber('{"a":"1e400","b":3e-324}'), "3e-324");
   assert.deepEqual(scanNumbers('{"a":1}'), { json: '{"a":1}', inexact: undefined });
+});
+
+test("an answer longer than V8's longest string is a GovDataParseError naming the request, not a plain Error (T14)", async (t) => {
+  // A real one needs a body of 512 MB and more (possible with maxResponseBytes 0): V8's own
+  // error is stood in for, for the body marked by its length.
+  const huge = Buffer.from('{"help":"h","success":true,"result":{}}    ');
+  const tooLong = Object.assign(new Error("Cannot create a string longer than 0x1fffffe8 characters"), { code: "ERR_STRING_TOO_LONG" });
+  const decode = TextDecoder.prototype.decode;
+  t.mock.method(TextDecoder.prototype, "decode", function (this: InstanceType<typeof TextDecoder>, input?: Uint8Array, options?: { stream?: boolean }) {
+    if (input !== undefined && input.byteLength === huge.length) throw tooLong;
+    return decode.call(this, input, options);
+  });
+  const toString = Buffer.prototype.toString;
+  t.mock.method(Buffer.prototype, "toString", function (this: Buffer, ...args: Parameters<Buffer["toString"]>) {
+    if (this.length === huge.length && args[0] === "utf8") throw tooLong;
+    return toString.apply(this, args);
+  });
+  const e = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "application/json")).transport });
+  await assert.rejects(e.getJson("/api/3/action/package_show", { id: "x" }), (err: unknown) => {
+    assert.ok(err instanceof GovDataParseError, String(err));
+    assert.equal(
+      err.message,
+      `GET https://ckan.govdata.de/api/3/action/package_show?id=x: the answer is too large to read as text (${huge.length} bytes; the longest string is 536870888 characters).`,
+    );
+    return true;
+  });
+  // An error status with such a body is still the API error, without the unreadable body.
+  const failing = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "text/plain", 500)).transport });
+  await assert.rejects(failing.getJson("/x"), (err: unknown) => err instanceof GovDataApiError && err.status === 500 && err.body === "");
 });

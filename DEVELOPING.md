@@ -301,9 +301,11 @@ library caller (a typed value after its userinfo is redacted, so a cut never lea
 a password); `GovDataApiError.body` keeps the full text.
 A number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in any
 written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but too small,
-`1e-400`) is a `GovDataParseError` `Unexpected response from /api/3/action/<name>: the number
+`1e-400`; a subnormal that does not print as written, `3e-324`, printed `5e-324`) is a
+`GovDataParseError` `Unexpected response from /api/3/action/<name>: the number
 <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a linear scan
-that skips strings; below 2^53 a decimal fraction keeps a double's precision). Past 2^53 the
+that skips strings; below 2^53 and above the smallest normal double, 2.2250738585072014e-308, a
+decimal fraction keeps a double's precision). Past 2^53 the
 number as printed (`String(value)`, the shortest decimal that reads back as the same double) is
 compared with the number as written (`exactAtTheEdges`/`decimalOf`, no BigInt):
 `12345678901234567890` prints as `12345678901234567000` and is refused, while `1E23` or

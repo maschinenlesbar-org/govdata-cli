@@ -198,14 +198,23 @@ function isScalarParam(value: unknown): boolean {
 
 /**
  * A value of an `action()` parameter: a string, a finite number, a boolean or a valid Date, or a
- * list of them. `null`/`undefined` mean "not given". An object would go out as `[object Object]`,
- * NaN and Infinity as words, a nested list flattened. A string (or a list entry) must pass
+ * non-empty list of them. `null`/`undefined` alone mean "not given". An object would go out as
+ * `[object Object]`, NaN and Infinity as words, a nested list flattened. A list must hold at least
+ * one value and no `null`/`undefined` entry: the query builder drops those, so `{ q: [null] }` ran
+ * the action with no `q` at all, over the whole catalogue. A string (or a list entry) must pass
  * {@link textProblem}: it is sent as text (`normalizeText`).
  */
 export function queryValueProblem(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   const values: unknown[] = Array.isArray(value) ? value : [value];
-  if (!values.every((v) => v === null || v === undefined || isScalarParam(v))) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "Expected at least one value; leave the parameter out instead.";
+    const missing = value.findIndex((v) => v === null || v === undefined);
+    if (missing >= 0) {
+      return `item ${missing + 1} of ${value.length} is ${String(value[missing])}; a list holds values only (leave the parameter out instead).`;
+    }
+  }
+  if (!values.every(isScalarParam)) {
     return "Expected a string, a finite number, a boolean or a Date (or a list of them).";
   }
   // A string goes out as text (normalizeText): the text rules apply to it and to each list entry.

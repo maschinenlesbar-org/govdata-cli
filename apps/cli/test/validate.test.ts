@@ -101,11 +101,14 @@ test("tokenProblem, idProblem, sortProblem, fieldProblem: tokens are trimmed, ne
   assert.match(fieldProblem("res format") ?? "", /is not a Solr field name/);
 });
 
-test("listProblem and queryValueProblem: no empty list, no blank item (D8)", () => {
+test("listProblem and queryValueProblem: no empty list, no blank or missing item (D8, Bug 01-2)", () => {
   assert.equal(listProblem(["a", "b"]), undefined);
   assert.equal(listProblem([]), "Expected at least one value.");
   assert.equal(listProblem(["a", " "]), "item 2 of 2: Expected a non-empty value.");
   for (const v of ["x", 5, true, new Date(0), ["a", 1], null, undefined]) assert.equal(queryValueProblem(v), undefined, String(v));
+  assert.equal(queryValueProblem([null]), "item 1 of 1 is null; a list holds values only (leave the parameter out instead).");
+  assert.equal(queryValueProblem(["a", undefined]), "item 2 of 2 is undefined; a list holds values only (leave the parameter out instead).");
+  assert.equal(queryValueProblem([]), "Expected at least one value; leave the parameter out instead.");
   assert.match(queryValueProblem({}) ?? "", /^Expected a string, a finite number/);
   assert.equal(queryValueProblem(["a", ""]), "item 2 of 2: Expected a non-empty value.");
 });

@@ -76,6 +76,18 @@ test("a typed method's parameter given as null means not given, as the docs say 
   assert.equal(mt.calls.length, 5);
 });
 
+test("action() refuses a list with no value or a missing entry, never sends it unfiltered (Bug 01-2)", async () => {
+  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  const client = clientWith(mt);
+  for (const q of [[null], [undefined], [], ["a", null]]) {
+    await assert.rejects(client.action("package_search", { q } as never), GovDataValidationError, JSON.stringify(q));
+  }
+  assert.equal(mt.calls.length, 0);
+  // A parameter given as null or undefined alone means not given.
+  await client.action("package_search", { q: null, fq: undefined } as never);
+  assert.equal(new URL(mt.last().url).search, "");
+});
+
 test("packageSearch sends several filters as fq_list, not a repeated fq", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
   await clientWith(mt).packageSearch({ fq: ["organization:x", "-groups:tran"] });

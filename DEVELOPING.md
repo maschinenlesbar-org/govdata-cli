@@ -123,8 +123,10 @@ parameter, call `action("package_search", params)`, which takes any key. `fq` an
 `facet_field` must be arrays of strings (a string used to be read character by
 character), `all_fields` a boolean. `action()` checks values instead of keys: a string,
 a finite number, a boolean or a valid `Date`, or a list of them; an object (which went
-out as `[object Object]`), `NaN`, `Infinity` or a nested list throws
-`GovDataValidationError`.
+out as `[object Object]`), `NaN`, `Infinity`, a nested list, an empty list or a list with a
+`null`/`undefined` entry throws `GovDataValidationError` (`queryValueProblem`). The query
+builder drops `null` and `undefined`, so `{ q: [null] }` used to run the action with no `q`
+at all, over the whole catalogue; `null` or `undefined` alone still mean "not given".
 
 In the CLI, `--fq` and `--param` are repeatable; every other option that takes a value
 (`--rows`, `--start`, `--sort`, `--limit`, `--offset`, `--query` and the global

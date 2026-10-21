@@ -352,7 +352,8 @@ engine rejects at the deadline whether the transport stops or not), and the body
 gets back is checked against `maxResponseBytes`. It accepts any `ArrayBuffer` view
 (`Buffer`, a fetch `Uint8Array`, a `DataView`) or `ArrayBuffer` as the body, from any
 realm, and reads headers (`Retry-After`, `Location`, `Content-Type`) from a plain object
-in any case, a `Headers` object or a `Map`. A malformed response (no numeric status, no
+in any case, a `Headers` object or a `Map` (read into a record without a prototype, so a
+header named `__proto__` is an ordinary header). A malformed response (no numeric status, no
 headers, a string body) and anything a transport throws become a `GovDataNetworkError`.
 
 **Redirect credential-strip.** The one credential the client can send is the

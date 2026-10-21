@@ -211,10 +211,15 @@ apps/cli/src/cli/
   `GovDataParseError` (`GET <url>: unexpected response shape: expected …`), and
   the typed methods check the result's top-level shape (an object for `*_show`, an array for
   the lists, `count` + `results` for `package_search`); the generic `action` passes any result
-  through. A response nested too deeply to print is a clear error, not a stack overflow.
+  through. An answer that cannot be printed is an `OutputError` (`output.ts`; an ERROR record
+  of `govdata.output`, exit 1) that names the cause: `The answer is nested too deeply to
+  pretty-print.` (the stack) or `The answer is too large (more than 536870888 characters of
+  JSON) to pretty-print.` (V8's longest string), with `; try --compact` only when the compact
+  form of that very answer prints (probed with `compactPrints`, never assumed from the Node
+  version).
   `--compact` takes V8's fast path (`JSON.stringify(value)`, the only one that prints very
   deep nesting on Node 26) unless the answer holds a string or key of 64 Mi characters or
-  more (`holdsHugeString`): on Node 26 the fast path aborts the process on a ~250 MB
+  more (`holdsHugeString`: iterative, linear, no allocation per value): on Node 26 the fast path aborts the process on a ~250 MB
   string from JSON.parse, so such an answer goes through the gap path (an empty gap, the
   same text).
 - Library input is checked before any request, as the CLI checks its options: a blank `q`,
@@ -515,11 +520,12 @@ forge another one or steer the terminal. Before that a lone surrogate (half a
 character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
-after one, unexpected errors, a response nested too deeply to print), `api` (the API's
+after one, unexpected errors), `api` (the API's
 answers: an error status, CKAN's error envelope on HTTP 200, a `GovDataActionError`, and a
 malformed answer, a `GovDataParseError`: bad JSON, not JSON, a number it cannot carry exactly, not a CKAN envelope, the wrong result shape, an
 unknown charset), `http` (the connection, the cleartext
-warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+warning) and `output` (a failed stdout write, an answer too deeply nested or too large to
+print). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of one of the program's own value options and takes the
 first `--log-format`, used only for the records of a parse error; the program's `preAction`

@@ -429,7 +429,13 @@ everything that drives the CLI is in `apps/cli/test/`.
   nothing raw, well-formed and bounded, the secret replaced in the message only,
   commander's help one record per line, the format commander parsed, a malformed answer
   under `api`, echoed credentials replaced, an `a:b@c` value left alone; adapter switches
-  `USAGE_EXIT` 1, `OUTPUT_OPTION` undefined: govdata has no `-o`).
+  `USAGE_EXIT` 1, `OUTPUT_OPTION` undefined: govdata has no `-o`); from the kit rollout
+  2026-10-21, P24 the input corpus (every text filter, the search text and `tags --query`, is
+  sent trimmed and in NFC or refused, never blank; the one id that goes into a path, the
+  action name of `govdata action <name>`, is sent trimmed or refused; adapter `USAGE_EXIT`
+  1) and P25 the response corpus (a number a double can't carry exactly, or an empty
+  answer, is an error, never a changed value; via `--compact package`). P26 (`-o`
+  integrity) is not copied: govdata has no `-o`.
 
 ## Continuous integration
 

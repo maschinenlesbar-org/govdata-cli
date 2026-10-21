@@ -229,6 +229,17 @@ apps/cli/src/cli/
   non-string `baseUrl`, `userAgent` or action name, a non-function `transport` or `sleep` —
   never a raw `TypeError` and never the base `GovDataError`. Messages echo a rejected value
   by type, or quoted and cut at 500 characters.
+- **Free text goes out canonical.** The search text (`q`, `govdata search [query]`) and the
+  tag query (`tagList(query)`, `govdata tags --query`) are sent trimmed and in composed
+  Unicode, NFC (`normalizeText`, exported): a decomposed "Gewässer" pasted from a macOS
+  file name, or a trailing space, matched nothing. Inner whitespace is kept, and NFC
+  changes no character of Solr's query syntax (all ASCII), so a `q` such as
+  `title:Haushalt AND -type:x` keeps its meaning. Solr filters (`fq`, still sent as
+  `fq_list`), the sort expression, facet fields, ids and `action()` parameters go out
+  exactly as given: they are query syntax over exact-match fields, field names or codes,
+  where only the stored form decides what matches. NFKC is not used: it would rewrite
+  characters (`ﬁ`, full-width forms) that a phrase or wildcard may mean literally. The CLI
+  passes the values on as typed.
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.

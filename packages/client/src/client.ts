@@ -9,7 +9,7 @@
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
 import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
-import { assertValid, textProblem } from "./validate.js";
+import { assertValid, normalizeText, textProblem } from "./validate.js";
 import type {
   CkanEnvelope,
   PackageSearchResult,
@@ -276,7 +276,8 @@ export class GovDataClient {
    * filter applied twice selects the same datasets). Wrapping it in parentheses
    * instead would break a negated filter: Solr matches nothing for a nested
    * `(-organization:x)`. Facet fields go out as the JSON list CKAN expects in
-   * `facet.field`; it rejects `facet_field` with HTTP 400.
+   * `facet.field`; it rejects `facet_field` with HTTP 400. The search text `q` goes
+   * out trimmed and in NFC (`normalizeText`); filters, sort and facet fields as given.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     // Checked before any request: an unknown key, a blank text value, a string where
@@ -293,7 +294,7 @@ export class GovDataClient {
     return this.typed<PackageSearchResult>(
       "package_search",
       prune({
-        q: params.q,
+        q: params.q === undefined ? undefined : normalizeText(params.q),
         fq_list: fq.length === 1 ? [fq[0], fq[0]] : fq.length > 1 ? fq : undefined,
         rows: params.rows,
         start: params.start,
@@ -362,10 +363,11 @@ export class GovDataClient {
     return this.typed<Group>("group_show", { id }, isObject, "a JSON object");
   }
 
-  /** Tags, optionally filtered by a query substring. */
+  /** Tags, optionally filtered by a query substring (a blank one is refused; sent trimmed, in NFC). */
   async tagList(query?: string): Promise<string[]> {
     if (query !== undefined) assertText("query", query);
-    return this.typed<string[]>("tag_list", prune({ query }), Array.isArray, "an array");
+    const text = query === undefined ? undefined : normalizeText(query);
+    return this.typed<string[]>("tag_list", prune({ query: text }), Array.isArray, "an array");
   }
 
   /** A single resource (distribution) by id. */

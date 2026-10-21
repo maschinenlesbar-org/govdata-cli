@@ -44,6 +44,20 @@ export function textProblem(value: unknown): string | undefined {
 }
 
 /**
+ * A free-text value as CKAN matches it: without surrounding whitespace (a value pasted
+ * with a trailing space matched nothing) and in composed Unicode, NFC (a decomposed
+ * "Gewässer", a plus U+0308 as pasted from a macOS file name, matched nothing the
+ * composed form matches). Inner whitespace is kept. Used for the search text (`q`) and
+ * the tag query, never for ids, Solr filters (`fq`), sort expressions, field names or
+ * `action()` parameters. NFC changes no character of Solr's query syntax (all ASCII), so
+ * a `q` keeps its meaning; NFKC is not used, because it would rewrite characters (`ﬁ` to
+ * `fi`, full-width forms) that a phrase or a wildcard may mean literally.
+ */
+export function normalizeText(value: string): string {
+  return value.trim().normalize("NFC");
+}
+
+/**
  * A value for an HTTP header (the User-Agent): not blank, no C0 control other
  * than tab, no DEL, nothing above U+00FF. Node's HTTP layer refuses those at
  * request time with an untyped "Invalid character in header content", and a

@@ -50,7 +50,7 @@ open-data theme). Unlike an organization, a group does not own datasets; it
 classifies them. CLI: `groups`, `group`.
 
 **Tag.** A free keyword attached to a dataset for discovery. Tags can be listed
-and filtered by substring. CLI: `tags [--query <substring>]`.
+and filtered by substring (sent trimmed and in NFC). CLI: `tags [--query <substring>]`.
 
 **Facet.** A field CKAN aggregates over a search result to give value counts
 (e.g. how many hits per `organization` or `res_format`). The counts are
@@ -120,11 +120,14 @@ CKAN search is backed by **Apache Solr**, so its parameters use Solr syntax.
 CLI positional: `search [query]`. Solr **tokenises** the query, so a bare term may
 match on a sub-token rather than the whole string (e.g. `abc12345` can hit a title
 containing `12345`). Scope the field (`title:…`) or add an `--fq` filter when you
-need a precise match instead of a loose keyword.
+need a precise match instead of a loose keyword. Sent trimmed and in composed Unicode
+(NFC), so a decomposed umlaut pasted from a file name matches; the Solr syntax in it is
+left as written.
 
 **`fq` (filter query).** A Solr filter constraining results without affecting
 relevance scoring, e.g. `organization:statistisches-bundesamt`, `groups:tran`.
-CLI: `--fq` (repeatable; every filter must match). CKAN rejects a repeated `fq`
+CLI: `--fq` (repeatable; every filter must match). Sent exactly as written (its values
+are mostly exact-match codes). CKAN rejects a repeated `fq`
 key, and it puts `+capacity:public` in front of a single `fq`, which disables a
 top-level `OR` in it. So the client sends every filter as `fq_list` (a single one
 twice, because CKAN splits a lone `fq_list` value into characters), and

@@ -52,7 +52,8 @@ CLI: `organizations`, `organization`.
 Datensätze; sie ordnet sie ein. CLI: `groups`, `group`.
 
 **Tag.** Ein freies Schlagwort an einem Datensatz, das beim Auffinden hilft. Tags lassen
-sich auflisten und nach Teilzeichenketten filtern. CLI: `tags [--query <substring>]`.
+sich auflisten und nach Teilzeichenketten filtern (ohne umgebende Leerzeichen und in NFC
+gesendet). CLI: `tags [--query <substring>]`.
 
 **Facette.** Ein Feld, über das CKAN ein Suchergebnis aggregiert, um Häufigkeiten der
 Werte zu liefern (z. B. wie viele Treffer je `organization` oder `res_format`). Gezählt
@@ -124,11 +125,14 @@ Begriff. CLI-Positionsargument: `search [query]`. Solr **zerlegt** die Anfrage i
 ein einfacher Begriff kann also auf ein Teil-Token statt auf die ganze Zeichenkette passen
 (z. B. kann `abc12345` einen Titel treffen, der `12345` enthält). Schränken Sie das Feld
 ein (`title:…`) oder ergänzen Sie einen `--fq`-Filter, wenn Sie einen genauen Treffer statt
-eines losen Stichworts brauchen.
+eines losen Stichworts brauchen. Wird ohne umgebende Leerzeichen und in zusammengesetztem
+Unicode (NFC) gesendet, sodass ein zerlegter Umlaut aus einem Dateinamen trifft; die
+Solr-Syntax darin bleibt, wie sie geschrieben ist.
 
 **`fq` (Filterabfrage).** Ein Solr-Filter, der die Ergebnisse einschränkt, ohne die
 Relevanzbewertung zu beeinflussen, z. B. `organization:statistisches-bundesamt`,
-`groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). CKAN lehnt
+`groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). Wird genau so
+gesendet, wie er geschrieben ist (seine Werte sind meist exakt verglichene Codes). CKAN lehnt
 einen wiederholten `fq`-Schlüssel ab und stellt einem einzelnen `fq` `+capacity:public`
 voran, wodurch ein `OR` auf oberster Ebene darin wirkungslos wird. Daher sendet der Client
 jeden Filter als `fq_list` (einen einzelnen zweimal, weil CKAN einen einzelnen

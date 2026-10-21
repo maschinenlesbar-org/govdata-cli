@@ -211,6 +211,11 @@ apps/cli/src/cli/
   the typed methods check the result's top-level shape (an object for `*_show`, an array for
   the lists, `count` + `results` for `package_search`); the generic `action` passes any result
   through. A response nested too deeply to print is a clear error, not a stack overflow.
+  `--compact` takes V8's fast path (`JSON.stringify(value)`, the only one that prints very
+  deep nesting on Node 26) unless the answer holds a string or key of 64 Mi characters or
+  more (`holdsHugeString`): on Node 26 the fast path aborts the process on a ~250 MB
+  string from JSON.parse, so such an answer goes through the gap path (an empty gap, the
+  same text).
 - Library input is checked before any request, as the CLI checks its options: a blank `q`,
   `sort`, `fq`/`facet_field` entry, tag query or id, a blank `action()` parameter name or
   value (or list entry), an invalid action name, or a paging value that is not a

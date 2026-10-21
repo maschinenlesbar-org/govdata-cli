@@ -155,7 +155,7 @@ test("a number the JSON cannot carry exactly is a parse error, never a changed v
     const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(body(n), "application/json")).transport });
     await assert.rejects(e.getJson("/api/3/action/package_show", { id: "a" }), (err: unknown) => {
       assert.ok(err instanceof GovDataParseError, n);
-      assert.equal(err.message, `Unexpected response from /api/3/action/package_show: the number ${n} cannot be represented exactly.`);
+      assert.equal(err.message, `GET https://ckan.govdata.de/api/3/action/package_show?id=a: the number ${n} cannot be represented exactly.`);
       return true;
     });
   }
@@ -576,7 +576,8 @@ test("an action name, a scheme and a rejected string are quoted at most 500 char
   for (const body of [{ success: false, error: { message: "denied" } }, { hello: "world" }, { success: true }]) {
     const client = new GovDataClient({ transport: async () => jsonResponse(body) });
     await assert.rejects(client.action(name), (err: Error) => {
-      assert.ok(err.message.length < 800, `${err.message.length}: ${err.message.slice(0, 100)}`);
+      // The request (the URL holds the name) and the name: two values, each cut at 500.
+      assert.ok(err.message.length < 1300, `${err.message.length}: ${err.message.slice(0, 100)}`);
       assert.match(err.message, /a…/);
       return true;
     });
@@ -717,4 +718,22 @@ test("a header named __proto__ is an ordinary header, never the prototype of the
   const fetchLike = new Headers([["__proto__", "x"], ["content-type", "application/json"]]);
   const f = new RequestEngine({ transport: async () => ({ status: 200, headers: fetchLike as unknown as Record<string, string>, body: Buffer.from('{"a":1}') }) });
   assert.deepEqual(await f.getJson("/x"), { a: 1 });
+});
+
+test("an answer error names the request: method and URL, userinfo left out (D9)", async () => {
+  const answers: Array<[string, () => HttpResponse]> = [
+    ['the answer is not valid JSON (expected JSON, got Content-Type "text/html").', () => rawResponse("<html>", "text/html")],
+    ["the answer is not valid JSON.", () => rawResponse("{", "application/json")],
+    ["empty response body.", () => rawResponse(" ", "application/json")],
+    ["the number 1e400 cannot be represented exactly.", () => rawResponse('{"n":1e400}', "application/json")],
+    ['unsupported response charset "x-bogus".', () => rawResponse("{}", "application/json; charset=x-bogus")],
+  ];
+  for (const [what, respond] of answers) {
+    const e = new RequestEngine({ baseUrl: "https://alice:s3cret@ckan.example.test", transport: makeMockTransport(respond).transport });
+    await assert.rejects(e.getJson("/items", { q: "x" }), (err: unknown) => {
+      assert.ok(err instanceof GovDataParseError, what);
+      assert.equal(err.message, `GET https://ckan.example.test/items?q=x: ${what}`);
+      return true;
+    });
+  }
 });

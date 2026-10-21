@@ -317,14 +317,14 @@ test("a success:false error on HTTP 200 reaches stderr without escape sequences"
     jsonResponse({ success: false, error: { message: `evil${ESC}[31mRED${ESC}]0;TITLE${BEL}` } }),
   );
   assert.equal(await run(["package", "x"], cli.deps), 1);
-  assert.deepEqual(cli.err.map(untimed), ['ERROR [govdata.api] CKAN action "package_show" failed: evil[31mRED]0;TITLE']);
+  assert.deepEqual(cli.err.map(untimed), ['ERROR [govdata.api] GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evil[31mRED]0;TITLE']);
 });
 
 test("malformed envelopes exit 1 with a clear error instead of an Unexpected error", async () => {
   for (const body of [null, { success: true }, [1, 2]]) {
     const cli = makeCli(() => jsonResponse(body));
     assert.equal(await run(["--compact", "search", "x"], cli.deps), 1, JSON.stringify(body));
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.api\] Unexpected response shape from \/api\/3\/action\/package_search: /);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[govdata\.api\] GET https:\/\/ckan\.govdata\.de\/api\/3\/action\/package_search\?q=x: unexpected response shape: /);
   }
 });
 
@@ -492,7 +492,7 @@ test("a subcommand's value option does not swallow the program's --log-format, i
 test("CKAN's Not Found Error sent with HTTP 200 exits 4, like the same error on a 404", async () => {
   const notFound = makeCli(() => jsonResponse({ success: false, error: { __type: "Not Found Error", message: "Not found" } }));
   assert.equal(await run(["package", "no-such-id"], notFound.deps), 4);
-  assert.deepEqual(notFound.err.map(untimed), ['ERROR [govdata.api] CKAN action "package_show" failed: Not found']);
+  assert.deepEqual(notFound.err.map(untimed), ['ERROR [govdata.api] GET https://ckan.govdata.de/api/3/action/package_show?id=no-such-id: CKAN action "package_show" failed: Not found']);
   // Any other CKAN error on HTTP 200 stays 1.
   for (const error of [{ __type: "Authorization Error", message: "Access denied" }, { message: "Not found" }]) {
     const cli = makeCli(() => jsonResponse({ success: false, error }));

@@ -73,6 +73,8 @@ export interface RawResponse {
   data: Buffer;
   contentType: string;
   status: number;
+  /** The URL that answered, after any redirects (without the base URL's userinfo). */
+  url: string;
 }
 
 /**
@@ -705,37 +707,48 @@ export class RequestEngine {
         );
       }
 
-      return { data: body, contentType, status };
+      return { data: body, contentType, status, url };
     }
   }
 
-  /** Perform a GET expecting JSON and parse it into `T`. */
+  /** Perform a GET expecting JSON and parse it into `T` (see {@link getAnswer}). */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
+    return (await this.getAnswer<T>(path, query)).value;
+  }
+
+  /**
+   * Perform a GET expecting JSON: the parsed value, the URL that answered (after any redirects,
+   * userinfo redacted) and the request as an error message names it, `GET <url>` (cut at
+   * MAX_MESSAGE_VALUE_LENGTH). Every error about the answer starts with that request
+   * (`GET <url>: the answer is not valid JSON.`), so a log of a script's many calls tells which
+   * one failed; the client prefixes its own envelope and shape errors with it too.
+   */
+  async getAnswer<T>(path: string, query?: QueryParams): Promise<{ value: T; url: string; request: string }> {
     const res = await this.request("GET", path, { query, accept: "application/json" });
-    const text = decodeBody(res.data, res.contentType, path);
+    const url = redactUrl(res.url);
+    const request = `GET ${cutForMessage(url)}`;
+    const text = decodeBody(res.data, res.contentType, request);
+    if (text.trim() === "") {
+      // A broken answer, not "no results".
+      throw new GovDataParseError(`${request}: empty response body.`);
+    }
     let parsed: T;
     try {
       parsed = JSON.parse(text) as T;
     } catch (cause) {
-      // Name the status, the Content-Type and the parser's reason: an HTML maintenance
-      // page, an empty body and a truncated one otherwise all read the same. The reason
-      // can quote the body, so it is sanitised (and cut).
-      const type = res.contentType.trim() === "" ? "no Content-Type" : sanitizeServerText(res.contentType);
-      const reason = cause instanceof Error ? sanitizeServerText(cause.message) : "";
-      throw new GovDataParseError(
-        `Failed to parse JSON response from ${path} (HTTP ${res.status}, ${type})${reason ? `: ${reason}` : ""}`,
-        { cause },
-      );
+      // An HTML maintenance or proxy page is the usual non-JSON answer: name its type, so it
+      // reads as an upstream problem. The Content-Type is server text: sanitised and cut.
+      const type = cutForMessage(sanitizeServerText(res.contentType.split(";")[0]!));
+      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${type}")` : "";
+      throw new GovDataParseError(`${request}: the answer is not valid JSON${hint}.`, { cause: this.scrubCause(cause) });
     }
     // JSON.parse rounds and overflows numbers silently: refuse the answer rather than print a
     // changed value.
     const inexact = firstInexactNumber(text);
     if (inexact !== undefined) {
-      throw new GovDataParseError(
-        `Unexpected response from ${path}: the number ${cutForMessage(inexact)} cannot be represented exactly.`,
-      );
+      throw new GovDataParseError(`${request}: the number ${cutForMessage(inexact)} cannot be represented exactly.`);
     }
-    return parsed;
+    return { value: parsed, url, request };
   }
 
   private toApiError(
@@ -828,13 +841,13 @@ function withoutUserinfo(baseUrl: string): string {
  * used to turn "Straße" into "Stra\uFFFDe" with exit 0). An unknown charset is a
  * GovDataParseError.
  */
-function decodeBody(body: Buffer, contentType: string, path: string): string {
+function decodeBody(body: Buffer, contentType: string, request: string): string {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset);
   } catch {
-    throw new GovDataParseError(`Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`);
+    throw new GovDataParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(charset))}".`);
   }
   return decoder.decode(body);
 }

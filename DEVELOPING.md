@@ -207,7 +207,7 @@ apps/cli/src/cli/
   envelope with HTTP 200, and the CLI logs it under `api` like the same error on an error
   status. A body that is not an
   envelope (`null`, an array, no boolean `success`) or has no `result` is a
-  `GovDataParseError` (`Unexpected response shape from /api/3/action/<name>: expected …`), and
+  `GovDataParseError` (`GET <url>: unexpected response shape: expected …`), and
   the typed methods check the result's top-level shape (an object for `*_show`, an array for
   the lists, `count` + `results` for `package_search`); the generic `action` passes any result
   through. A response nested too deeply to print is a clear error, not a stack overflow.
@@ -302,8 +302,7 @@ a password); `GovDataApiError.body` keeps the full text.
 A number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in any
 written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but too small,
 `1e-400`; a subnormal that does not print as written, `3e-324`, printed `5e-324`) is a
-`GovDataParseError` `Unexpected response from /api/3/action/<name>: the number
-<N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a linear scan
+`GovDataParseError` `GET <url>: the number <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a linear scan
 that skips strings; below 2^53 and above the smallest normal double, 2.2250738585072014e-308, a
 decimal fraction keeps a double's precision). Past 2^53 the
 number as printed (`String(value)`, the shortest decimal that reads back as the same double) is
@@ -311,8 +310,13 @@ compared with the number as written (`exactAtTheEdges`/`decimalOf`, no BigInt):
 `12345678901234567890` prints as `12345678901234567000` and is refused, while `1E23` or
 `1.7976931348623157E308`, a double a server printed in its own shortest form, prints as the same
 number and passes.
-A parse error names the status and Content-Type (`Failed to parse JSON response from
-/api/3/action/x (HTTP 200, text/html): …`), so a proxy's maintenance page reads as one. Whatever an injected transport throws becomes a
+Every error about an answer starts with the request, `GET <url>` (the URL that answered, after any
+redirects, userinfo redacted, cut at 500; `RequestEngine.getAnswer` returns it with the value), so
+a script's log tells which call failed: `GET <url>: the answer is not valid JSON (expected JSON,
+got Content-Type "text/html").` (a proxy's maintenance page; the type is named when it isn't
+JSON), `GET <url>: empty response body.`, `GET <url>: unsupported response charset "…".`,
+`GET <url>: unexpected response shape: expected …`, and CKAN's error envelope
+`GET <url>: CKAN action "<name>" failed: …` (`GovDataActionError.url`). Whatever an injected transport throws becomes a
 `GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the
 default transport's network errors read the same way, so they name the request. No
 error and no client shows the base URL's password: the engine keeps the base URL in a
@@ -391,9 +395,10 @@ the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`
 **Charset.** A JSON body is decoded by the charset its `Content-Type` declares
 (`TextDecoder`; UTF-8 when none is given), so a mirror or proxy that re-encodes to
 Latin-1 still gives `Straße`, not `Stra�e`. A leading byte-order mark is dropped. An
-unknown charset label is a `GovDataParseError`.
+unknown charset label is a `GovDataParseError` (`GET <url>: unsupported response charset "…".`).
 
-**`RawResponse`.** The engine's raw-response shape (`data`/`contentType`/`status`)
+**`RawResponse`.** The engine's raw-response shape (`data`/`contentType`/`status`/`url`, the
+URL that answered)
 — exported for completeness; action endpoints return decoded JSON.
 
 **Global options.** CLI-wide flags resolved for every command and translated to

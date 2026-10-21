@@ -142,7 +142,7 @@ test("a body that is not a CKAN envelope is a GovDataParseError, not a TypeError
       (err: unknown) =>
         err instanceof GovDataParseError &&
         err.message ===
-          "Unexpected response shape from /api/3/action/package_search: expected a CKAN envelope (a JSON object with a boolean success).",
+          "GET https://ckan.govdata.de/api/3/action/package_search?q=x: unexpected response shape: expected a CKAN envelope (a JSON object with a boolean success).",
       JSON.stringify(body),
     );
   }
@@ -154,7 +154,7 @@ test("a success envelope without a result is a GovDataParseError; a null result 
     () => clientWith(mt).action("status_show"),
     (err: unknown) =>
       err instanceof GovDataParseError &&
-      err.message === "Unexpected response shape from /api/3/action/status_show: expected a result in the envelope.",
+      err.message === "GET https://ckan.govdata.de/api/3/action/status_show: unexpected response shape: expected a result in the envelope.",
   );
   const nul = makeMockTransport(() => jsonResponse(ckan(null)));
   assert.equal(await clientWith(nul).action("status_show"), null);
@@ -162,15 +162,15 @@ test("a success envelope without a result is a GovDataParseError; a null result 
 
 test("typed methods check the top-level shape of the result", async () => {
   const cases: Array<[string, (c: GovDataClient) => Promise<unknown>, unknown, string]> = [
-    ["package_search", (c) => c.packageSearch({ q: "x" }), { count: "3", results: [] }, "an object with a numeric count and a results array"],
-    ["package_search", (c) => c.packageSearch({ q: "x" }), { count: 3 }, "an object with a numeric count and a results array"],
-    ["package_show", (c) => c.packageShow("x"), [], "a JSON object"],
-    ["organization_show", (c) => c.organizationShow("x"), null, "a JSON object"],
-    ["group_show", (c) => c.groupShow("x"), "g", "a JSON object"],
-    ["resource_show", (c) => c.resourceShow("x"), 1, "a JSON object"],
+    ["package_search?q=x", (c) => c.packageSearch({ q: "x" }), { count: "3", results: [] }, "an object with a numeric count and a results array"],
+    ["package_search?q=x", (c) => c.packageSearch({ q: "x" }), { count: 3 }, "an object with a numeric count and a results array"],
+    ["package_show?id=x", (c) => c.packageShow("x"), [], "a JSON object"],
+    ["organization_show?id=x", (c) => c.organizationShow("x"), null, "a JSON object"],
+    ["group_show?id=x", (c) => c.groupShow("x"), "g", "a JSON object"],
+    ["resource_show?id=x", (c) => c.resourceShow("x"), 1, "a JSON object"],
     ["package_list", (c) => c.packageList(), {}, "an array"],
     ["organization_list", (c) => c.organizationList(), null, "an array"],
-    ["group_list", (c) => c.groupList({ all_fields: true }), { a: 1 }, "an array"],
+    ["group_list?all_fields=true", (c) => c.groupList({ all_fields: true }), { a: 1 }, "an array"],
     ["tag_list", (c) => c.tagList(), "t", "an array"],
   ];
   for (const [name, call, result, expected] of cases) {
@@ -179,7 +179,7 @@ test("typed methods check the top-level shape of the result", async () => {
       () => call(clientWith(mt)),
       (err: unknown) =>
         err instanceof GovDataParseError &&
-        err.message === `Unexpected response shape from /api/3/action/${name}: expected ${expected}.`,
+        err.message === `GET https://ckan.govdata.de/api/3/action/${name}: unexpected response shape: expected ${expected}.`,
       name,
     );
   }
@@ -283,9 +283,9 @@ test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi
     `str ${ESC}[31merr\nError: forged ${RLO}line`,
   ];
   const expected = [
-    'CKAN action "package_show" failed: evil[31mRED]0;TITLE [2J31m',
-    'CKAN action "package_show" failed: {"__type":"X31m","detail":"d\\u001b[2J"}',
-    'CKAN action "package_show" failed: str [31merr Error: forged line',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evil[31mRED]0;TITLE [2J31m',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: {"__type":"X31m","detail":"d\\u001b[2J"}',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: str [31merr Error: forged line',
   ];
   for (const [i, error] of errors.entries()) {
     const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));
@@ -371,7 +371,8 @@ test("a success:false envelope is a GovDataActionError naming the action and CKA
     assert.equal(err.action, "package_show");
     assert.equal(err.errorType, "Not Found Error");
     assert.equal(err.isNotFound, true);
-    assert.equal(err.message, 'CKAN action "package_show" failed: Not found');
+    assert.equal(err.message, 'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: Not found');
+    assert.equal(err.url, "https://ckan.govdata.de/api/3/action/package_show?id=x");
     return true;
   });
   // Without a __type (or with one that is no string) the type is undefined.
@@ -381,6 +382,29 @@ test("a success:false envelope is a GovDataActionError naming the action and CKA
       assert.ok(err instanceof GovDataActionError);
       assert.equal(err.errorType, undefined);
       assert.equal(err.isNotFound, false);
+      return true;
+    });
+  }
+});
+
+test("an error answer and a wrong shape name the request: method and URL, userinfo left out (D9)", async () => {
+  const site = "https://alice:s3cret@ckan.example.test";
+  const cases: Array<[string, unknown, (c: GovDataClient) => Promise<unknown>, string]> = [
+    ["error envelope", { help: "h", success: false, error: { __type: "Not Found Error", message: "Not found" } },
+      (c) => c.packageShow("x"), 'GET https://ckan.example.test/api/3/action/package_show?id=x: CKAN action "package_show" failed: Not found'],
+    ["wrong shape", ckan({ count: "many" }),
+      (c) => c.packageSearch({ q: "elbe" }), "GET https://ckan.example.test/api/3/action/package_search?q=elbe: unexpected response shape: expected an object with a numeric count and a results array."],
+    ["no result", { help: "h", success: true },
+      (c) => c.action("status_show"), "GET https://ckan.example.test/api/3/action/status_show: unexpected response shape: expected a result in the envelope."],
+    ["not an envelope", { hello: "world" },
+      (c) => c.action("status_show"), "GET https://ckan.example.test/api/3/action/status_show: unexpected response shape: expected a CKAN envelope (a JSON object with a boolean success)."],
+  ];
+  for (const [label, answer, call, message] of cases) {
+    const mt = makeMockTransport(() => jsonResponse(answer));
+    await assert.rejects(call(new GovDataClient({ transport: mt.transport, baseUrl: site })), (err: Error) => {
+      assert.ok(err instanceof GovDataError, label);
+      assert.equal(err.message, message, label);
+      assert.ok(!err.message.includes("s3cret"), label);
       return true;
     });
   }

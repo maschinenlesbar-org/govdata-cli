@@ -184,9 +184,9 @@ function isSearchResult(value: unknown): boolean {
   return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 && Array.isArray(value["results"]);
 }
 
-/** The error for an answer that does not have the shape the caller relies on. */
-function shapeError(name: string, expected: string): GovDataParseError {
-  return new GovDataParseError(`Unexpected response shape from ${ACTION}/${cutForMessage(name)}: expected ${expected}.`);
+/** The error for an answer that does not have the shape the caller relies on, naming the request (`GET <url>`). */
+function shapeError(request: string, expected: string): GovDataParseError {
+  return new GovDataParseError(`${request}: unexpected response shape: expected ${expected}.`);
 }
 
 export class GovDataClient {
@@ -203,6 +203,15 @@ export class GovDataClient {
    * GovDataValidationError before any request.
    */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
+    return (await this.call<T>(name, params)).result;
+  }
+
+  /**
+   * Call an action: its unwrapped `result` and the request as error messages name it
+   * (`GET <url>`, the URL that answered, userinfo redacted). Every error about the answer starts
+   * with that request.
+   */
+  private async call<T>(name: string, params: QueryParams): Promise<{ result: T; request: string }> {
     if (typeof name !== "string") {
       // `String(name)` made `action(5)` call an action named "5" and `action(null)` one named "null".
       throw wrongType("CKAN action name", "a string", name);
@@ -212,14 +221,14 @@ export class GovDataClient {
       throw new GovDataValidationError(`Invalid CKAN action name: ${cutForMessage(JSON.stringify(name))}`);
     }
     assertParams(params);
-    const env = await this.engine.getJson<CkanEnvelope<T> | null>(
+    const { value: env, url, request } = await this.engine.getAnswer<CkanEnvelope<T> | null>(
       `${ACTION}/${encodeURIComponent(action)}`,
       params,
     );
     // A proxy's JSON error page or another JSON API is not an envelope (`null`,
     // an array, an object without `success`); say so rather than crash on it.
     if (!isObject(env) || typeof env.success !== "boolean") {
-      throw shapeError(action, "a CKAN envelope (a JSON object with a boolean success)");
+      throw shapeError(request, "a CKAN envelope (a JSON object with a boolean success)");
     }
     if (!env.success) {
       // Surface CKAN's human-readable error.message; fall back to the raw JSON
@@ -238,20 +247,20 @@ export class GovDataClient {
       // engine's error-detail sanitising: strip terminal controls here too.
       const type = (e as { __type?: unknown } | null | undefined)?.__type;
       throw new GovDataActionError(
-        `CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`,
-        { action, errorType: typeof type === "string" ? sanitizeServerText(type) : undefined },
+        `${request}: CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`,
+        { action, errorType: typeof type === "string" ? sanitizeServerText(type) : undefined, url },
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI
     // would crash rendering `undefined`); CKAN always sends one, `null` included.
-    if (env.result === undefined) throw shapeError(action, "a result in the envelope");
-    return env.result as T;
+    if (env.result === undefined) throw shapeError(request, "a result in the envelope");
+    return { result: env.result as T, request };
   }
 
   /**
    * An action whose `result` must have a known top-level shape (never a deep
    * schema): a broken or foreign answer becomes a GovDataParseError naming the
-   * action, not a TypeError further down.
+   * request, not a TypeError further down.
    */
   private async typed<T>(
     name: string,
@@ -259,8 +268,8 @@ export class GovDataClient {
     ok: (value: unknown) => boolean,
     expected: string,
   ): Promise<T> {
-    const result = await this.action<unknown>(name, params);
-    if (!ok(result)) throw shapeError(name, expected);
+    const { result, request } = await this.call<unknown>(name, params);
+    if (!ok(result)) throw shapeError(request, expected);
     return result as T;
   }
 

@@ -210,18 +210,21 @@ export class GovDataApiError extends GovDataError {
 /**
  * CKAN answered with a `success: false` envelope on a 2xx status: the API's own error
  * answer, which CKAN can send with HTTP 200 (an error status is a `GovDataApiError`). The
- * message is `CKAN action "<action>" failed: <CKAN's error, one line>`; `errorType` is
+ * message is `GET <url>: CKAN action "<action>" failed: <CKAN's error, one line>`; `errorType` is
  * CKAN's `__type` (`"Not Found Error"`, `"Authorization Error"`, `"Validation Error"`),
  * or undefined when the error carries none.
  */
 export class GovDataActionError extends GovDataError {
   readonly action: string;
   readonly errorType: string | undefined;
+  /** The URL that answered, userinfo redacted; empty when the error was built without one. */
+  readonly url: string;
 
-  constructor(message: string, args: { action: string; errorType?: string | undefined }) {
+  constructor(message: string, args: { action: string; errorType?: string | undefined; url?: string | undefined }) {
     super(message);
     this.action = args.action;
     this.errorType = args.errorType;
+    this.url = args.url === undefined ? "" : redactUrl(args.url);
   }
 
   /** True for CKAN's `Not Found Error`: what a 404 says, sent with HTTP 200. */

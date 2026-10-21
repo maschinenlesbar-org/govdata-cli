@@ -216,7 +216,11 @@ apps/cli/src/cli/
   pretty-print.` (the stack) or `The answer is too large (more than 536870888 characters of
   JSON) to pretty-print.` (V8's longest string), with `; try --compact` only when the compact
   form of that very answer prints (probed with `compactPrints`, never assumed from the Node
-  version).
+  version). The printed JSON has DEL, the C1 controls and the bidi controls escaped
+  (`escapeControlChars`; each becomes six characters, so it counts first: past V8's longest
+  string it is `The answer is too large to print (N characters once its control characters
+  are escaped).`, else it builds the text in 64 Ki chunks, never one `+=` per character,
+  which died of a heap crash on 100 MB of DEL).
   `--compact` takes V8's fast path (`JSON.stringify(value)`, the only one that prints very
   deep nesting on Node 26) unless the answer holds a string or key of 64 Mi characters or
   more (`holdsHugeString`: iterative, linear, no allocation per value): on Node 26 the fast path aborts the process on a ~250 MB
@@ -454,7 +458,10 @@ everything that drives the CLI is in `apps/cli/test/`.
   action name of `govdata action <name>`, is sent trimmed or refused; adapter `USAGE_EXIT`
   1) and P25 the response corpus (a number a double can't carry exactly, or an empty
   answer, is an error, never a changed value; via `--compact package`). P26 (`-o`
-  integrity) is not copied: govdata has no `-o`.
+  integrity) is not copied: govdata has no `-o`. P27 (a big or odd answer is printed or
+  refused in one clean record, within memory: 8 M numbers with `--compact` under a 256 MB
+  heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `govdata.output`; runs
+  the built bin, 30 s).
 
 ## Continuous integration
 

@@ -409,3 +409,24 @@ test("an error answer and a wrong shape name the request: method and URL, userin
     });
   }
 });
+
+test("the client declares Solr's _version_ as a big integer: its exact literal as a string, as GovData sends it (D3)", async () => {
+  // GovData answers package_search?fl=name,_version_ with "_version_" as a string; a mirror that
+  // sends Solr's number (≈1.88e18, past 2^53) gets the same string, never a refusal.
+  const mt = makeMockTransport(() => ({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: Buffer.from('{"help":"h","success":true,"result":{"count":2,"results":[{"name":"a","_version_":1879692734409736192},{"name":"b","_version_":"1879677114230243328"}]}}'),
+  }));
+  const res = await clientWith(mt).packageSearch({ rows: 2 });
+  assert.deepEqual(res.results.map((r) => (r as Record<string, unknown>)["_version_"]), ["1879692734409736192", "1879677114230243328"]);
+  // A caller's own declarations add to it.
+  const own = makeMockTransport(() => ({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: Buffer.from('{"help":"h","success":true,"result":{"id":"x","serial":12345678901234567890,"_version_":1879692734409736192}}'),
+  }));
+  const shown = await new GovDataClient({ transport: own.transport, bigIntegerKeys: new Set(["serial"]) }).packageShow("x");
+  assert.deepEqual(shown, { id: "x", serial: "12345678901234567890", _version_: "1879692734409736192" });
+  assert.throws(() => new GovDataClient({ bigIntegerKeys: 5 as unknown as ReadonlySet<string> }), GovDataValidationError);
+});

@@ -6,7 +6,7 @@
 //   client.packageShow("some-dataset-id")
 //   client.action("organization_list")   // generic escape hatch
 
-import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
+import { bigIntegerKeysOption, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import type { QueryParams } from "./query.js";
 import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
 import { assertValid, normalizeText, textProblem } from "./validate.js";
@@ -23,6 +23,13 @@ import type {
 } from "./types.js";
 
 const ACTION = "/api/3/action";
+
+/**
+ * The members every GovDataClient declares as big integers (`EngineOptions.bigIntegerKeys`): Solr's
+ * `_version_`, which `package_search` returns for `fl=_version_` (GovData sends it as a string; a
+ * number would be past 2^53).
+ */
+const BIG_INTEGER_KEYS = ["_version_"] as const;
 
 /**
  * CKAN action names are always `[a-z0-9_]+`. Restricting to that allowlist closes
@@ -193,7 +200,13 @@ export class GovDataClient {
   private readonly engine: RequestEngine;
 
   constructor(options: EngineOptions = {}) {
-    this.engine = new RequestEngine(options);
+    // Solr's `_version_` (≈1.88e18, past 2^53) is always declared a big integer: a mirror that
+    // sends it as a number gets the string GovData sends, never a refused answer.
+    const given = options ?? {};
+    this.engine = new RequestEngine({
+      ...given,
+      bigIntegerKeys: new Set([...bigIntegerKeysOption(given.bigIntegerKeys), ...BIG_INTEGER_KEYS]),
+    });
   }
 
   /**

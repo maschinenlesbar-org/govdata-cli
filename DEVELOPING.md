@@ -64,6 +64,7 @@ new GovDataClient({
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   transport: customTransport, // inject your own HTTP transport
   onWarning: (message) => console.warn(message), // an answer delivered changed (text replaced with U+FFFD)
+  bigIntegerKeys: new Set(["serial"]), // members delivered as their exact literal, a string (`_version_` always)
 });
 ```
 
@@ -320,7 +321,12 @@ number as printed (`String(value)`, the shortest decimal that reads back as the 
 compared with the number as written (`exactAtTheEdges`/`decimalOf`, no BigInt):
 `12345678901234567890` prints as `12345678901234567000` and is refused, while `1E23` or
 `1.7976931348623157E308`, a double a server printed in its own shortest form, prints as the same
-number and passes.
+number and passes. A member declared in `bigIntegerKeys` (decision D3 of the 2026-10-21 fix
+plan) is exempt: its number is delivered as its exact literal, a JSON string, whatever its size,
+so its type never depends on its value (`scanNumbers` quotes it in the same linear pass, before
+`JSON.parse`; no reviver). The GovDataClient always declares Solr's `_version_`, which
+`package_search` returns for `fl=_version_`: GovData sends it as a string already, and a mirror
+that sends Solr's number (≈1.88e18) gets the same string instead of a refused answer.
 Every error about an answer starts with the request, `GET <url>` (the URL that answered, after any
 redirects, userinfo redacted, cut at 500; `RequestEngine.getAnswer` returns it with the value), so
 a script's log tells which call failed: `GET <url>: the answer is not valid JSON (expected JSON,

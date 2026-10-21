@@ -35,7 +35,7 @@ const REQUEST = `GET ${new URL(DEFAULT_BASE_URL).protocol}//${new URL(DEFAULT_BA
  * none. `bigBody(key, literal)` is a 2xx body for the call above with that member set to `literal`
  * where the client reads it; `bigFromCli`/`bigFromLib` read it back.
  */
-const BIG_INTEGER_KEYS: readonly string[] = [];
+const BIG_INTEGER_KEYS: readonly string[] = ["_version_"];
 const bigBody = (key: string, literal: string): string => `{"help":"h","success":true,"result":{"id":"a1",${JSON.stringify(key)}:${literal}}}`;
 const bigFromCli = (out: string, key: string): unknown => (JSON.parse(out) as Record<string, unknown>)[key];
 const bigFromLib = (value: unknown, key: string): unknown => (value as Record<string, unknown>)[key];

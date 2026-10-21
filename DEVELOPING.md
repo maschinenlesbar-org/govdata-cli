@@ -265,7 +265,7 @@ subprocess.
 **Error types.** [`errors.ts`](packages/client/src/errors.ts): `GovDataApiError`
 (non-2xx, carries `status`/`detail`/`url`, with `isRetryable`),
 `GovDataNetworkError` (transport failure/timeout, including the default transport's
-per-hop scheme check), `GovDataParseError` (bad JSON, or an answer that is not a CKAN
+per-hop scheme check), `GovDataParseError` (bad JSON, a number it cannot carry exactly, or an answer that is not a CKAN
 envelope of the expected shape), `GovDataValidationError` (an input refused before any
 request: a bad client option such as the base URL or User-Agent, or a bad method
 parameter), and `GovDataActionError` (a `success: false` envelope on a 2xx status, with
@@ -277,6 +277,11 @@ the user's input (an action name or parameter key, a scheme, a rejected string, 
 value or key, an unknown command) is cut there too, so `err.message` stays bounded for a
 library caller (a typed value after its userinfo is redacted, so a cut never leaves part of
 a password); `GovDataApiError.body` keeps the full text.
+A number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past 2^53 in any
+written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but too small,
+`1e-400`) is a `GovDataParseError` `Unexpected response from /api/3/action/<name>: the number
+<N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a linear scan
+that skips strings; below 2^53 a decimal fraction keeps a double's precision).
 A parse error names the status and Content-Type (`Failed to parse JSON response from
 /api/3/action/x (HTTP 200, text/html): …`), so a proxy's maintenance page reads as one. Whatever an injected transport throws becomes a
 `GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the
@@ -469,7 +474,7 @@ and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cu
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages and the help it shows
 after one, unexpected errors, a response nested too deeply to print), `api` (the API's
 answers: an error status, CKAN's error envelope on HTTP 200, a `GovDataActionError`, and a
-malformed answer, a `GovDataParseError`: bad JSON, not JSON, not a CKAN envelope, the wrong result shape, an
+malformed answer, a `GovDataParseError`: bad JSON, not JSON, a number it cannot carry exactly, not a CKAN envelope, the wrong result shape, an
 unknown charset), `http` (the connection, the cleartext
 warning) and `output` (a failed stdout write). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it

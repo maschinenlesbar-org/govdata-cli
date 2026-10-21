@@ -453,7 +453,7 @@ everything that drives the CLI is in `apps/cli/test/`.
 - **`cli.test.ts`** — end-to-end command parsing, `--param`/`--fq` handling and exit codes — mocked client.
 - **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
-- **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands, any other stdout error is an ERROR record of `govdata.output`.
+- **`io.test.ts`** — `handleOutputErrors`: EPIPE on stdout exits 0, on stderr the run's code stands, any other stdout error is an ERROR record of `govdata.output`; stdout to a regular file gets every byte or an error (`stdoutWriter`).
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan
   `.reviews/2026-10-05-exploratory/fix-plan.md` in the workspace), one file per pattern, the same
   code in every repo apart from an adapter block at the top: P1 credential redaction in CLI output,
@@ -475,7 +475,8 @@ everything that drives the CLI is in `apps/cli/test/`.
   action name of `govdata action <name>`, is sent trimmed or refused; adapter `USAGE_EXIT`
   1) and P25 the response corpus (a number a double can't carry exactly, or an empty
   answer, is an error, never a changed value; via `--compact package`). P26 (`-o`
-  integrity) is not copied: govdata has no `-o`. P27 (a big or odd answer is printed or
+  integrity) is copied without its `-o` tests (govdata has no `-o`): stdout redirected to a
+  file under `ulimit -f` exits 1 with an ERROR record of `govdata.output`, never 0. P27 (a big or odd answer is printed or
   refused in one clean record, within memory: 8 M numbers with `--compact` under a 256 MB
   heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `govdata.output`; runs
   the built bin, 30 s; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
@@ -565,7 +566,11 @@ escaped: the frame is never touched, and the secret is kept out of the log in ei
 format. `CliDeps.now` makes the timestamps testable. stdout
 carries data only. What happens outside `run()`, in the bin shim, is logged too: a failed
 stdout write is an ERROR record of `govdata.output` (`handleOutputErrors`, through
-`processLogger(argv)`, in the format argv asks for, with the run's redaction), and so are
+`processLogger(argv)`, in the format argv asks for, with the run's redaction). When stdout is
+a regular file (`> out.json`), every byte is written (`stdoutWriter`, `writeAll`): Node's
+stream wrote it with one `writeSync` and ignored a short count, so a file-size limit or a full
+disk cut the output short with exit 0; now the failure (EFBIG, ENOSPC) is stdout's `error`,
+an ERROR record and exit 1 (decision D6). So are
 Node's own process warnings (`NODE_TLS_REJECT_UNAUTHORIZED=0`): WARN records of
 `govdata.cli`, through `installWarningLog`, which removes Node's default `warning` listener
 and logs `(node) <name>: <message>` through `processLogger(argv)`. In `defaultDeps` a

@@ -171,8 +171,8 @@ Errors and diagnostics go to stderr, so piping stdout into `jq` stays clean.
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`govdata.cli` for usage
 errors, `govdata.api` for the API's answers, a malformed one included,
-`govdata.http` for the connection, `govdata.output` when stdout can't be written or an answer
-is too deeply nested or too large to print). Text in an answer is never changed silently:
+`govdata.http` for the connection, `govdata.output` when stdout can't be written, a redirected file cut short by a full disk
+included, or an answer is too deeply nested or too large to print). Text in an answer is never changed silently:
 bytes that are not valid in its charset and half characters (lone surrogates) are replaced
 with U+FFFD, so the output stays readable for `jq`, and a `WARN` record of `govdata.api`
 says how many. By default it is written log4j style; `--log-format

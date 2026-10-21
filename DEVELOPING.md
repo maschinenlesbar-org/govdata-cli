@@ -303,7 +303,12 @@ A number JSON.parse cannot carry exactly (out of a double's range, `1e400`; past
 written form, `12345678901234567890`, `…890.0`, `9007199254740993e0`; non-zero but too small,
 `1e-400`) is a `GovDataParseError` `Unexpected response from /api/3/action/<name>: the number
 <N> cannot be represented exactly.`, never a changed value (`firstInexactNumber`, a linear scan
-that skips strings; below 2^53 a decimal fraction keeps a double's precision).
+that skips strings; below 2^53 a decimal fraction keeps a double's precision). Past 2^53 the
+number as printed (`String(value)`, the shortest decimal that reads back as the same double) is
+compared with the number as written (`exactAtTheEdges`/`decimalOf`, no BigInt):
+`12345678901234567890` prints as `12345678901234567000` and is refused, while `1E23` or
+`1.7976931348623157E308`, a double a server printed in its own shortest form, prints as the same
+number and passes.
 A parse error names the status and Content-Type (`Failed to parse JSON response from
 /api/3/action/x (HTTP 200, text/html): …`), so a proxy's maintenance page reads as one. Whatever an injected transport throws becomes a
 `GovDataNetworkError` (`GET <url> failed: <reason>`, the original as `cause`); the

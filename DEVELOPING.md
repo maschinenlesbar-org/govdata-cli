@@ -63,6 +63,7 @@ new GovDataClient({
   maxResponseBytes: 50 << 20, // reject responses larger than 50 MiB (0 = unlimited), any transport
   userAgent: "my-app/1.0",    // not blank; no control characters but tab; Latin-1 only
   transport: customTransport, // inject your own HTTP transport
+  onWarning: (message) => console.warn(message), // an answer delivered changed (text replaced with U+FFFD)
 });
 ```
 
@@ -407,6 +408,16 @@ the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`
 Latin-1 still gives `Straße`, not `Stra�e`. A leading byte-order mark is dropped. An
 unknown charset label is a `GovDataParseError` (`GET <url>: unsupported response charset "…".`).
 
+Text in an answer is never changed silently (decision D2 of the 2026-10-21 fix plan): the
+engine decodes with a `fatal` TextDecoder and, on bytes that are not valid in the charset,
+decodes again with U+FFFD and counts what it replaced; a lone surrogate written as a JSON
+escape (`\ud800` without its pair, which `jq` refuses, and the whole output with it) becomes
+`\ufffd` too (`wellFormedEscapes`, one linear pass). The answer is delivered, never refused
+for one bad character, and the engine option `onWarning(message)` is told once per answer:
+`GET <url>: 2 characters of the answer were not valid text (invalid bytes or a lone
+surrogate) and replaced with U+FFFD.` A throw in it is swallowed. The CLI's `action()` logs
+it as a `WARN` record of `govdata.api`.
+
 **`RawResponse`.** The engine's raw-response shape (`data`/`contentType`/`status`/`url`, the
 URL that answered)
 — exported for completeness; action endpoints return decoded JSON.
@@ -461,7 +472,7 @@ everything that drives the CLI is in `apps/cli/test/`.
   integrity) is not copied: govdata has no `-o`. P27 (a big or odd answer is printed or
   refused in one clean record, within memory: 8 M numbers with `--compact` under a 256 MB
   heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `govdata.output`; runs
-  the built bin, 30 s).
+  the built bin, 30 s; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
 
 ## Continuous integration
 
@@ -530,7 +541,7 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 after one, unexpected errors), `api` (the API's
 answers: an error status, CKAN's error envelope on HTTP 200, a `GovDataActionError`, and a
 malformed answer, a `GovDataParseError`: bad JSON, not JSON, a number it cannot carry exactly, not a CKAN envelope, the wrong result shape, an
-unknown charset), `http` (the connection, the cleartext
+unknown charset; and a WARN for replaced text), `http` (the connection, the cleartext
 warning) and `output` (a failed stdout write, an answer too deeply nested or too large to
 print). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it

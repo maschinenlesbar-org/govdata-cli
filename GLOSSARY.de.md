@@ -110,9 +110,13 @@ Text (im Stil von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Z
 Bereiche: `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die
 Antworten der API: ein Fehlerstatus, die CKAN-Hülle mit `success: false` auch bei HTTP
 200 und eine fehlerhafte Antwort — ungültiges JSON, kein
-JSON, eine Zahl, die JSON nicht genau tragen kann, keine CKAN-Hülle, die falsche Form des Ergebnisses), `http` (die Verbindung, die
+JSON, eine Zahl, die JSON nicht genau tragen kann, keine CKAN-Hülle, die falsche Form des Ergebnisses, und eine WARN-Zeile für ersetzten Text), `http` (die Verbindung, die
 Klartext-Warnung und je Wiederholung eine WARN-Zeile vor dem Warten) und `output` (Schreibfehler auf stdout, eine Antwort, die zu tief verschachtelt oder zu groß zum Ausgeben ist). Ein Eintrag ist immer eine Zeile;
 Steuerzeichen darin werden maskiert.
+
+**Ersetzter Text.** Bytes einer Antwort, die in ihrem Zeichensatz ungültig sind, und halbe
+Zeichen (einzelne Surrogate) werden durch U+FFFD ersetzt und in einem `WARN`-Eintrag von
+`govdata.api` mit Anzahl und Anfrage gemeldet; der Lauf gelingt trotzdem.
 
 ---
 

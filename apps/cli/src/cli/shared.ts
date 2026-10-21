@@ -146,6 +146,8 @@ export function action(
     const global = command.optsWithGlobals() as GlobalOptions;
     const options = toEngineOptions(global);
     options.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    // An answer delivered changed (invalid text replaced with U+FFFD) is never silent.
+    options.onWarning = (message) => logOf(deps).warn("api", message);
     const client = deps.createClient(options);
     // One warning per run, before the first request, when the base URL is plain http: to
     // a host other than loopback. Help, version and usage errors never get here.

@@ -22,16 +22,28 @@ import type { AddressInfo } from "node:net";
 // ---- adapter (per repo) -------------------------------------------------------------
 /** The built bin, relative to this compiled test file (dist/test/…). */
 const BIN = fileURLToPath(new URL("../src/cli/index.js", import.meta.url));
-/** CLI argv (after the global options) for a call whose answer carries a free-form value. */
+/** `parity` as in P24, mapped from govdata's own helper below; `rawResponse(body, contentType)`. */
+import { parity as govdataParity, rawResponse } from "./helpers.js";
+import { GovDataClient as Client } from "@maschinenlesbar.org/govdata-client/internal/client";
+import type { HttpRequest, HttpResponse, Transport } from "@maschinenlesbar.org/govdata-client/internal/http";
+/** CLI argv (after the global options) for a call whose answer carries a free-form value, and the same call in the library. */
 const call = ["package", "a1"];
+const lib = (client: Client): Promise<unknown> => client.packageShow("a1");
 /** The raw 2xx body with `json` (a JSON value, written as is) as that value, in CKAN's envelope. */
 const bodyWith = (json: string): string => `{"help":"h","success":true,"result":{"id":"a1","x":${json}}}`;
-/** The value from the CLI's printed result. */
+/** The value from the CLI's printed result and from the library's. */
 const fromCli = (out: string): unknown => (JSON.parse(out) as { x: unknown }).x;
-/** The log program, as in `ERROR [<bin>.output]`. */
+const fromLib = (value: unknown): unknown => (value as { x: unknown }).x;
+/** The log program, as in `WARN [<bin>.api]`. */
 const PROGRAM = "govdata";
 /** The exit code of a failed output in this repo (most repos use 1). */
 const OUTPUT_EXIT = 1;
+/** govdata's harness in the kit's shape: the responder as the third argument, the library's error as `{ name, message }`. */
+async function parity(args: string[], call: (transport: Transport) => unknown, responder: (req: HttpRequest) => HttpResponse) {
+  const o = await govdataParity(args, async (t) => call(t), { responder });
+  const e = o.lib.error;
+  return { cli: o.cli, lib: { ...o.lib, error: e instanceof Error ? { name: e.constructor.name, message: e.message } : undefined } };
+}
 // --------------------------------------------------------------------------------------
 
 // These tests start the built CLI as a process: 30 s instead of the suite's 5 s.
@@ -103,4 +115,32 @@ test("P27: an answer that escaped would pass V8's longest string is an ERROR rec
   assert.equal(run.code, OUTPUT_EXIT, run.stderr.slice(0, 500));
   assert.equal(run.stdout.length, 0);
   assert.match(run.stderr, new RegExp(`ERROR \\[${PROGRAM}\\.output\\] The answer is too large to print`), run.stderr.slice(0, 500));
+});
+
+/** The body with the string value `a<bytes>b`, the bytes as they are. */
+const withBytes = (bytes: number[]): Buffer => {
+  const [head = "", tail = ""] = bodyWith('"a\u0000b"').split("\u0000");
+  return Buffer.concat([Buffer.from(head), Buffer.from(bytes), Buffer.from(tail)]);
+};
+
+const WELL_FORMED = (text: string): boolean => !/[\ud800-\udfff]/u.test(text) && !/\\u[dD][89abAB][0-9a-fA-F]{2}(?!\\u[dD][c-fC-F])/.test(text);
+
+test("P27: a lone surrogate or invalid bytes are replaced with U+FFFD and reported, never silent or fatal", async () => {
+  const cases: Array<[string, Buffer, string, number]> = [
+    ["a lone high surrogate", Buffer.from(bodyWith('"a\\ud800b"')), "a\ufffdb", 1],
+    ["a lone low surrogate and a pair", Buffer.from(bodyWith('"\\udc00\\ud83d\\ude00"')), "\ufffd\u{1f600}", 1],
+    ["invalid UTF-8", withBytes([0xff, 0xfe]), "a\ufffd\ufffdb", 2],
+  ];
+  for (const [label, body, expected, count] of cases) {
+    const o = await parity(call, (t) => lib(new Client({ transport: t })), () => rawResponse(body, "application/json"));
+    assert.equal(o.cli.code, 0, `${label}: ${o.cli.err}`);
+    assert.ok(WELL_FORMED(o.cli.out), `${label}: ${o.cli.out}`);
+    assert.equal(fromCli(o.cli.out), expected, label);
+    const warn = new RegExp(
+      `^WARN  \\[${PROGRAM}\\.api\\] GET \\S+: ${count} characters? of the answer (was|were) not valid text .*replaced with U\\+FFFD\\.$`,
+    );
+    assert.match(o.cli.err, warn, `${label}: ${o.cli.err}`);
+    assert.equal(o.lib.ok, true, `${label}: ${o.lib.error?.message}`);
+    assert.equal(fromLib(o.lib.value), expected, label);
+  }
 });

@@ -51,6 +51,11 @@ const BIG_INTEGER_KEYS = ["_version_"] as const;
  */
 const ACTION_NAME = /^[a-z0-9_]+$/;
 
+/** A typed method's parameter as given: `null` means "not given", like `undefined`. */
+function given<T>(value: T | null | undefined): T | undefined {
+  return value === null ? undefined : value;
+}
+
 /**
  * The parameters as they are sent, checked first (GovDataValidationError before any request):
  * each name as a token (`normalizeToken`: trimmed, NFC; a blank or invisible name and two names
@@ -136,10 +141,10 @@ function assertOptional(name: string, value: string | undefined, problem: Proble
  * Check an optional list parameter (`fq`, `facet_field`): an array, each entry checked with
  * `itemProblem`, a blank entry refused, never dropped. A string was iterated character by
  * character: `fq: "a OR b"` failed on its space, and `facet_field: "organization"` went out as
- * a string CKAN rejects. `undefined`, `null` and an empty list mean "not given".
+ * a string CKAN rejects. `undefined` and an empty list mean "not given".
  */
 function assertList(name: string, value: readonly string[] | undefined, itemProblem: Problem<string>): void {
-  if (value === undefined || value === null) return;
+  if (value === undefined) return;
   if (!Array.isArray(value)) throw wrongType(name, "an array of strings", value);
   if (value.length === 0) return;
   assertValid(name, value, (v) => listProblem(v, itemProblem));
@@ -304,18 +309,19 @@ export class GovDataClient {
    * `facet.field`; it rejects `facet_field` with HTTP 400. The search text `q` and each
    * filter go out as text, trimmed and in NFC (`textProblem`, `normalizeText`); the sort
    * expression (`sortProblem`: `<field> asc|desc`, …) and each facet field (`fieldProblem`: a
-   * Solr field name) as tokens (`normalizeToken`).
+   * Solr field name) as tokens (`normalizeToken`). A parameter given as `null` means "not
+   * given", like `undefined`.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
     // Checked before any request: an unknown key, a refused text value, a string where
     // a list belongs or a NaN/negative number would otherwise go out (or be dropped).
     assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
-    const q = params.q;
-    const sort = params.sort;
-    const fqGiven = params.fq;
-    const facetGiven = params.facet_field;
-    const rows = params.rows;
-    const start = params.start;
+    const q = given(params.q);
+    const sort = given(params.sort);
+    const fqGiven = given(params.fq);
+    const facetGiven = given(params.facet_field);
+    const rows = given(params.rows);
+    const start = given(params.start);
     assertOptional("q", q, textProblem);
     assertList("fq", fqGiven, textProblem);
     assertOptional("sort", sort, sortProblem);
@@ -347,8 +353,8 @@ export class GovDataClient {
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
   async packageList(params: Pick<ListParams, "limit" | "offset"> = {}): Promise<string[]> {
     assertKeys("packageList", "package_list", params, PACKAGE_LIST_KEYS);
-    const limit = params.limit;
-    const offset = params.offset;
+    const limit = given(params.limit);
+    const offset = given(params.offset);
     assertLimit(limit);
     assertCount("offset", offset);
     return this.typed<string[]>("package_list", { limit, offset }, Array.isArray, "an array");
@@ -371,9 +377,9 @@ export class GovDataClient {
   /** `organization_list` / `group_list`: the same parameters, the same checks. */
   private async groupLike(method: string, action: string, params: ListParams): Promise<JsonValue[]> {
     assertKeys(method, action, params, GROUP_LIST_KEYS);
-    const allFields = params.all_fields;
-    const limit = params.limit;
-    const offset = params.offset;
+    const allFields = given(params.all_fields);
+    const limit = given(params.limit);
+    const offset = given(params.offset);
     assertFlag("all_fields", allFields);
     assertLimit(limit);
     assertCount("offset", offset);
@@ -384,9 +390,9 @@ export class GovDataClient {
     return this.typed<Group>("group_show", { id: idOf(id) }, isObject, "a JSON object");
   }
 
-  /** Tags, optionally filtered by a query substring (refused like `q`; sent trimmed, in NFC). */
+  /** Tags, optionally filtered by a query substring (refused like `q`; sent trimmed, in NFC; `null` means none). */
   async tagList(query?: string): Promise<string[]> {
-    const text = query;
+    const text = given(query);
     assertOptional("query", text, textProblem);
     return this.typed<string[]>("tag_list", { query: text }, Array.isArray, "an array");
   }

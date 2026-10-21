@@ -61,6 +61,21 @@ test("every value goes out canonical: text, filters and parameter values trimmed
   assert.equal(new URL(mt.last().url).search, "?q=Gew%C3%A4sser&rows=5");
 });
 
+test("a typed method's parameter given as null means not given, as the docs say (Bug 01-1)", async () => {
+  const mt = makeMockTransport((req) => jsonResponse(ckan(req.url.includes("package_search") ? { count: 0, results: [] } : [])));
+  const client = clientWith(mt);
+  const none = null as unknown as undefined;
+  await client.packageSearch({ q: none, sort: none, rows: none, start: none, fq: none, facet_field: none });
+  assert.equal(new URL(mt.last().url).search, "");
+  await client.tagList(none);
+  assert.equal(new URL(mt.last().url).search, "");
+  await client.packageList({ limit: none, offset: none });
+  await client.organizationList({ all_fields: none, limit: none, offset: none });
+  await client.groupList({ all_fields: none });
+  assert.equal(new URL(mt.last().url).search, "");
+  assert.equal(mt.calls.length, 5);
+});
+
 test("packageSearch sends several filters as fq_list, not a repeated fq", async () => {
   const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
   await clientWith(mt).packageSearch({ fq: ["organization:x", "-groups:tran"] });

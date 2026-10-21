@@ -72,7 +72,9 @@ Every optional field of the exported option and parameter types (`EngineOptions`
 `PackageSearchParams`, `ListParams`) is typed `?: T | undefined`, so a consumer compiled with
 `exactOptionalPropertyTypes` can pass `{ baseUrl: process.env.GOVDATA_BASE_URL }`: an option
 given as `undefined` means its default, as an omitted one does
-(`packages/client/test/types.test.ts`).
+(`packages/client/test/types.test.ts`). A JavaScript caller (or one passing parsed JSON) may
+also give a method parameter as `null`, which means "not given" too; an engine option given as
+`null` is refused (only `undefined` selects its default).
 
 `userAgent` goes through `assertHeaderValue` (exported; the rule is `headerValueProblem`,
 which `--user-agent` uses too): a blank value, a C0 control other than tab (CR/LF
@@ -249,8 +251,9 @@ apps/cli/src/cli/
   escaped, `"el\u200bbe"`, cut at 500; decision D10), and commander's own echo of a rejected
   value is escaped the same way (`escapeTerminalText` in `run.ts`). An invalid action name or
   a paging value that is not a non-negative integer throws `GovDataValidationError` too
-  (`Invalid <name>: …`; `undefined`/`null` still mean "not given" for an `action()`
-  parameter), and the
+  (`Invalid <name>: …`; `undefined` and `null` mean "not given", for an `action()`
+  parameter and for every parameter of a typed method: `packageSearch({ q: null })` and
+  `tagList(null)` run without it, as `fq: null` always did), and the
   engine's numeric options must be integers in range (`timeoutMs` 0..2^31 − 1, `maxRetries`
   0..10, `retryDelayMs` 0..30000, `maxRedirects` 0..20, `maxResponseBytes` ≥ 0; `0` disables
   the timeout, retries, redirects or size cap). Every rejected input is a

@@ -160,7 +160,8 @@ export interface Redaction {
 
 /**
  * The secrets of the run in `argv`. Commander echoes rejected values in its errors (a
- * `--base-url` with a query, a bad port or a trailing space; a URL given to `--param`; an
+ * `--base-url` with a query, a bad port or a trailing space; a URL given to `--param`, alone or
+ * as the value of a `key=value` pair, also percent-encoded as a request URL echoes it; an
  * excess argument), and the CLI's own messages name unknown commands and repeat a
  * rejected `--param`: whatever path a credential takes to stdout or stderr, the exact
  * userinfo (as `credentialsIn` finds it, plus its JSON-escaped form) is replaced by
@@ -168,11 +169,15 @@ export interface Redaction {
  * the exact strings can. Without credentials the text passes through unchanged.
  */
 export function redactionFor(argv: readonly string[]): Redaction {
-  // An `--option=value` token is echoed as its value alone.
-  const values = argv.map((token) =>
-    token.startsWith("-") && token.includes("=") ? token.slice(token.indexOf("=") + 1) : token,
-  );
+  // An `--option=value` token is echoed as its value alone; a `key=value` pair (`--param
+  // id=https://user:pw@host`) carries its value after the "=", which a URL there starts.
+  const values = argv.flatMap((token) => {
+    const eq = token.indexOf("=");
+    if (eq < 0) return [token];
+    return token.startsWith("-") ? [token.slice(eq + 1)] : [token, token.slice(eq + 1)];
+  });
   const secrets = new Set<string>();
+  const encoded = new Set<string>();
   const echoed = new Set<string>();
   const passwords = new Set<string>();
   // A base URL typed without its scheme is read as if it had one (anywhere else a bare
@@ -187,6 +192,9 @@ export function redactionFor(argv: readonly string[]): Redaction {
       // As commander's echo and the library's quoteValue show it: invisible characters escaped.
       secrets.add(escapeTerminalText(secret));
       secrets.add(escapeTerminalText(JSON.stringify(secret).slice(1, -1)));
+      // A URL sent as a parameter (`--param id=<url>`) is echoed percent-encoded in a 404
+      // message: `id=https%3A%2F%2Fuser%3Apw%40host`.
+      encoded.add(encodeURIComponent(`${secret}@`));
       // What a server echoes back: the Basic value and the decoded user:password on
       // stdout and stderr, the password alone (it may well occur in the data) on stderr.
       const [basic, pair, password] = echoedCredentialForms(secret);
@@ -200,7 +208,11 @@ export function redactionFor(argv: readonly string[]): Redaction {
   // Longest first, so a secret is never left half-replaced by one of its own substrings.
   const echoedList = [...echoed].sort((a, b) => b.length - a.length);
   const passwordList = [...passwords].sort((a, b) => b.length - a.length);
-  const out = (text: string): string => redactSecrets(redactUserinfo(redactCredentials(text, list)), echoedList);
+  const out = (text: string): string => {
+    let result = redactUserinfo(redactCredentials(text, list));
+    for (const form of encoded) result = result.split(form).join("***%40");
+    return redactSecrets(result, echoedList);
+  };
   return { out, err: (text) => redactSecrets(out(text), passwordList) };
 }
 

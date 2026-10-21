@@ -95,7 +95,9 @@ doesn't start an escape (write a literal `%` as `%25`) all throw `GovDataValidat
 `GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
 (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every URL argument
-(`credentialsIn`, exported) and replaces it with `***` in everything it prints —
+(`credentialsIn`, exported; the value of a `key=value` pair too, `--param id=<url>`, and its
+percent-encoded form, as a request URL in an error echoes it) and replaces it with `***` in
+everything it prints —
 commander's usage errors, which echo rejected values (a `--base-url` with a query, an
 excess argument), and its own messages (unknown command, a rejected `--param`) — so a
 password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only

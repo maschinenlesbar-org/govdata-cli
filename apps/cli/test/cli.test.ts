@@ -229,6 +229,24 @@ test("usage errors never print a --base-url password (02#1, 06 C10)", async () =
   }
 });
 
+test("a password in a URL given as an --param value is never printed, as typed or percent-encoded", async () => {
+  // The argument is `id=https://…`: it starts with no scheme, so the URL after the "=" is the source.
+  for (const pw of ["hunter2", "pa ss-pw"]) {
+    const url = `https://bob:${pw}@ckan.example.org`;
+    // A URL sent as a parameter goes out percent-encoded; a 404 message echoes that form.
+    const notFound = makeCli(() => jsonResponse({ success: false, error: { message: "Not found" } }, 404));
+    assert.equal(await run(["action", "package_show", "--param", `id=${url}`], notFound.deps), 4, pw);
+    assert.ok(notFound.mt.last().url.includes(encodeURIComponent(pw)), notFound.mt.last().url);
+    // A network error names the request URL too.
+    const down = makeCli(() => { throw new Error(`connect ECONNREFUSED for ${url}`); });
+    assert.equal(await run(["--max-retries", "0", "action", "package_show", "--param", `id=${url}`], down.deps), 1, pw);
+    for (const text of [notFound.err.join("\n"), down.err.join("\n")]) {
+      assert.ok(!text.includes(pw) && !text.includes(encodeURIComponent(pw)), text);
+      assert.match(text, /\*\*\*/, text);
+    }
+  }
+});
+
 test("--max-retries is bounded to 0..10", async () => {
   for (const [value, ok] of [["0", true], ["10", true], ["11", false], ["9007199254740991", false]] as const) {
     const cli = makeCli(() => jsonResponse(ckan({})));

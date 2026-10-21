@@ -5,7 +5,13 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
 import { DEFAULT_BASE_URL, cleartextProblem, type EngineOptions, type RetryEvent } from "@maschinenlesbar.org/govdata-client/internal/engine";
-import { baseUrlProblem, headerValueProblem, isBlank } from "@maschinenlesbar.org/govdata-client/internal/validate";
+import {
+  baseUrlProblem,
+  headerValueProblem,
+  idProblem,
+  textProblem,
+  type Problem,
+} from "@maschinenlesbar.org/govdata-client/internal/validate";
 
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
@@ -34,16 +40,24 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
- * commander value-parser: a value that is not blank (the library's isBlank). A
- * blank filter would otherwise run the command unfiltered; the library refuses it
- * too, and this reports it as a usage error before the client is built.
+ * A commander value-parser for the library's `problem` rule (`textProblem`, `idProblem`,
+ * `sortProblem`, …), reported as a usage error before the client is built. The value goes on
+ * as typed: the library canonicalises it (`normalizeText`, `normalizeToken`). A blank filter
+ * would otherwise run the command unfiltered.
  */
-export function parseNonEmpty(value: string): string {
-  if (isBlank(value)) {
-    throw new InvalidArgumentError("Expected a non-empty value.");
-  }
-  return value;
+export function parseWith(problem: Problem<string>): (value: string) => string {
+  return (value) => {
+    const reason = problem(value);
+    if (reason !== undefined) throw new InvalidArgumentError(reason);
+    return value;
+  };
 }
+
+/** commander value-parser for free text (the search text, a filter, the tag query): the library's `textProblem`. */
+export const parseText = parseWith(textProblem);
+
+/** commander value-parser for the id or name of a dataset, resource, organization or group: the library's `idProblem`. */
+export const parseId = parseWith(idProblem);
 
 /**
  * commander value-parser for a value that ends up in an HTTP header (`--user-agent`):
@@ -71,9 +85,9 @@ export function once<T>(parse: (value: string) => T): (value: string, previous: 
   };
 }
 
-/** commander accumulator for a repeatable option whose values must not be blank. */
-export function collectNonEmpty(value: string, previous: string[] = []): string[] {
-  return previous.concat([parseNonEmpty(value)]);
+/** commander accumulator for a repeatable text option (`--fq`), each value checked by `parseText`. */
+export function collectText(value: string, previous: string[] = []): string[] {
+  return previous.concat([parseText(value)]);
 }
 
 /**

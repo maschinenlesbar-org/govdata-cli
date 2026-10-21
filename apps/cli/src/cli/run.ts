@@ -76,7 +76,7 @@ function writeCommanderErr(command: Command, deps: CliDeps, state: { errorLogged
   if (text.trim() === "") return;
   if (text.startsWith("error: ")) {
     state.errorLogged = true;
-    log.error("cli", text.slice("error: ".length).replace(/\n(\(Did you mean .*\?\))$/, " $1"));
+    log.error("cli", escapeCommanderError(text.slice("error: ".length)).replace(/\n(\(Did you mean .*\?\))$/, " $1"));
     return;
   }
   if (!state.errorLogged) {
@@ -84,6 +84,40 @@ function writeCommanderErr(command: Command, deps: CliDeps, state: { errorLogged
     log.error("cli", `missing command: \`${commandPath(command)} <subcommand>\``);
   }
   for (const line of text.split("\n")) if (line.trim() !== "") log.info("cli", line.trimEnd());
+}
+
+/**
+ * Escape the characters a terminal acts on in one commander error message: CR and LF
+ * become `\r` and `\n` (as a log record writes them, `escapeForRecord`), the other C0
+ * controls (tab excepted), DEL, C1 and Unicode format characters (bidi overrides,
+ * zero-width characters) `\uXXXX`. Commander repeats a rejected argument raw
+ * ("command-argument value '<value>' is invalid"), and a value can come from a
+ * pipeline: a newline in it could forge a record, an override reorder the line. The
+ * record escapes most of these too; this keeps the invisible format characters visible,
+ * as the library's own refusals show them (`quoteValue`).
+ */
+function escapeTerminalText(text: string): string {
+  return text.replace(/[\u0000-\u0008\u000a-\u001f\u007f-\u009f]|\p{Cf}/gu, (ch) =>
+    ch === "\n"
+      ? "\\n"
+      : ch === "\r"
+        ? "\\r"
+        : Array.from({ length: ch.length }, (_, i) => `\\u${ch.charCodeAt(i).toString(16).padStart(4, "0")}`).join(""),
+  );
+}
+
+/**
+ * escapeTerminalText for one commander error message, except for the
+ * `\n(Did you mean …?)` line commander appends after an unknown command or option.
+ * That hint is built from this CLI's own command and option names, and it can only
+ * end the message: commander quotes the user's value (`unknown command '<value>'`), so
+ * a value that contains the same text is followed by its closing quote and stays
+ * escaped.
+ */
+function escapeCommanderError(message: string): string {
+  const hint = /\n\(Did you mean [^\n]*\?\)$/.exec(message);
+  if (hint === null) return escapeTerminalText(message);
+  return escapeTerminalText(message.slice(0, hint.index)) + hint[0];
 }
 
 /**
@@ -150,6 +184,9 @@ export function redactionFor(argv: readonly string[]): Redaction {
     for (const secret of credentialsIn(source)) {
       secrets.add(secret);
       secrets.add(JSON.stringify(secret).slice(1, -1));
+      // As commander's echo and the library's quoteValue show it: invisible characters escaped.
+      secrets.add(escapeTerminalText(secret));
+      secrets.add(escapeTerminalText(JSON.stringify(secret).slice(1, -1)));
       // What a server echoes back: the Basic value and the decoded user:password on
       // stdout and stderr, the password alone (it may well occur in the data) on stderr.
       const [basic, pair, password] = echoedCredentialForms(secret);

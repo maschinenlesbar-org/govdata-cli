@@ -7,9 +7,21 @@
 //   client.action("organization_list")   // generic escape hatch
 
 import { bigIntegerKeysOption, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
-import type { QueryParams } from "./query.js";
-import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage } from "./errors.js";
-import { assertValid, normalizeText, textProblem } from "./validate.js";
+import type { QueryParams, QueryValue } from "./query.js";
+import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage, quoteValue } from "./errors.js";
+import {
+  assertValid,
+  fieldProblem,
+  idProblem,
+  listProblem,
+  normalizeText,
+  normalizeToken,
+  queryValueProblem,
+  sortProblem,
+  textProblem,
+  tokenProblem,
+  type Problem,
+} from "./validate.js";
 import type {
   CkanEnvelope,
   PackageSearchResult,
@@ -40,38 +52,51 @@ const BIG_INTEGER_KEYS = ["_version_"] as const;
 const ACTION_NAME = /^[a-z0-9_]+$/;
 
 /**
- * Drop undefined values so only the parameters the caller actually set are sent.
- * The typed methods reject a blank filter before they get here (assertText), and
- * `action()` refuses any blank parameter, so nothing is silently dropped.
+ * The parameters as they are sent, checked first (GovDataValidationError before any request):
+ * each name as a token (`normalizeToken`: trimmed, NFC; a blank or invisible name and two names
+ * that are the same once trimmed, `q` and ` q`, are refused), each value by `queryValueProblem`
+ * (a string, a finite number, a boolean or a Date, or a non-empty list of them; each string as
+ * text, `normalizeText`). `undefined` and `null` mean "not given" and are left out. CKAN reads
+ * an empty parameter as "not given", so a blank or dropped filter would silently widen the
+ * result to the whole catalogue.
  */
-function prune(params: Record<string, unknown>): QueryParams {
+function prune(params: unknown): QueryParams {
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw wrongType("action parameters", "an object", params);
+  }
   // A null-prototype object, so a `__proto__` key is kept as a parameter instead
   // of setting the prototype (and being lost).
   const out = Object.create(null) as QueryParams;
+  const names = new Map<string, string>();
   for (const [k, v] of Object.entries(params)) {
-    if (v === undefined) continue;
-    out[k] = v as QueryParams[string];
+    const name = normalizeToken(assertValid("parameter name", k, tokenProblem));
+    const earlier = names.get(name);
+    if (earlier !== undefined) {
+      throw new GovDataValidationError(
+        `Invalid action parameters: ${quoteValue(name)} is given twice (as ${quoteValue(earlier)} and ${quoteValue(k)}).`,
+      );
+    }
+    names.set(name, k);
+    if (v === undefined || v === null) continue;
+    out[name] = textValue(assertValid(`parameter ${name}`, v as QueryValue, queryValueProblem));
   }
   return out;
 }
 
+/** A query value with each string in it sent as text (`normalizeText`); other values as they are. */
+function textValue(value: QueryValue): QueryValue {
+  if (typeof value === "string") return normalizeText(value);
+  return Array.isArray(value) ? (value.map((v) => (typeof v === "string" ? normalizeText(v) : v)) as QueryValue) : value;
+}
+
 function invalid(name: string, expected: string, value: unknown): GovDataValidationError {
-  const shown = typeof value === "string" ? cutForMessage(JSON.stringify(value)) : String(value);
+  const shown = typeof value === "string" ? quoteValue(value) : String(value);
   return new GovDataValidationError(`Invalid ${name}: expected ${expected}, got ${shown}.`);
 }
 
-/**
- * Throw GovDataValidationError unless `value` is a string with non-whitespace
- * content (textProblem). CKAN reads a blank filter as no filter, so a blank `q`,
- * `fq` or tag query would silently widen the result, and a blank id is not an id.
- */
-function assertText(name: string, value: unknown): void {
-  assertValid(name, value, textProblem);
-}
-
-/** How a value is shown in a message: strings quoted, other values by type or value. */
+/** How a value is shown in a message: strings quoted visibly, other values by type or value. */
 function describe(value: unknown): string {
-  if (typeof value === "string") return cutForMessage(JSON.stringify(value));
+  if (typeof value === "string") return quoteValue(value);
   if (Array.isArray(value)) return "an array";
   if (value === null) return "null";
   return typeof value === "object" ? "an object" : String(value);
@@ -80,40 +105,6 @@ function describe(value: unknown): string {
 /** GovDataValidationError `Invalid <name>: expected <expected>, got <value described>.` */
 function wrongType(name: string, expected: string, value: unknown): GovDataValidationError {
   return new GovDataValidationError(`Invalid ${name}: expected ${expected}, got ${describe(value)}.`);
-}
-
-/** One scalar `action()` parameter value the query builder sends as written. */
-function isScalarParam(value: unknown): boolean {
-  if (typeof value === "string" || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
-  return value instanceof Date && !Number.isNaN(value.getTime());
-}
-
-/**
- * Check the parameters of a generic `action()` call: a non-object, a blank parameter
- * name, a blank string value or a blank string in a list value throws
- * GovDataValidationError. CKAN reads an empty parameter as unset, so `{ q: "" }`
- * would run the action unfiltered. So does a value the query builder can't send as
- * written: an object went out as `[object Object]`, NaN and Infinity as words, a
- * nested array flattened. `undefined`/`null` still mean "not given"; strings, finite
- * numbers, booleans and valid Dates pass, alone or in a list.
- */
-function assertParams(params: unknown): asserts params is QueryParams {
-  if (typeof params !== "object" || params === null || Array.isArray(params)) {
-    throw wrongType("action parameters", "an object", params);
-  }
-  for (const [k, v] of Object.entries(params)) {
-    assertText("parameter name", k);
-    if (v === undefined || v === null) continue;
-    const values: unknown[] = Array.isArray(v) ? v : [v];
-    for (const item of values) {
-      if (item === undefined || item === null) continue;
-      if (!isScalarParam(item)) {
-        throw wrongType(`parameter ${cutForMessage(k)}`, "a string, finite number, boolean or Date, or a list of them", item);
-      }
-      if (typeof item === "string") assertText(`parameter ${cutForMessage(k)}`, item);
-    }
-  }
 }
 
 /**
@@ -129,23 +120,29 @@ function assertKeys(method: string, action: string, params: unknown, known: read
   for (const key of Object.keys(params)) {
     if (!known.includes(key)) {
       throw new GovDataValidationError(
-        `Invalid ${method} parameter ${cutForMessage(JSON.stringify(key))}: not a parameter of ${method}. ` +
+        `Invalid ${method} parameter ${quoteValue(key)}: not a parameter of ${method}. ` +
           `Known: ${known.join(", ")}. Use action("${action}", params) to send another CKAN parameter.`,
       );
     }
   }
 }
 
+/** Check an optional parameter with `problem`; `undefined` means "not given". */
+function assertOptional(name: string, value: string | undefined, problem: Problem<string>): void {
+  if (value !== undefined) assertValid(name, value, problem);
+}
+
 /**
- * Throw GovDataValidationError unless `value` is undefined, null or an array of
- * non-blank strings. A string was iterated character by character: `fq: "a OR b"`
- * failed on its space, and `facet_field: "organization"` went out as a string CKAN
- * rejects.
+ * Check an optional list parameter (`fq`, `facet_field`): an array, each entry checked with
+ * `itemProblem`, a blank entry refused, never dropped. A string was iterated character by
+ * character: `fq: "a OR b"` failed on its space, and `facet_field: "organization"` went out as
+ * a string CKAN rejects. `undefined`, `null` and an empty list mean "not given".
  */
-function assertTextList(name: string, value: unknown): void {
+function assertList(name: string, value: readonly string[] | undefined, itemProblem: Problem<string>): void {
   if (value === undefined || value === null) return;
   if (!Array.isArray(value)) throw wrongType(name, "an array of strings", value);
-  for (const item of value) assertText(`${name} entry`, item);
+  if (value.length === 0) return;
+  assertValid(name, value, (v) => listProblem(v, itemProblem));
 }
 
 /** Throw unless `value` is undefined or a boolean. */
@@ -177,6 +174,11 @@ function assertLimit(limit: number | undefined): void {
       `Invalid limit: expected a positive integer, got ${cutForMessage(String(limit))}. Leave it out for the whole list.`,
     );
   }
+}
+
+/** Check an id with `idProblem` and return it as it is sent (`normalizeToken`). */
+function idOf(id: string): string {
+  return normalizeToken(assertValid("id", id, idProblem));
 }
 
 /** A JSON object (not null, not an array). */
@@ -212,8 +214,10 @@ export class GovDataClient {
   /**
    * Call any CKAN action by name and return its unwrapped `result`. Throws a
    * GovDataActionError if the envelope reports `success: false`. An invalid action name,
-   * a blank parameter name or a blank parameter value (or list entry) rejects with
-   * GovDataValidationError before any request.
+   * a parameter name or value the rules refuse (`prune`: a blank or invisible name, a name
+   * given twice once trimmed, a blank value, a control or format character, an empty list or
+   * one with a `null` entry) rejects with GovDataValidationError before any request. Names go
+   * out trimmed, string values trimmed and in NFC.
    */
   async action<T = JsonValue>(name: string, params: QueryParams = {}): Promise<T> {
     return (await this.call<T>(name, params)).result;
@@ -231,12 +235,11 @@ export class GovDataClient {
     }
     const action = name.trim();
     if (!ACTION_NAME.test(action)) {
-      throw new GovDataValidationError(`Invalid CKAN action name: ${cutForMessage(JSON.stringify(name))}`);
+      throw new GovDataValidationError(`Invalid CKAN action name: ${quoteValue(name)}`);
     }
-    assertParams(params);
     const { value: env, url, request } = await this.engine.getAnswer<CkanEnvelope<T> | null>(
       `${ACTION}/${encodeURIComponent(action)}`,
-      params,
+      prune(params),
     );
     // A proxy's JSON error page or another JSON API is not an envelope (`null`,
     // an array, an object without `success`); say so rather than crash on it.
@@ -298,103 +301,98 @@ export class GovDataClient {
    * filter applied twice selects the same datasets). Wrapping it in parentheses
    * instead would break a negated filter: Solr matches nothing for a nested
    * `(-organization:x)`. Facet fields go out as the JSON list CKAN expects in
-   * `facet.field`; it rejects `facet_field` with HTTP 400. The search text `q` goes
-   * out trimmed and in NFC (`normalizeText`); filters, sort and facet fields as given.
+   * `facet.field`; it rejects `facet_field` with HTTP 400. The search text `q` and each
+   * filter go out as text, trimmed and in NFC (`textProblem`, `normalizeText`); the sort
+   * expression (`sortProblem`: `<field> asc|desc`, …) and each facet field (`fieldProblem`: a
+   * Solr field name) as tokens (`normalizeToken`).
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    // Checked before any request: an unknown key, a blank text value, a string where
+    // Checked before any request: an unknown key, a refused text value, a string where
     // a list belongs or a NaN/negative number would otherwise go out (or be dropped).
     assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
-    if (params.q !== undefined) assertText("q", params.q);
-    if (params.sort !== undefined) assertText("sort", params.sort);
-    assertTextList("fq", params.fq);
-    assertTextList("facet_field", params.facet_field);
-    const fq = params.fq ?? [];
-    const facetFields = params.facet_field ?? [];
-    assertCount("rows", params.rows);
-    assertCount("start", params.start);
+    const q = params.q;
+    const sort = params.sort;
+    const fqGiven = params.fq;
+    const facetGiven = params.facet_field;
+    const rows = params.rows;
+    const start = params.start;
+    assertOptional("q", q, textProblem);
+    assertList("fq", fqGiven, textProblem);
+    assertOptional("sort", sort, sortProblem);
+    assertList("facet_field", facetGiven, fieldProblem);
+    assertCount("rows", rows);
+    assertCount("start", start);
+    const fq = fqGiven ?? [];
+    const facetFields = (facetGiven ?? []).map(normalizeToken);
     return this.typed<PackageSearchResult>(
       "package_search",
-      prune({
-        q: params.q === undefined ? undefined : normalizeText(params.q),
-        fq_list: fq.length === 1 ? [fq[0], fq[0]] : fq.length > 1 ? fq : undefined,
-        rows: params.rows,
-        start: params.start,
-        sort: params.sort,
+      {
+        q,
+        fq_list: fq.length === 1 ? [fq[0]!, fq[0]!] : fq.length > 1 ? fq : undefined,
+        rows,
+        start,
+        sort,
         "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
-      }),
+      },
       isSearchResult,
       "an object with a numeric count and a results array",
     );
   }
 
-  /** A single dataset by id or name. */
+  /** A single dataset by id or name (sent trimmed, in NFC; `idProblem`). */
   async packageShow(id: string): Promise<Package> {
-    assertText("id", id);
-    return this.typed<Package>("package_show", { id }, isObject, "a JSON object");
+    return this.typed<Package>("package_show", { id: idOf(id) }, isObject, "a JSON object");
   }
 
   /** Dataset names, paged with limit/offset (a positive limit; omit it for all). */
   async packageList(params: Pick<ListParams, "limit" | "offset"> = {}): Promise<string[]> {
     assertKeys("packageList", "package_list", params, PACKAGE_LIST_KEYS);
-    assertLimit(params.limit);
-    assertCount("offset", params.offset);
-    return this.typed<string[]>(
-      "package_list",
-      prune({ limit: params.limit, offset: params.offset }),
-      Array.isArray,
-      "an array",
-    );
+    const limit = params.limit;
+    const offset = params.offset;
+    assertLimit(limit);
+    assertCount("offset", offset);
+    return this.typed<string[]>("package_list", { limit, offset }, Array.isArray, "an array");
   }
 
   /** Organizations (names, or full objects with `all_fields`), paged with limit/offset. */
   async organizationList(params: ListParams = {}): Promise<JsonValue[]> {
-    assertKeys("organizationList", "organization_list", params, GROUP_LIST_KEYS);
-    assertFlag("all_fields", params.all_fields);
-    assertLimit(params.limit);
-    assertCount("offset", params.offset);
-    return this.typed<JsonValue[]>(
-      "organization_list",
-      prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
-      Array.isArray,
-      "an array",
-    );
+    return this.groupLike("organizationList", "organization_list", params);
   }
 
   async organizationShow(id: string): Promise<Organization> {
-    assertText("id", id);
-    return this.typed<Organization>("organization_show", { id }, isObject, "a JSON object");
+    return this.typed<Organization>("organization_show", { id: idOf(id) }, isObject, "a JSON object");
   }
 
   /** Groups (themes/categories), paged with limit/offset like organizationList. */
   async groupList(params: ListParams = {}): Promise<JsonValue[]> {
-    assertKeys("groupList", "group_list", params, GROUP_LIST_KEYS);
-    assertFlag("all_fields", params.all_fields);
-    assertLimit(params.limit);
-    assertCount("offset", params.offset);
-    return this.typed<JsonValue[]>(
-      "group_list",
-      prune({ all_fields: params.all_fields, limit: params.limit, offset: params.offset }),
-      Array.isArray,
-      "an array",
-    );
+    return this.groupLike("groupList", "group_list", params);
+  }
+
+  /** `organization_list` / `group_list`: the same parameters, the same checks. */
+  private async groupLike(method: string, action: string, params: ListParams): Promise<JsonValue[]> {
+    assertKeys(method, action, params, GROUP_LIST_KEYS);
+    const allFields = params.all_fields;
+    const limit = params.limit;
+    const offset = params.offset;
+    assertFlag("all_fields", allFields);
+    assertLimit(limit);
+    assertCount("offset", offset);
+    return this.typed<JsonValue[]>(action, { all_fields: allFields, limit, offset }, Array.isArray, "an array");
   }
 
   async groupShow(id: string): Promise<Group> {
-    assertText("id", id);
-    return this.typed<Group>("group_show", { id }, isObject, "a JSON object");
+    return this.typed<Group>("group_show", { id: idOf(id) }, isObject, "a JSON object");
   }
 
-  /** Tags, optionally filtered by a query substring (a blank one is refused; sent trimmed, in NFC). */
+  /** Tags, optionally filtered by a query substring (refused like `q`; sent trimmed, in NFC). */
   async tagList(query?: string): Promise<string[]> {
-    if (query !== undefined) assertText("query", query);
-    const text = query === undefined ? undefined : normalizeText(query);
-    return this.typed<string[]>("tag_list", prune({ query: text }), Array.isArray, "an array");
+    const text = query;
+    assertOptional("query", text, textProblem);
+    return this.typed<string[]>("tag_list", { query: text }, Array.isArray, "an array");
   }
 
-  /** A single resource (distribution) by id. */
+  /** A single resource (distribution) by id (sent trimmed, in NFC; `idProblem`). */
   async resourceShow(id: string): Promise<Resource> {
-    assertText("id", id);
-    return this.typed<Resource>("resource_show", { id }, isObject, "a JSON object");
+    return this.typed<Resource>("resource_show", { id: idOf(id) }, isObject, "a JSON object");
   }
 }

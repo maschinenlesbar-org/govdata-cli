@@ -135,8 +135,10 @@ Solr-Syntax darin bleibt, wie sie geschrieben ist.
 
 **`fq` (Filterabfrage).** Ein Solr-Filter, der die Ergebnisse einschränkt, ohne die
 Relevanzbewertung zu beeinflussen, z. B. `organization:statistisches-bundesamt`,
-`groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). Wird genau so
-gesendet, wie er geschrieben ist (seine Werte sind meist exakt verglichene Codes). CKAN lehnt
+`groups:tran`. CLI: `--fq` (mehrfach angebbar; jeder Filter muss zutreffen). Wird wie `q`
+ohne umgebende Leerzeichen und in zusammengesetztem Unicode (NFC) gesendet: `title:` ist ein
+analysiertes Feld, in dem ein zerlegter Umlaut nichts traf. Ein Filter mit einem unsichtbaren
+oder einem Steuerzeichen wird abgelehnt. CKAN lehnt
 einen wiederholten `fq`-Schlüssel ab und stellt einem einzelnen `fq` `+capacity:public`
 voran, wodurch ein `OR` auf oberster Ebene darin wirkungslos wird. Daher sendet der Client
 jeden Filter als `fq_list` (einen einzelnen zweimal, weil CKAN einen einzelnen
@@ -149,7 +151,8 @@ je Anfrage; ein größerer Wert liefert also höchstens 1.000 Ergebnisse (wobei 
 weiterhin die tatsächliche Gesamtzahl meldet). Über die ersten 1.000 hinaus blättern Sie
 mit `start`. (Die `*_list`-Actions verwenden stattdessen `limit` / `offset`.)
 
-**`sort`.** Ein Solr-Sortierausdruck, z. B. `metadata_modified desc`. CLI: `--sort`.
+**`sort`.** Ein Solr-Sortierausdruck, z. B. `metadata_modified desc`: ein Feld und `asc`
+oder `desc`, mehrere durch Kommas getrennt; alles andere wird vor der Anfrage abgelehnt. CLI: `--sort`.
 
 **`facet.field`.** Die Felder, für die Facettenzahlen berechnet werden, als JSON-Liste wie
 `["res_format"]` (siehe *Facette*). In der Bibliothek heißt die Option `facet_field`; CKAN
@@ -170,7 +173,10 @@ ist der übliche Sortierschlüssel für „neueste zuerst“.
 
 **id / name (Slug).** Datensätze, Organisationen und Gruppen lassen sich entweder über ihre
 CKAN-**ID** (UUID) oder ihren menschenlesbaren **Namen** (URL-Slug) ansprechen. Die
-`*_show`-Actions akzeptieren beides. Ressourcen werden nur per ID angesprochen.
+`*_show`-Actions akzeptieren beides. Ressourcen werden nur per ID angesprochen. Eine ID wird ohne
+umgebende Leerzeichen und in NFC gesendet (eine eingefügte ID mit Leerzeichen oder
+Zeilenumbruch am Ende galt früher als „nicht gefunden“); eine mit `/`, einem unsichtbaren oder
+einem Steuerzeichen wird abgelehnt.
 
 **`limit` / `offset` (`ListParams`).** Paginierung für die `*_list`-Actions: Seitengröße
 und Anzahl der zu überspringenden Einträge. (Nicht zu verwechseln mit `rows` / `start` der

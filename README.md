@@ -86,7 +86,13 @@ action <name> [--param key=value …]   call any CKAN action (generic)
 | `--fq <filter>` | Solr filter query, e.g. `groups:tran` (repeatable; every filter must match) |
 | `--rows <n>` | max results to return |
 | `--start <n>` | zero-based offset for paging |
-| `--sort <expr>` | Solr sort expression, e.g. `metadata_modified desc` |
+| `--sort <expr>` | Solr sort expression, e.g. `metadata_modified desc` (`<field> asc\|desc`, comma-separated; anything else is refused) |
+
+Every value goes out canonical: the query, each `--fq`, `--query` and a `--param` value
+trimmed and in composed Unicode (NFC), an id, `--sort` and a `--param` name trimmed. A value
+with an invisible or control character (a zero-width space, a soft hyphen, a bidi control),
+or one that is blank, is a usage error before any request, and the error shows the
+character escaped (`"el\u200bbe"`).
 
 > **Note on `--rows`** — GovData's Solr caps a single search at **1000 results**
 > server-side. Asking for more (e.g. `--rows 100000`) is not an error — you simply

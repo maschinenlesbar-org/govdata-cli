@@ -140,7 +140,7 @@ test("action refuses a blank --param value and keeps a __proto__ key", async () 
     const cli = makeCli(() => jsonResponse(ckan({})));
     assert.equal(await run(["action", "package_search", "--param", param], cli.deps), 1, param);
     assert.equal(cli.mt.calls.length, 0);
-    assert.match(cli.err.join("\n"), /The value must not be blank\./);
+    assert.match(cli.err.join("\n"), /the value: Expected a non-empty value\./);
   }
   const proto = makeCli(() => jsonResponse(ckan({})));
   assert.equal(await run(["action", "x", "--param", "__proto__=1", "--param", "constructor=2"], proto.deps), 0);
@@ -409,9 +409,9 @@ test("the CLI's own usage errors quote a typed value at most 500 characters long
     assert.equal(await run(argv, cli.deps), 1);
     assert.equal(cli.mt.calls.length, 0);
     const record = cli.err[0] ?? "";
-    // govdata's own quote is cut; commander's echo of a rejected option value
-    // (`argument '…' is invalid.`) is bounded by the record cap only.
-    assert.match(record, /["']x{500}…["']/, record.slice(0, 200));
+    // govdata's own quote is cut (quoteValue: the "…" after the closing quote); commander's
+    // echo of a rejected option value (`argument '…' is invalid.`) is bounded by the record cap only.
+    assert.match(record, /["']x{500}(…["']|["']…)/, record.slice(0, 200));
     if (argv[0] === long) assert.ok(record.length < 700, `${record.length}`);
   }
 });

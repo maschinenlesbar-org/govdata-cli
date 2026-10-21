@@ -45,8 +45,9 @@ See what was just published or updated — useful for monitoring a topic.
 govdata search Klima --rows 10 --sort "metadata_modified desc"
 ```
 
-`--sort` takes any Solr sort expression (`<field> asc|desc`), e.g.
-`metadata_created desc` or `title_string asc`.
+`--sort` takes any Solr sort expression (`<field> asc|desc`, several comma-separated), e.g.
+`metadata_created desc` or `title_string asc`; one without `asc`/`desc` is refused before
+the request.
 
 ### 3. Filter by publishing organization and file format
 

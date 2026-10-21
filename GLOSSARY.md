@@ -130,8 +130,9 @@ left as written.
 
 **`fq` (filter query).** A Solr filter constraining results without affecting
 relevance scoring, e.g. `organization:statistisches-bundesamt`, `groups:tran`.
-CLI: `--fq` (repeatable; every filter must match). Sent exactly as written (its values
-are mostly exact-match codes). CKAN rejects a repeated `fq`
+CLI: `--fq` (repeatable; every filter must match). Sent trimmed and in composed Unicode
+(NFC), like `q`: `title:` is an analysed field, where a decomposed umlaut matched nothing.
+A filter with an invisible or control character is refused. CKAN rejects a repeated `fq`
 key, and it puts `+capacity:public` in front of a single `fq`, which disables a
 top-level `OR` in it. So the client sends every filter as `fq_list` (a single one
 twice, because CKAN splits a lone `fq_list` value into characters), and
@@ -143,7 +144,8 @@ request, so a larger value yields at most 1000 results (with `count` still
 reporting the true total); page past the first 1000 with `start`. (The `*_list`
 actions instead use `limit` / `offset`.)
 
-**`sort`.** A Solr sort expression, e.g. `metadata_modified desc`. CLI: `--sort`.
+**`sort`.** A Solr sort expression, e.g. `metadata_modified desc`: a field and `asc` or
+`desc`, several separated by commas; anything else is refused before the request. CLI: `--sort`.
 
 **`facet.field`.** The fields to compute facet counts over, as a JSON list such
 as `["res_format"]` (see *Facet*). The library option is `facet_field`; CKAN
@@ -164,7 +166,9 @@ former is the usual sort key for "newest first".
 
 **id / name (slug).** Datasets, organizations and groups can be addressed by
 either their CKAN **id** (UUID) or their human-readable **name** (URL slug). The
-`*_show` actions accept either. Resources are addressed by id only.
+`*_show` actions accept either. Resources are addressed by id only. An id is sent
+trimmed and in NFC (a pasted id with a trailing space or newline used to read as "not
+found"); one with a `/`, an invisible or a control character is refused.
 
 **`limit` / `offset` (`ListParams`).** Pagination for the `*_list` actions: page
 size and number of records to skip. (Distinct from search's `rows` / `start`.)

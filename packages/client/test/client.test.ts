@@ -34,28 +34,31 @@ test("packageSearch unwraps result and passes params", async () => {
   assert.deepEqual(url.searchParams.getAll("fq_list"), ["organization:x", "organization:x"]);
 });
 
-test("the search text and the tag query go out trimmed and composed (NFC); Solr filters, sort and facets as given", async () => {
+test("every value goes out canonical: text, filters and parameter values trimmed and in NFC, tokens trimmed (D8)", async () => {
   // A decomposed "Gewässer" (a plus U+0308, as pasted from a macOS file name) and a trailing
-  // space matched nothing the composed form matches. fq, sort and facet fields are Solr syntax
-  // over exact-match fields and field names: sent exactly as written (a lone fq still twice).
+  // space matched nothing the composed form matches: live, --fq "title:Gewässer" found 112
+  // datasets, the decomposed spelling 0, and package " haushalt " exited 4 for an existing one.
   const nfd = "Gewa\u0308sser";
   const mt = makeMockTransport((req) =>
-    jsonResponse(ckan(req.url.includes("tag_list") ? [] : { count: 0, results: [] })),
+    jsonResponse(ckan(req.url.includes("tag_list") ? [] : req.url.includes("_show") ? { id: "x" } : { count: 0, results: [] })),
   );
   const client = clientWith(mt);
-  await client.packageSearch({ q: `  title:${nfd}  `, fq: [` tags:${nfd}`], sort: "score desc", facet_field: ["tags"] });
+  await client.packageSearch({ q: `  title:${nfd}  `, fq: [` title:${nfd}`], sort: " score desc ", facet_field: [" tags "] });
   const search = new URL(mt.last().url).searchParams;
   assert.equal(search.get("q"), "title:Gew\u00e4sser");
-  assert.deepEqual(search.getAll("fq_list"), [` tags:${nfd}`, ` tags:${nfd}`]);
+  assert.deepEqual(search.getAll("fq_list"), ["title:Gew\u00e4sser", "title:Gew\u00e4sser"]);
   assert.equal(search.get("sort"), "score desc");
+  assert.equal(search.get("facet.field"), '["tags"]');
   await client.tagList(`\u00a0${nfd} `);
   assert.equal(new URL(mt.last().url).searchParams.get("query"), "Gew\u00e4sser");
   // Inner whitespace and Solr syntax stay as written.
   await client.packageSearch({ q: ' "Elbe  Hafen" AND -type:x ' });
   assert.equal(new URL(mt.last().url).searchParams.get("q"), '"Elbe  Hafen" AND -type:x');
-  // Ids and the generic action's parameters go out as given.
-  await client.action("package_search", { q: ` ${nfd} ` });
-  assert.equal(new URL(mt.last().url).searchParams.get("q"), ` ${nfd} `);
+  // Ids, the generic action's parameter names and values.
+  await client.packageShow(" haushalt\n");
+  assert.equal(new URL(mt.last().url).searchParams.get("id"), "haushalt");
+  await client.action("package_search", { " q ": ` ${nfd} `, rows: 5 });
+  assert.equal(new URL(mt.last().url).search, "?q=Gew%C3%A4sser&rows=5");
 });
 
 test("packageSearch sends several filters as fq_list, not a repeated fq", async () => {
@@ -190,23 +193,23 @@ test("typed methods check the top-level shape of the result", async () => {
 
 test("library parameters are checked before any request", async () => {
   const cases: Array<[(c: GovDataClient) => Promise<unknown>, string]> = [
-    [(c) => c.packageSearch({ q: "  " }), 'Invalid q: expected a non-empty string, got "  ".'],
-    [(c) => c.packageSearch({ q: "" }), 'Invalid q: expected a non-empty string, got "".'],
-    [(c) => c.packageSearch({ fq: ["  "] }), 'Invalid fq entry: expected a non-empty string, got "  ".'],
-    [(c) => c.packageSearch({ fq: ["a:b", ""] }), 'Invalid fq entry: expected a non-empty string, got "".'],
-    [(c) => c.packageSearch({ sort: " " }), 'Invalid sort: expected a non-empty string, got " ".'],
-    [(c) => c.packageSearch({ facet_field: [""] }), 'Invalid facet_field entry: expected a non-empty string, got "".'],
+    [(c) => c.packageSearch({ q: "  " }), 'Invalid q: Expected a non-empty value.'],
+    [(c) => c.packageSearch({ q: "" }), 'Invalid q: Expected a non-empty value.'],
+    [(c) => c.packageSearch({ fq: ["  "] }), 'Invalid fq: Expected a non-empty value.'],
+    [(c) => c.packageSearch({ fq: ["a:b", ""] }), 'Invalid fq: item 2 of 2: Expected a non-empty value.'],
+    [(c) => c.packageSearch({ sort: " " }), 'Invalid sort: Expected a non-empty value.'],
+    [(c) => c.packageSearch({ facet_field: [""] }), 'Invalid facet_field: Expected a non-empty value.'],
     [(c) => c.packageSearch({ q: "x", rows: Number.NaN }), "Invalid rows: expected a non-negative integer, got NaN."],
     [(c) => c.packageSearch({ q: "x", start: -5 }), "Invalid start: expected a non-negative integer, got -5."],
     [(c) => c.packageSearch({ rows: 1.5 }), "Invalid rows: expected a non-negative integer, got 1.5."],
     [(c) => c.packageList({ offset: -1 }), "Invalid offset: expected a non-negative integer, got -1."],
     [(c) => c.organizationList({ offset: Infinity }), "Invalid offset: expected a non-negative integer, got Infinity."],
     [(c) => c.groupList({ offset: Number.NaN }), "Invalid offset: expected a non-negative integer, got NaN."],
-    [(c) => c.packageShow(""), 'Invalid id: expected a non-empty string, got "".'],
-    [(c) => c.organizationShow(" "), 'Invalid id: expected a non-empty string, got " ".'],
-    [(c) => c.groupShow("\t"), 'Invalid id: expected a non-empty string, got "\\t".'],
-    [(c) => c.resourceShow(""), 'Invalid id: expected a non-empty string, got "".'],
-    [(c) => c.tagList("   "), 'Invalid query: expected a non-empty string, got "   ".'],
+    [(c) => c.packageShow(""), 'Invalid id: Expected a non-empty value.'],
+    [(c) => c.organizationShow(" "), 'Invalid id: Expected a non-empty value.'],
+    [(c) => c.groupShow("\t"), 'Invalid id: Expected a non-empty value.'],
+    [(c) => c.resourceShow(""), 'Invalid id: Expected a non-empty value.'],
+    [(c) => c.tagList("   "), 'Invalid query: Expected a non-empty value.'],
   ];
   for (const [call, message] of cases) {
     const mt = makeMockTransport(() => jsonResponse(ckan([])));
@@ -221,11 +224,11 @@ test("library parameters are checked before any request", async () => {
 
 test("action refuses a blank parameter name, value or list entry before any request", async () => {
   const cases: Array<[QueryParams, string]> = [
-    [{ q: "" }, 'Invalid parameter q: expected a non-empty string, got "".'],
-    [{ q: "  " }, 'Invalid parameter q: expected a non-empty string, got "  ".'],
-    [{ fq_list: ["a:b", "\t"] }, 'Invalid parameter fq_list: expected a non-empty string, got "\\t".'],
-    [{ "": "x" }, 'Invalid parameter name: expected a non-empty string, got "".'],
-    [{ " ": "x" }, 'Invalid parameter name: expected a non-empty string, got " ".'],
+    [{ q: "" }, 'Invalid parameter q: Expected a non-empty value.'],
+    [{ q: "  " }, 'Invalid parameter q: Expected a non-empty value.'],
+    [{ fq_list: ["a:b", "\t"] }, 'Invalid parameter fq_list: item 2 of 2: Expected a non-empty value.'],
+    [{ "": "x" }, 'Invalid parameter name: Expected a non-empty value.'],
+    [{ " ": "x" }, 'Invalid parameter name: Expected a non-empty value.'],
   ];
   for (const [params, message] of cases) {
     const mt = makeMockTransport(() => jsonResponse(ckan([])));

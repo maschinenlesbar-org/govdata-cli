@@ -228,12 +228,29 @@ apps/cli/src/cli/
   more (`holdsHugeString`: iterative, linear, no allocation per value): on Node 26 the fast path aborts the process on a ~250 MB
   string from JSON.parse, so such an answer goes through the gap path (an empty gap, the
   same text).
-- Library input is checked before any request, as the CLI checks its options: a blank `q`,
-  `sort`, `fq`/`facet_field` entry, tag query or id, a blank `action()` parameter name or
-  value (or list entry), an invalid action name, or a paging value that is not a
-  non-negative integer throws `GovDataValidationError` (`Invalid <name>: expected …, got …`;
-  blank is `isBlank`/`textProblem` in `validate.ts`, which the CLI's `parseNonEmpty` and
-  `--param` use too; `undefined`/`null` still mean "not given"), and the
+- Library input is checked before any request, as the CLI checks its options (decision D8 of
+  the 2026-10-21 fix plan: every value that goes into a request passes one rule for its kind,
+  in `validate.ts`, which the CLI's `parseText`, `parseId`, `parseWith(sortProblem)` and
+  `--param` use too):
+  - **text** (`textProblem`; sent trimmed and in NFC, `normalizeText`): `q`, each `fq`, the
+    tag query, every string `action()` parameter value. Refused: a blank value, a lone
+    surrogate, a control character (but TAB/LF/CR), a format character (a zero-width space,
+    a soft hyphen, a bidi control; ZWNJ/ZWJ are allowed);
+  - **tokens** (`tokenProblem`; sent trimmed and in NFC, `normalizeToken`): the `*_show` ids
+    (`idProblem`: also no `/`, not `.`/`..`), the sort (`sortProblem`: `<field> asc|desc[,
+    …]`, so `metadata_modified sideways` is a usage error, not CKAN's HTTP 400), each facet
+    field (`fieldProblem`: a Solr field name) and every `action()` parameter name (two names
+    equal once trimmed, `q` and ` q`, are refused). Refused: a blank value and any control or
+    format character;
+  - **blank** (`isBlank`) is anything with nothing left once whitespace, control and format
+    characters and combining marks are taken out: a lone zero-width space matches nothing;
+  - **lists** are checked item by item (`listProblem`, `item 2 of 3: …`).
+  A refusal quotes the value visibly (`quoteValue`: control, format and bidi characters
+  escaped, `"el\u200bbe"`, cut at 500; decision D10), and commander's own echo of a rejected
+  value is escaped the same way (`escapeTerminalText` in `run.ts`). An invalid action name or
+  a paging value that is not a non-negative integer throws `GovDataValidationError` too
+  (`Invalid <name>: …`; `undefined`/`null` still mean "not given" for an `action()`
+  parameter), and the
   engine's numeric options must be integers in range (`timeoutMs` 0..2^31 − 1, `maxRetries`
   0..10, `retryDelayMs` 0..30000, `maxRedirects` 0..20, `maxResponseBytes` ≥ 0; `0` disables
   the timeout, retries, redirects or size cap). Every rejected input is a
@@ -241,17 +258,18 @@ apps/cli/src/cli/
   non-string `baseUrl`, `userAgent` or action name, a non-function `transport` or `sleep` —
   never a raw `TypeError` and never the base `GovDataError`. Messages echo a rejected value
   by type, or quoted and cut at 500 characters.
-- **Free text goes out canonical.** The search text (`q`, `govdata search [query]`) and the
-  tag query (`tagList(query)`, `govdata tags --query`) are sent trimmed and in composed
-  Unicode, NFC (`normalizeText`, exported): a decomposed "Gewässer" pasted from a macOS
-  file name, or a trailing space, matched nothing. Inner whitespace is kept, and NFC
-  changes no character of Solr's query syntax (all ASCII), so a `q` such as
-  `title:Haushalt AND -type:x` keeps its meaning. Solr filters (`fq`, still sent as
-  `fq_list`), the sort expression, facet fields, ids and `action()` parameters go out
-  exactly as given: they are query syntax over exact-match fields, field names or codes,
-  where only the stored form decides what matches. NFKC is not used: it would rewrite
-  characters (`ﬁ`, full-width forms) that a phrase or wildcard may mean literally. The CLI
-  passes the values on as typed.
+- **Every value goes out canonical.** The search text (`q`, `govdata search [query]`), each
+  Solr filter (`fq`, still sent as `fq_list`), the tag query and every string `action()`
+  parameter value are sent trimmed and in composed Unicode, NFC (`normalizeText`, exported):
+  a decomposed "Gewässer" pasted from a macOS file name, or a trailing space, matched
+  nothing (live, `--fq "title:Gewässer"` found 112 datasets, the decomposed spelling 0:
+  `title:` is an analysed field, not an exact code). Ids, the sort expression, facet fields
+  and parameter names go out trimmed and in NFC too (`normalizeToken`): `package " haushalt "`
+  exited 4 for an existing dataset. Inner whitespace is kept, and NFC changes no character
+  of Solr's query syntax (all ASCII), so a `q` such as `title:Haushalt AND -type:x` keeps
+  its meaning. NFKC is not used: it would rewrite characters (`ﬁ`, full-width forms) that a
+  phrase or wildcard may mean literally. The CLI passes the values on as typed; the library
+  canonicalises them.
 - A generic `action(name, params)` exposes every read action even where there is no typed
   convenience method. The action name is validated against `^[a-z0-9_]+$` and URL-encoded, so
   it cannot inject extra path segments, query string, or fragments into the request URL.
@@ -475,10 +493,12 @@ everything that drives the CLI is in `apps/cli/test/`.
   commander's help one record per line, the format commander parsed, a malformed answer
   under `api`, echoed credentials replaced, an `a:b@c` value left alone; adapter switches
   `USAGE_EXIT` 1, `OUTPUT_OPTION` undefined: govdata has no `-o`); from the kit rollout
-  2026-10-21, P24 the input corpus (every text filter, the search text and `tags --query`, is
-  sent trimmed and in NFC or refused, never blank; the one id that goes into a path, the
-  action name of `govdata action <name>`, is sent trimmed or refused; adapter `USAGE_EXIT`
-  1) and P25 the response corpus (a number a double can't carry exactly, or an empty
+  2026-10-21, P24 the input corpus (fix plan 2026-10-21, D8 and D10: every text value, the
+  search text, `--fq`, `tags --query` and an `action --param` value, is sent trimmed and in
+  NFC or refused, never blank; every token, the action name, the four `*_show` ids and
+  `--sort`, is sent trimmed or refused, never with a `/` or as a dot segment; a value of only
+  invisible characters or combining marks is blank, and a refusal shows an invisible
+  character escaped; adapter `USAGE_EXIT` 1, no list option) and P25 the response corpus (a number a double can't carry exactly, or an empty
   answer, is an error, never a changed value; via `--compact package`). P26 (`-o`
   integrity) is copied without its `-o` tests (govdata has no `-o`): stdout redirected to a
   file under `ulimit -f` exits 1 with an ERROR record of `govdata.output`, never 0. P27 (a big or odd answer is printed or

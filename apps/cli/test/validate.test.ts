@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertValid, baseUrlProblem, headerValueProblem, isBlank, textProblem } from "@maschinenlesbar.org/govdata-client/internal/validate";
+import {
+  assertValid,
+  baseUrlProblem,
+  fieldProblem,
+  headerValueProblem,
+  idProblem,
+  isBlank,
+  listProblem,
+  normalizeToken,
+  queryValueProblem,
+  sortProblem,
+  textProblem,
+  tokenProblem,
+} from "@maschinenlesbar.org/govdata-client/internal/validate";
 import { GovDataError, GovDataValidationError } from "@maschinenlesbar.org/govdata-client/internal/errors";
 import * as library from "../src/index.js";
 import { GovDataClient } from "@maschinenlesbar.org/govdata-client/internal/client";
@@ -54,18 +67,47 @@ test("parity() runs the CLI and the library on one transport and splits their re
   assertSameRequests(result);
 });
 
-test("isBlank: empty or whitespace-only", () => {
-  for (const v of ["", " ", "\t", " \n "]) assert.equal(isBlank(v), true, JSON.stringify(v));
-  for (const v of ["x", " x ", "0"]) assert.equal(isBlank(v), false, JSON.stringify(v));
+test("isBlank: nothing but whitespace, control and format characters or combining marks (D8)", () => {
+  for (const v of ["", " ", "\t", " \n ", "\u00a0", "\u3000", "\u200b", "\u00ad", "\ufeff", "\u0301\u0308", " \u200b "]) {
+    assert.equal(isBlank(v), true, JSON.stringify(v));
+  }
+  for (const v of ["x", " x ", "0", "a\u200bb", "\u00e9"]) assert.equal(isBlank(v), false, JSON.stringify(v));
 });
 
-test("textProblem: a string with non-whitespace content, else the reason", () => {
-  assert.equal(textProblem("Klima"), undefined);
-  assert.equal(textProblem(" a "), undefined);
-  assert.equal(textProblem(""), 'expected a non-empty string, got "".');
-  assert.equal(textProblem("\t"), 'expected a non-empty string, got "\\t".');
-  assert.equal(textProblem(undefined), "expected a non-empty string, got undefined.");
-  assert.equal(textProblem(5), "expected a non-empty string, got 5.");
+test("textProblem: not blank, no lone surrogate, no control or format character but TAB/LF/CR and ZWNJ/ZWJ; quoted visibly (D8, D10)", () => {
+  for (const v of ["Klima", " a ", "Mu\u0308ller", "a\tb", "a\nb", "a\u200db", "\ud83d\ude00"]) assert.equal(textProblem(v), undefined, JSON.stringify(v));
+  assert.equal(textProblem(""), "Expected a non-empty value.");
+  assert.equal(textProblem("\u200b"), "Expected a non-empty value.");
+  assert.equal(textProblem(undefined as unknown as string), "Expected a string.");
+  assert.equal(textProblem(5 as unknown as string), "Expected a string.");
+  assert.equal(textProblem("el\u200bbe"), '"el\\u200bbe" contains an invisible character (U+200B).');
+  assert.equal(textProblem("a\u0000b"), '"a\\u0000b" contains a control character (U+0000).');
+  assert.equal(textProblem("a\ud800"), '"a\\ud800" contains half of a character (a lone surrogate).');
+});
+
+test("tokenProblem, idProblem, sortProblem, fieldProblem: tokens are trimmed, never invisible (D8)", () => {
+  for (const v of ["haushalt", " haushalt ", "haushalt\n"]) {
+    assert.equal(tokenProblem(v), undefined, JSON.stringify(v));
+    assert.equal(idProblem(v), undefined, JSON.stringify(v));
+    assert.equal(normalizeToken(v), "haushalt");
+  }
+  assert.equal(tokenProblem("a\u200db"), '"a\\u200db" contains an invisible or control character (U+200D).');
+  assert.equal(idProblem("a/b"), '"a/b" is not an id or name: it contains "/".');
+  assert.equal(idProblem(" .. "), '"." and ".." are not ids.');
+  for (const v of ["metadata_modified desc", "name asc, metadata_modified desc", " score DESC "]) assert.equal(sortProblem(v), undefined, v);
+  assert.match(sortProblem("metadata_modified") ?? "", /is not a sort expression/);
+  assert.match(sortProblem("metadata_modified sideways") ?? "", /is not a sort expression/);
+  assert.equal(fieldProblem("res_format"), undefined);
+  assert.match(fieldProblem("res format") ?? "", /is not a Solr field name/);
+});
+
+test("listProblem and queryValueProblem: no empty list, no blank item (D8)", () => {
+  assert.equal(listProblem(["a", "b"]), undefined);
+  assert.equal(listProblem([]), "Expected at least one value.");
+  assert.equal(listProblem(["a", " "]), "item 2 of 2: Expected a non-empty value.");
+  for (const v of ["x", 5, true, new Date(0), ["a", 1], null, undefined]) assert.equal(queryValueProblem(v), undefined, String(v));
+  assert.match(queryValueProblem({}) ?? "", /^Expected a string, a finite number/);
+  assert.equal(queryValueProblem(["a", ""]), "item 2 of 2: Expected a non-empty value.");
 });
 
 test("headerValueProblem: not blank, no control characters but tab, Latin-1 only", () => {

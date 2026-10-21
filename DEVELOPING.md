@@ -183,7 +183,8 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global-option resolver, JSON renderer
+    shared.ts    # option parsers, global-option resolver
+    output.ts    # the JSON renderer: escaping, deep and huge answers
     commands/    # search / package / organizations / groups / tags / resource / action
     program.ts   # assembles the commander program from injectable deps
     run.ts       # parses argv -> exit code (no process.exit; testable)

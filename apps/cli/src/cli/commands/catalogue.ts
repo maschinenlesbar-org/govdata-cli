@@ -8,8 +8,8 @@ import {
   parseBoundedInt,
   parseIntArg,
   parseNonEmpty,
-  renderJson,
 } from "../shared.js";
+import { renderJson } from "../output.js";
 import type { QueryParams } from "@maschinenlesbar.org/govdata-client/internal/query";
 import { isBlank } from "@maschinenlesbar.org/govdata-client/internal/validate";
 import { cutForMessage, redactUrl } from "@maschinenlesbar.org/govdata-client/internal/errors";

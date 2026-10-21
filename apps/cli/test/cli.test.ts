@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli/run.js";
-import { renderJson } from "../src/cli/shared.js";
+import { renderJson } from "../src/cli/output.js";
 import { GovDataClient } from "@maschinenlesbar.org/govdata-client/internal/client";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "@maschinenlesbar.org/govdata-client/internal/http";

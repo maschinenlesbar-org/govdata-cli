@@ -558,3 +558,74 @@ test("terminal controls are escaped in chunks: the same text as one pass, across
   assert.equal(out[0], expected);
   assert.deepEqual(JSON.parse(out[0]!), { text });
 });
+
+// T15 of the 2026-10-21 fix round (jobsuche-cli 28be809, ladesaeulenregister-cli 001c48d,
+// abgeordnetenwatch-cli 6d136ad): a URL with a password anywhere in an argument — a query,
+// padded, after a dash, inside a phrase, an id, a --param or --fq value, a rejected option value,
+// commander's echo — must never reach stderr, neither raw in a refusal or note nor
+// percent-encoded in the request URL of an error record.
+test("a password in a URL inside any argument is redacted on stderr, raw or percent-encoded (T15)", async () => {
+  const url = "https://bob:s3cretpw@host.example/x";
+  const argvs = [
+    ["search", url],
+    ["search", ` ${url}`],
+    ["search", `Verkehr ${url}`],
+    ["search", ` -${url}`],
+    ["search", "--fq", `groups:${url}`],
+    ["search", "--fq", ` ${url}`],
+    ["search", "x", "--sort", ` ${url}`],
+    ["search", "x", "--rows", ` ${url}`],
+    ["search", "x", "--start", `1 ${url}`],
+    ["packages", "--limit", ` ${url}`],
+    ["tags", "--query", `\t${url}`],
+    ["tags", "--query", `a ${url}`],
+    ["package", ` ${url}`],
+    ["package", `abc ${url}`],
+    ["organization", ` -${url}`],
+    ["group", ` ${url}`],
+    ["resource", ` ${url}`],
+    ["action", "package_show", "--param", `id= ${url}`],
+    ["action", "package_show", "--param", `id=x ${url}`],
+    ["action", ` ${url}`],
+    ["action", "package_show", "--param", ` ${url}`],
+    [` ${url}`],
+    ["search", url, "--bogus"],
+    ["search", "x", `--sort= ${url}`],
+    ["--timeout", ` ${url}`, "tags"],
+  ];
+  const answers: Array<() => HttpResponse> = [
+    () => jsonResponse({ success: false, error: { message: `not found: ${url}` } }, 404),
+    () => jsonResponse({}, 500),
+    () => rawResponse("busy", "text/plain", 503),
+    () => {
+      throw Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+    },
+  ];
+  for (const argv of argvs) {
+    for (const answer of answers) {
+      const cli = makeCli(answer);
+      await run(["--max-retries", "0", ...argv], cli.deps);
+      const err = cli.err.join("\n");
+      assert.ok(err.length > 0, JSON.stringify(argv));
+      assert.doesNotMatch(err, /s3cretpw|bob%3As3/, `${JSON.stringify(argv)}: ${err}`);
+    }
+  }
+  // A password under 4 characters is not replaced on its own, so the percent-encoded userinfo
+  // a request URL carries is matched as a whole (with its "@").
+  for (const argv of [["search", " https://bob:pw@host.example/x"], ["tags", "--query", "a https://bob:pw@h.example"]]) {
+    const cli = makeCli(() => jsonResponse({}, 404));
+    await run(["--max-retries", "0", ...argv], cli.deps);
+    const err = cli.err.join("\n");
+    assert.match(err, /\*\*\*/, err);
+    assert.doesNotMatch(err, /bob:pw@|bob%3Apw%40/, `${JSON.stringify(argv)}: ${err}`);
+  }
+});
+
+test("the URL search of the redaction is linear: a 1 MB argument without '://' is quick (T15)", async () => {
+  for (const big of ["a".repeat(1 << 20), "a:/".repeat(350_000), `${"a".repeat(1 << 20)}://`]) {
+    const cli = makeCli(() => jsonResponse({}, 404));
+    const started = performance.now();
+    await run(["--max-retries", "0", "search", big], cli.deps);
+    assert.ok(performance.now() - started < 1500, `${big.length} characters took ${Math.round(performance.now() - started)} ms`);
+  }
+});

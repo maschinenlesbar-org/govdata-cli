@@ -100,8 +100,12 @@ percent-encoded form, as a request URL in an error echoes it) and replaces it wi
 everything it prints —
 commander's usage errors, which echo rejected values (a `--base-url` with a query, an
 excess argument), and its own messages (unknown command, a rejected `--param`) — so a
-password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. Only
-a value that starts with a scheme counts (a bare `a:b@c` is a dataset id, a search text or
+password with spaces, quotes, `#`, `?` or `/` is caught as well as an ordinary one. A URL
+counts wherever it starts inside an argument (`urlsWithin`: each `://` found with indexOf, its
+scheme by walking back, at most 64 per argument), since a query or an id is sent trimmed and a
+refusal quotes it whole: a padded `" https://u:pw@host"`, one after a dash, inside a phrase or
+an `--fq` filter reached the request URL of an error record and the refusals. Only
+a URL with a scheme counts (a bare `a:b@c` is a dataset id, a search text or
 a User-Agent as often as a credential), except as the `--base-url` value, where a
 `user:password@host` without its scheme is still a credential. The log replaces it in each record's *message*, before the record is cut and escaped, and
 writes it to the raw stderr: the frame (time, level, topic) is never touched, and a

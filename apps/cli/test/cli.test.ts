@@ -212,6 +212,26 @@ test("userinfo in --base-url is sent but redacted in error messages", async () =
   assert.match(stderr, /HTTP 500 for GET http:\/\/mirror\.test\/s500\/api\/3\/action\/x/);
 });
 
+test("a token in --base-url (no password) is redacted from what the CLI prints, on stderr and stdout", async () => {
+  const token = "tok3nSECRETvalue";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const base of [`http://${token}@mirror.test`, `http://${token}:@mirror.test`]) {
+    // An error answer that echoes the header and the token: stderr.
+    const failed = makeCli(() =>
+      jsonResponse({ success: false, error: { message: `rejected Basic ${basic} (decoded ${token}:) ${token}` } }, 401),
+    );
+    assert.equal(await run(["--base-url", base, "--max-retries", "0", "package", "demo-id"], failed.deps), 1);
+    assert.equal(failed.mt.last().headers?.["Authorization"], `Basic ${basic}`);
+    const stderr = failed.err.join("\n");
+    assert.ok(!stderr.includes(token) && !stderr.includes(basic), stderr);
+    // A 2xx answer that echoes the Basic value and `TOKEN:`: stdout.
+    const echoed = makeCli(() => jsonResponse(ckan({ echo: `Basic ${basic}`, decoded: `${token}:` })));
+    assert.equal(await run(["--base-url", base, "--compact", "action", "status_show"], echoed.deps), 0);
+    const stdout = echoed.out.join("\n");
+    assert.ok(!stdout.includes(basic) && !stdout.includes(`${token}:`), stdout);
+  }
+});
+
 test("usage errors never print a --base-url password (02#1, 06 C10)", async () => {
   const url = "https://bob:hunter2@ckan.example.org/api/3/action/package_search?q=x";
   for (const argv of [

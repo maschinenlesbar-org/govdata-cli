@@ -16,6 +16,7 @@ import {
   GovDataValidationError,
   redactUrl,
   cutText,
+  echoedCredentialForms,
   toWellFormed,
 } from "../src/errors.js";
 import { GovDataClient } from "../src/client.js";
@@ -620,6 +621,46 @@ test("credentials a server echoes are scrubbed from the error: Basic, user:passw
     for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) assert.ok(!err.message.includes(form), err.message);
     return true;
   });
+});
+
+test("echoedCredentialForms treats a userinfo without a password as a token (Basic `TOKEN:`)", () => {
+  const basic = (pair: string): string => Buffer.from(pair, "utf8").toString("base64");
+  assert.deepEqual(echoedCredentialForms("alice:s3cret"), [basic("alice:s3cret"), "alice:s3cret", "s3cret"]);
+  assert.deepEqual(echoedCredentialForms("T0ken"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T0ken:"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T%C3%B6k"), [basic("Tök:"), "Tök:"]); // short: not alone
+  assert.deepEqual(echoedCredentialForms(":pw12"), [basic(":pw12"), ":pw12", "pw12"]);
+  assert.deepEqual(echoedCredentialForms(""), []);
+  assert.deepEqual(echoedCredentialForms(":"), []);
+});
+
+test("a token userinfo (no password) a server echoes is scrubbed from the error in every form", async () => {
+  const token = "tok3nSECRETvalue";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const baseUrl of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    const body = JSON.stringify({
+      success: false,
+      error: { message: `rejected Authorization: Basic ${basic} (decoded ${token}:) token ${token}` },
+    });
+    const respond = (status: number) => async (): Promise<HttpResponse> => ({
+      status,
+      headers: { "content-type": "application/json" },
+      body: Buffer.from(body),
+    });
+    const engine = new RequestEngine({ baseUrl, transport: respond(401), maxRetries: 0 });
+    await assert.rejects(engine.getJson("/api/3/action/package_show"), (err: GovDataApiError) => {
+      for (const text of [err.message, err.body, err.detail ?? ""]) {
+        assert.ok(!text.includes(token) && !text.includes(basic), `${baseUrl}: ${text}`);
+      }
+      return true;
+    });
+    // The same echo in a success:false envelope on HTTP 200.
+    const client = new GovDataClient({ baseUrl, transport: respond(200), maxRetries: 0 });
+    await assert.rejects(client.organizationList(), (err: Error) => {
+      assert.ok(!err.message.includes(token) && !err.message.includes(basic), err.message);
+      return true;
+    });
+  }
 });
 
 test("onRetry is called once per retry, with the event fields, right before the sleep", async () => {

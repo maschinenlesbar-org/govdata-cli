@@ -112,7 +112,10 @@ writes it to the raw stderr: the frame (time, level, topic) is never touched, an
 password with DEL, C1 or bidi characters is matched in its raw form. The forms a server
 echoes a userinfo back in are replaced too: the `Basic` value and the decoded
 `user:password` on stdout and stderr, the password alone (4 characters or more) on stderr
-only, since it may well occur in the data. `redactUrl` falls back to the same
+only, since it may well occur in the data. A userinfo without a password (`TOKEN@host`,
+`TOKEN:@host`) is a token: the engine sends it as Basic `TOKEN:`, and the token takes the
+password's place (the Basic value of `TOKEN:` and `TOKEN:` on both streams, the token alone
+on stderr). `redactUrl` falls back to the same
 text-based cut (`redactCredentials`, exported) for a value that doesn't parse as a URL.
 
 ### Methods
@@ -369,7 +372,8 @@ error and no client shows the base URL's password: the engine keeps the base URL
 real `#private` field (so `console.log(client)`, `util.inspect` and `JSON.stringify`
 don't reveal it), every URL in a message goes through `redactUrl`, and the base URL's
 userinfo (raw and percent-decoded) and the forms a server echoes it back in (the `Basic`
-value, the decoded `user:password`, the password alone from 4 characters:
+value, the decoded `user:password`, the password alone from 4 characters, the user name
+in its place when there is no password:
 `echoedCredentialForms`) are scrubbed from error bodies and details, a CKAN
 `success: false` message, redirect targets, transport error text and the `cause` chain
 (`RequestEngine.scrub`). The CLI maps a `404` and CKAN's `Not Found Error` sent with HTTP 200

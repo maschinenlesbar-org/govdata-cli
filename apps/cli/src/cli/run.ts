@@ -154,7 +154,7 @@ export interface Redaction {
    * a server echoes it back in (the Basic value, the decoded `user:password`).
    */
   out(text: string): string;
-  /** stderr text, a record's message: that, and the password alone (`***`). */
+  /** stderr text, a record's message: that, and the password (or a token user name) alone (`***`). */
   err(text: string): string;
 }
 
@@ -197,7 +197,8 @@ export function redactionFor(argv: readonly string[]): Redaction {
       // message: `id=https%3A%2F%2Fuser%3Apw%40host`.
       encoded.add(encodeURIComponent(`${secret}@`));
       // What a server echoes back: the Basic value and the decoded user:password on
-      // stdout and stderr, the password alone (it may well occur in the data) on stderr.
+      // stdout and stderr, the password alone (it may well occur in the data) on stderr. A
+      // userinfo without a password is a token: the user name takes the password's place.
       const [basic, pair, password] = echoedCredentialForms(secret);
       if (basic !== undefined) echoed.add(basic);
       if (pair !== undefined) echoed.add(pair);

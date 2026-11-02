@@ -338,7 +338,11 @@ parameter), and `GovDataActionError` (a `success: false` envelope on a 2xx statu
 `action` and CKAN's `__type` as `errorType`) — all extending `GovDataError`. Server text in a message (an error `detail`, a `success: false`
 message, a redirect target, a parser's reason) is cut at 500 characters
 (`MAX_MESSAGE_VALUE_LENGTH`, ending in "…"), never inside a surrogate pair (`cutText`), so a
-message stays well-formed. Every other value an own message quotes from a server answer or
+message stays well-formed. It is cleaned first (`sanitizeServerText`): whole terminal escape
+sequences, the remaining C0/C1 controls and DEL and every format character (Cf: bidi
+controls, zero-width characters) are dropped and whitespace runs become one space, reading
+at most the first 16 384 characters, so a hostile error message of millions of characters
+costs neither time nor heap. Every other value an own message quotes from a server answer or
 the user's input (an action name or parameter key, a scheme, a rejected string, a `--param`
 value or key, an unknown command) is cut there too, so `err.message` stays bounded for a
 library caller (a typed value after its userinfo is redacted, so a cut never leaves part of

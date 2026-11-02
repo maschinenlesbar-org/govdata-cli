@@ -313,9 +313,9 @@ test("a success:false envelope on HTTP 200 is stripped of terminal escapes, bidi
     `str ${ESC}[31merr\nError: forged ${RLO}line`,
   ];
   const expected = [
-    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evil[31mRED]0;TITLE [2J31m',
-    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: {"__type":"X31m","detail":"d\\u001b[2J"}',
-    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: str [31merr Error: forged line',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evilRED',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: {"__type":"X","detail":"d\\u001b[2J"}',
+    'GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: str err Error: forged line',
   ];
   for (const [i, error] of errors.entries()) {
     const mt = makeMockTransport(() => jsonResponse({ help: "h", success: false, error }));

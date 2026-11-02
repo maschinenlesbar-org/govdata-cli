@@ -355,7 +355,7 @@ test("a success:false error on HTTP 200 reaches stderr without escape sequences"
     jsonResponse({ success: false, error: { message: `evil${ESC}[31mRED${ESC}]0;TITLE${BEL}` } }),
   );
   assert.equal(await run(["package", "x"], cli.deps), 1);
-  assert.deepEqual(cli.err.map(untimed), ['ERROR [govdata.api] GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evil[31mRED]0;TITLE']);
+  assert.deepEqual(cli.err.map(untimed), ['ERROR [govdata.api] GET https://ckan.govdata.de/api/3/action/package_show?id=x: CKAN action "package_show" failed: evilRED']);
 });
 
 test("malformed envelopes exit 1 with a clear error instead of an Unexpected error", async () => {

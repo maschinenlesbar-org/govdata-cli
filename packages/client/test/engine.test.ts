@@ -6,6 +6,7 @@ import {
   RequestEngine,
   assertHeaderValue,
   parseRetryAfter,
+  sanitizeServerText,
   validateBaseUrl,
 } from "../src/engine.js";
 import {
@@ -15,6 +16,7 @@ import {
   GovDataParseError,
   GovDataValidationError,
   redactUrl,
+  cutForMessage,
   cutText,
   echoedCredentialForms,
   toWellFormed,
@@ -274,8 +276,8 @@ test("error detail is stripped of terminal control characters (GOV-02)", async (
       // human-readable message that run.ts prints to stderr...
       assert.ok(!hasControlChars(err.detail ?? ""));
       assert.ok(!hasControlChars(err.message));
-      // ...while the printable characters (and the __type prefix) survive.
-      assert.equal(err.detail, "Internal Server Error: boom[31mred2J");
+      // ...as whole escape sequences, while the printable text (and the __type prefix) survives.
+      assert.equal(err.detail, "Internal Server Error: boomred");
       return true;
     },
   );
@@ -290,10 +292,10 @@ test("a bare JSON string error body (CKAN's unknown-action answer) becomes the d
     () => e.getJson("/api/3/action/no_such_action"),
     (err: unknown) => {
       assert.ok(err instanceof GovDataApiError);
-      assert.equal(err.detail, "Fehlerhafte Anfrage - Action name not known: no_such_action[2J");
+      assert.equal(err.detail, "Fehlerhafte Anfrage - Action name not known: no_such_action");
       assert.equal(
         err.message,
-        "HTTP 400 for GET https://a.example/api/3/action/no_such_action: Fehlerhafte Anfrage - Action name not known: no_such_action[2J",
+        "HTTP 400 for GET https://a.example/api/3/action/no_such_action: Fehlerhafte Anfrage - Action name not known: no_such_action",
       );
       return true;
     },
@@ -318,6 +320,51 @@ test("error detail loses newlines and bidi overrides, so it cannot forge stderr 
       return true;
     },
   );
+});
+
+test("sanitizeServerText reads a bounded prefix and drops what the per-character filter dropped", () => {
+  // The filter it replaces, one character at a time: C0 but TAB to CR, DEL, C1 and Cf go.
+  const perCharacter = (text: string): string =>
+    cutForMessage(
+      [...text]
+        .filter((ch) => {
+          const n = ch.codePointAt(0) ?? 0;
+          return (n >= 0x09 && n <= 0x0d) || !(n <= 0x1f || (n >= 0x7f && n <= 0x9f) || /\p{Cf}/u.test(ch));
+        })
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim(),
+    );
+  const every = Array.from({ length: 0x3000 }, (_, i) => String.fromCharCode(i)).join("") + "\u{1f600}\u{e0001}\ud800x";
+  for (let at = 0; at < every.length; at += 512) {
+    const piece = every.slice(at, at + 512).replace(/[\u001b\u0090\u0098\u009b-\u009f]/g, "");
+    assert.equal(sanitizeServerText(piece), perCharacter(piece), `from U+${at.toString(16)}`);
+  }
+  // At most 16 384 units of the text are read, never half a surrogate pair: what follows is
+  // never copied, whatever the cleaning would have left of the start.
+  assert.equal(sanitizeServerText(`${" ".repeat(16_384)}tail`), "");
+  assert.equal(sanitizeServerText(`${"\u0000".repeat(16_383)}\u{1f600}`), "");
+  assert.equal(sanitizeServerText(`${"\u0000".repeat(16_382)}\u{1f600}`), "\u{1f600}");
+  assert.equal(sanitizeServerText("x".repeat(100_000)), `${"x".repeat(500)}…`);
+  // A control string ends at another introducer: the first is dropped by the filter, the second
+  // string as a whole.
+  const OSC8 = String.fromCharCode(0x9d);
+  const ST8 = String.fromCharCode(0x9c);
+  assert.equal(sanitizeServerText(`a${OSC8}0;x${OSC8}0;t${ST8}b`), "a0;xb");
+  assert.equal(sanitizeServerText(`a${ESC}]0;x${ESC}]0;t${BEL}b`), "a0;xb");
+  // Whole escape sequences go, not only their control bytes.
+  assert.equal(sanitizeServerText(`a${ESC}]0;title${BEL}b${ESC}[1;31mc${CSI}2Jd`), "abcd");
+});
+
+test("sanitizeServerText cleans a huge server text in linear time", () => {
+  for (const intro of ["\u009d", "\u0090", "\u0098", "\u009e", "\u009f", `${ESC}]`]) {
+    const started = Date.now();
+    assert.equal(sanitizeServerText(`${intro}x`.repeat(100_000)).slice(0, 3), "xxx");
+    assert.ok(Date.now() - started < 1000, `${JSON.stringify(intro)}: ${Date.now() - started} ms`);
+  }
+  const started = Date.now();
+  assert.equal(sanitizeServerText("A".repeat(20_000_000)).length, 501);
+  assert.ok(Date.now() - started < 1000, `${Date.now() - started} ms`);
 });
 
 function redirect(status: number, location?: string): HttpResponse {
@@ -352,7 +399,7 @@ test("a malformed or missing Location is an API error, not an Unexpected error",
     () => new RequestEngine({ transport: bad.transport, baseUrl: "https://a.example" }).getJson("/x"),
     (err: unknown) =>
       err instanceof GovDataApiError &&
-      err.message === "HTTP 302 for GET https://a.example/x: redirect to http://[::1[2J not followed",
+      err.message === "HTTP 302 for GET https://a.example/x: redirect to http://[::1 not followed",
   );
   const none = makeMockTransport(() => redirect(302));
   await assert.rejects(

@@ -4,6 +4,9 @@
 // - A CKAN error message of millions of characters, on HTTP 500 and in a success:false envelope
 //   on HTTP 200: sanitizeServerText copied the whole text, one string node per character, before
 //   it cut it to 500 characters.
+// - A 2xx answer in millions of one-byte chunks (transfer-encoding: chunked): the default transport
+//   kept each chunk as its own Buffer until the end, about 210 bytes of heap per byte of payload,
+//   far below the byte cap.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -76,4 +79,19 @@ test("a 16 MB CKAN error message ends in one ERROR record within a small heap, o
     assert.match(records[0] ?? "", /ERROR \[govdata\.api\] /);
     assert.ok((records[0] ?? "").length < 1500, "the record is cut");
   }
+});
+
+/** A 200 answer in chunked transfer encoding: `first`, then `count` chunks of one space, then `last`. */
+function tinyChunks(first: string, count: number, last: string): Buffer {
+  const chunk = (text: string): string => `${Buffer.byteLength(text).toString(16)}\r\n${text}\r\n`;
+  const head = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n";
+  return Buffer.from(head + chunk(first) + "1\r\n \r\n".repeat(count) + chunk(last) + "0\r\n\r\n", "latin1");
+}
+
+test("an answer in two million one-byte chunks is read within a small heap", STARTS_A_PROCESS, async () => {
+  const answer = tinyChunks('{"help":"h","success":true,"result":{"id":"a1"}', 2_000_000, "}");
+  const run = await runWithRawAnswer(answer, 256, ["package", "a1"]);
+  noCrash(run, "tiny chunks");
+  assert.equal(run.code, 0, run.stderr.slice(0, 500));
+  assert.deepEqual(JSON.parse(run.stdout), { id: "a1" });
 });

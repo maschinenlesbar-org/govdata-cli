@@ -444,7 +444,10 @@ not followed`, plus `(stopped after 5 redirects)` at the limit.
 unlimited) defending against memory exhaustion from a hostile/buggy endpoint. The
 built-in transport aborts as soon as the body passes it; the engine checks the body any
 transport returns. The message names the option and the CLI flag: `Response exceeded
-the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`.
+the size limit of <n> bytes (maxResponseBytes; --max-response-bytes on the CLI)`. The
+built-in transport joins small chunks as they arrive (at most 1024 kept unjoined, or 64 KiB),
+so the memory an answer holds follows its bytes, not the number of chunks a server sends it
+in: two million one-byte chunks used to exhaust a 256 MB heap.
 
 **Charset.** A JSON body is decoded by the charset its `Content-Type` declares
 (`TextDecoder`; UTF-8 when none is given), so a mirror or proxy that re-encodes to

@@ -141,6 +141,10 @@ test("baseUrlProblem: an absolute http(s) URL without a query or fragment", () =
   assert.equal(baseUrlProblem("  "), "Expected an absolute http(s) URL.");
   assert.equal(baseUrlProblem("not-a-url"), "Expected an absolute http(s) URL.");
   assert.equal(baseUrlProblem("ftp://x"), 'Unsupported scheme "ftp:". Expected an http(s) URL.');
+  // A scheme is named only when the value spells `<scheme>://`: without it, it is a user name or a token (F5).
+  for (const v of ["alice:s3cret@h.example", "T0kenS3cret:@h.example", "mailto:a@b.example", "data:text/plain,x"]) {
+    assert.equal(baseUrlProblem(v), "Expected an absolute http(s) URL.", v);
+  }
   assert.equal(baseUrlProblem("https://x/?q=1"), "A base URL cannot have a query (?) or fragment (#).");
   assert.equal(baseUrlProblem("https://x/#f"), "A base URL cannot have a query (?) or fragment (#).");
 });

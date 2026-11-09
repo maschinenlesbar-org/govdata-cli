@@ -687,3 +687,26 @@ test("a refused --base-url whose userinfo WHATWG reads after slashes or backslas
     assert.ok(!err.includes("pw1-Secret"), err);
   }
 });
+
+test("a --base-url typed without its scheme never names its user name or token (F5)", async () => {
+  // `T0kenS3cret:@h.example` parses as a URL whose scheme is the token, lower-cased
+  // ("t0kens3cret:"), which no exact-string redaction matches: `Unsupported scheme` named it.
+  for (const [base, secrets] of [
+    ["T0kenS3cret:@h.example", ["T0kenS3cret", "t0kens3cret"]],
+    ["alice:s3cret@h.example", ["alice", "s3cret"]],
+    ["my_user:pw-S3cret@h.example", ["my_user", "pw-S3cret"]],
+    ["T0k:@h.example", ["T0k", "t0k"]],
+  ] as const) {
+    const cli = makeCli(() => jsonResponse(ckan([])));
+    assert.equal(await run(["--base-url", base, "tags"], cli.deps), 1, base);
+    assert.equal(cli.mt.calls.length, 0);
+    const err = cli.err.join("\n");
+    assert.match(err, /Expected an absolute http\(s\) URL\./, base);
+    for (const secret of secrets) assert.ok(!err.includes(secret), `${base}: ${err}`);
+    assert.throws(
+      () => new GovDataClient({ baseUrl: base }),
+      (e: unknown) => e instanceof Error && secrets.every((secret) => !e.message.includes(secret)) && /Expected an absolute http\(s\) URL\./.test(e.message),
+      base,
+    );
+  }
+});

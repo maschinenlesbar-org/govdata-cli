@@ -278,6 +278,10 @@ export function baseUrlProblem(value: unknown): string | undefined {
     return "Expected an absolute http(s) URL.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
+    // `user:password@host` without a scheme parses as a URL whose scheme is the user name
+    // ("t0kens3cret:"), lower-cased, which no exact-string redaction can match: name a scheme
+    // only when the value spells one, `<scheme>://`.
+    if (!/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) return "Expected an absolute http(s) URL.";
     return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";

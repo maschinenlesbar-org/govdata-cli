@@ -269,7 +269,7 @@ export class GovDataClient {
       const type = (e as { __type?: unknown } | null | undefined)?.__type;
       throw new GovDataActionError(
         `${request}: CKAN action ${cutForMessage(JSON.stringify(action))} failed: ${sanitizeServerText(this.engine.scrub(detail))}`,
-        { action, errorType: typeof type === "string" ? sanitizeServerText(type) : undefined, url },
+        { action, errorType: typeof type === "string" ? sanitizeServerText(this.engine.scrub(type)) : undefined, url },
       );
     }
     // `{"success": true}` without a result would print nothing useful (and the CLI

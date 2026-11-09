@@ -1,5 +1,5 @@
 import { test } from "node:test";
-import { TextDecoder } from "node:util";
+import { TextDecoder, inspect } from "node:util";
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import {
@@ -1010,4 +1010,111 @@ test("scanNumbers quotes millions of declared members within a small heap (C)", 
     `process.stdout.write(String(scanNumbers(json, new Set(["k"])).json.length));`;
   const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(out, String(n * 10 + 1));
+});
+
+// A password with characters a JSON writer escapes (a quote) or may write as \u00XX (an umlaut).
+const ECHO_PW = "pä\"s's-W0rd";
+const ECHO_BASE = `https://alice:${encodeURIComponent(ECHO_PW)}@mirror.example`;
+const ECHO_BASIC = Buffer.from(`alice:${ECHO_PW}`, "utf8").toString("base64");
+/** The forms of the credential an error must not carry: decoded, and as a quoted value spells them (`\"`). */
+const ECHO_SECRETS = [ECHO_PW, `alice:${ECHO_PW}`, ECHO_BASIC].flatMap((secret) => [secret, JSON.stringify(secret).slice(1, -1)]);
+
+/** Everything a library user may log of an error: inspect, message, detail, errorType, and the decoded body. */
+function everythingOf(err: unknown): string {
+  let text = inspect(err, { depth: 10, showHidden: true });
+  const e = err as { message?: unknown; detail?: unknown; errorType?: unknown; body?: unknown };
+  text += [e.message, e.detail, e.errorType, e.body].map(String).join("\n");
+  let decoded: unknown;
+  try {
+    decoded = typeof e.body === "string" ? JSON.parse(e.body) : undefined;
+  } catch {
+    // not JSON: the body as sent is all a caller reads
+  }
+  const walk = (v: unknown): void => {
+    if (typeof v === "string") text += `\n${v}`;
+    else if (v !== null && typeof v === "object") {
+      for (const [k, w] of Object.entries(v)) {
+        text += `\n${k}`;
+        walk(w);
+      }
+    }
+  };
+  walk(decoded);
+  return text;
+}
+
+/** `text` as a JSON writer that escapes every non-ASCII character writes it (Python's json.dumps). */
+const asciiJson = (text: string): string =>
+  JSON.stringify(text).replace(/[\u0080-￿]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
+/** `text` with every character written as a \uXXXX escape: no spelling of it as sent matches. */
+const escapedJson = (text: string): string => `"${[...text].map((ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}"`;
+
+test("a credential echoed with JSON escapes is scrubbed from the message, the detail and the decoded body (D)", async () => {
+  const echoes: Array<[string, string]> = [
+    ["the password, ASCII-only JSON", asciiJson(`wrong password ${ECHO_PW}`)],
+    ["the user:password, minimal JSON", JSON.stringify(`bad login alice:${ECHO_PW}`)],
+    ["the password, every character escaped", escapedJson(ECHO_PW)],
+    ["the site URL as the server decoded it", JSON.stringify(`no access to https://alice:${ECHO_PW}@mirror.example/x`)],
+  ];
+  const shapes: Array<[string, (json: string) => string]> = [
+    ["CKAN's error object", (json) => `{"help":"h","success":false,"error":{"__type":"Authorization Error","message":${json}}}`],
+    ["CKAN's validation error (no message)", (json) => `{"help":"h","success":false,"error":{"__type":"Validation Error","name":[${json}]}}`],
+    ["a plain message", (json) => `{"message":${json}}`],
+    ["a bare JSON string", (json) => json],
+  ];
+  for (const status of [401, 500]) {
+    for (const [shape, bodyWith] of shapes) {
+      for (const [label, json] of echoes) {
+        const e = new RequestEngine({ baseUrl: ECHO_BASE, maxRetries: 0, transport: async () => rawResponse(bodyWith(json), "application/json", status) });
+        const err = await e.getJson("/api/3/action/status_show").catch((caught: unknown) => caught);
+        assert.ok(err instanceof GovDataApiError && err.message.startsWith(`HTTP ${status} `), `${shape}, ${label}: ${String(err)}`);
+        const seen = everythingOf(err);
+        for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret), `${status} ${shape}, ${label}: ${seen.slice(0, 2000)}`);
+      }
+    }
+  }
+});
+
+test("a credential in CKAN's success:false error on HTTP 200 is scrubbed, its __type and a validation error too (D)", async () => {
+  for (const json of [asciiJson(ECHO_PW), JSON.stringify(`alice:${ECHO_PW}`), escapedJson(ECHO_PW)]) {
+    for (const body of [
+      `{"help":"h","success":false,"error":{"__type":${json},"message":${json}}}`,
+      `{"help":"h","success":false,"error":{"__type":"Validation Error","name":[${json}]}}`,
+    ]) {
+      const client = new GovDataClient({ baseUrl: ECHO_BASE, transport: async () => rawResponse(body, "application/json") });
+      const err = await client.packageShow("a1").catch((caught: unknown) => caught);
+      assert.ok(err instanceof Error, String(err));
+      const seen = everythingOf(err);
+      for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret), `${body}: ${seen.slice(0, 2000)}`);
+    }
+  }
+});
+
+test("an error body keeps its spelling unless a credential hides behind an escape (D)", async () => {
+  const base = "https://alice:s3cret-pw@mirror.example";
+  const bodyOf = async (body: string): Promise<string> => {
+    const e = new RequestEngine({ baseUrl: base, maxRetries: 0, transport: async () => rawResponse(body, "application/json", 500) });
+    const err = await e.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof GovDataApiError, String(err));
+    return err.body;
+  };
+  // No credential, or one spelled as sent: the body as sent (scrubbed), escapes kept.
+  assert.equal(await bodyOf('{"m":"caf\\u00e9 \\"x\\""}'), '{"m":"caf\\u00e9 \\"x\\""}');
+  assert.equal(await bodyOf('{"m":"pw s3cret-pw \\u00e9"}'), '{"m":"pw *** \\u00e9"}');
+  // Escaped: written again decoded, scrubbed in that spelling.
+  assert.equal(await bodyOf('{"m":"pw s3cret\\u002dpw \\u00e9"}'), '{"m":"pw *** é"}');
+  // Not JSON: nobody decodes it, it stays as sent.
+  assert.equal(await bodyOf("pw s3cret\\u002dpw"), "pw s3cret\\u002dpw");
+  // Too deep to write again: left out.
+  assert.equal(await bodyOf(`${"[".repeat(20_000)}"s3cret\\u002dpw"${"]".repeat(20_000)}`).then((b) => b.length < 100_000), true);
+});
+
+test("a credential in an answer's Content-Type or charset is scrubbed from the parse error (D)", async () => {
+  for (const contentType of [`text/html; x=${ECHO_PW}`, `application/json; charset=${encodeURIComponent(ECHO_PW)}`, `text/${encodeURIComponent(`alice:${ECHO_PW}`)}`]) {
+    const e = new RequestEngine({ baseUrl: ECHO_BASE, transport: async () => rawResponse("<html>", contentType) });
+    const err = await e.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof GovDataParseError, String(err));
+    const seen = everythingOf(err);
+    for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret) && !seen.includes(encodeURIComponent(secret)), `${contentType}: ${seen.slice(0, 2000)}`);
+  }
 });

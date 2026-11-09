@@ -470,8 +470,9 @@ export class RequestEngine {
   readonly #credentials: string[];
   /**
    * The forms a server echoes that userinfo back in (the Basic value, the decoded
-   * `user:password`, the password alone or a token user name; `echoedCredentialForms`),
-   * longest first, so a password never leaves half of the `user:password` around it.
+   * `user:password`, the password alone or a token user name; `echoedCredentialForms`), each
+   * also percent-encoded as in a URL and escaped as in a JSON string, longest first, so a
+   * password never leaves half of the `user:password` around it.
    */
   readonly #echoed: string[];
   private readonly transport: Transport;
@@ -496,16 +497,20 @@ export class RequestEngine {
     // injects a custom transport would otherwise get no gating at all, and could
     // be steered to a non-http(s) scheme. Only undefined selects the default.
     this.#baseUrl = validateBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
-    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+    // The userinfo as typed and as sent (WHATWG percent-encodes some of its characters).
+    const userinfos = [...new Set([...credentialsIn(this.#baseUrl), ...credentialsIn(new URL(this.#baseUrl).href)])];
+    this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];
       } catch {
         return [raw];
       }
     });
-    this.#echoed = credentialsIn(this.#baseUrl)
-      .flatMap(echoedCredentialForms)
-      .sort((a, b) => b.length - a.length);
+    // Each form also as a URL (a redirect's Location) and as JSON (an error object the engine
+    // writes again with JSON.stringify, CKAN's validation errors) spell it; longest first.
+    this.#echoed = [...new Set(userinfos.flatMap(echoedCredentialForms).flatMap(urlSpellings).flatMap(jsonSpellings))].sort(
+      (a, b) => b.length - a.length,
+    );
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only undefined selects the default; a blank or unsendable value is refused.
     this.userAgent =
@@ -563,6 +568,32 @@ export class RequestEngine {
    */
   scrub(text: string): string {
     return this.#credentials.length === 0 ? text : redactSecrets(redactCredentials(text, this.#credentials), this.#echoed);
+  }
+
+  /**
+   * An error body, already scrubbed as sent, as `GovDataApiError.body` keeps it: when it is JSON
+   * with an escape in it, checked decoded too. An escape (`\u00e4`, `\u002d`) hides an echoed
+   * credential from the scrub of the text as sent, while a caller who parses the body sees it. Such
+   * a body is kept as the decoded JSON written again (`JSON.stringify`, one spelling per character)
+   * with the credential scrubbed in that spelling. A body that doesn't parse is text nobody
+   * decodes, and stays as sent; one too deeply nested to write again is left out.
+   */
+  private scrubBody(scrubbed: string): string {
+    if (this.#echoed.length === 0 || !scrubbed.includes("\\")) return scrubbed;
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(scrubbed);
+    } catch {
+      return scrubbed;
+    }
+    let rewritten: string;
+    try {
+      rewritten = JSON.stringify(decoded);
+    } catch {
+      return "";
+    }
+    const spelled = this.#echoed.map((form) => JSON.stringify(form).slice(1, -1));
+    return spelled.some((form) => rewritten.includes(form)) ? redactSecrets(rewritten, spelled) : scrubbed;
   }
 
   /**
@@ -818,7 +849,7 @@ export class RequestEngine {
     const res = await this.request("GET", path, { query, accept: "application/json" });
     const url = redactUrl(res.url);
     const request = `GET ${cutForMessage(url)}`;
-    const decoded = decodeBody(res.data, res.contentType, request);
+    const decoded = decodeBody(res.data, res.contentType, request, (text) => this.scrub(text));
     if (decoded.text.trim() === "") {
       // A broken answer, not "no results".
       throw new GovDataParseError(`${request}: empty response body.`);
@@ -831,8 +862,8 @@ export class RequestEngine {
       parsed = JSON.parse(json) as T;
     } catch (cause) {
       // An HTML maintenance or proxy page is the usual non-JSON answer: name its type, so it
-      // reads as an upstream problem. The Content-Type is server text: sanitised and cut.
-      const type = cutForMessage(sanitizeServerText(res.contentType.split(";")[0]!));
+      // reads as an upstream problem. The Content-Type is server text: scrubbed, sanitised and cut.
+      const type = cutForMessage(sanitizeServerText(this.scrub(res.contentType.split(";")[0]!)));
       const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${type}")` : "";
       throw new GovDataParseError(`${request}: the answer is not valid JSON${hint}.`, { cause: this.scrubCause(cause) });
     }
@@ -902,9 +933,10 @@ export class RequestEngine {
     } catch {
       // Non-JSON error body; leave detail undefined.
     }
-    // `detail` came from the response body; strip control characters so a hostile
+    // `detail` came from the response body, decoded: scrubbed again (a JSON escape hid the
+    // credential from the scrub above), then stripped of control characters so a hostile
     // endpoint cannot inject terminal escape sequences via the stderr error message.
-    if (detail !== undefined) detail = sanitizeServerText(detail);
+    if (detail !== undefined) detail = sanitizeServerText(this.scrub(detail));
     if (hint !== undefined) detail = detail === undefined ? hint : `${detail}; ${hint}`;
     // Name the target of a redirect that was not followed.
     const location =
@@ -913,7 +945,7 @@ export class RequestEngine {
       status,
       url,
       method,
-      body: text,
+      body: this.scrubBody(text),
       detail,
       ...(location !== undefined ? { location } : {}),
       ...(redirectsFollowed !== undefined ? { redirectsFollowed } : {}),
@@ -949,15 +981,20 @@ function withoutUserinfo(baseUrl: string): string {
  * used to turn "Straße" into "Stra\uFFFDe" with exit 0). An unknown charset is a
  * GovDataParseError naming `request`. Bytes that are not valid in the charset become
  * U+FFFD, and `replaced` counts them: exactly for UTF-8 and the single-byte charsets; for
- * UTF-16 a U+FFFD the server sent counts too.
+ * UTF-16 a U+FFFD the server sent counts too. The charset a message quotes is `scrub`bed first.
  */
-function decodeBody(body: Buffer, contentType: string, request: string): { text: string; replaced: number } {
+function decodeBody(
+  body: Buffer,
+  contentType: string,
+  request: string,
+  scrub: (text: string) => string,
+): { text: string; replaced: number } {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset, { fatal: true });
   } catch {
-    throw new GovDataParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(charset))}".`);
+    throw new GovDataParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(scrub(charset)))}".`);
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };
@@ -1066,6 +1103,28 @@ function originOf(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * `form` and its spelling in a URL (`encodeURIComponent`): a server that puts a credential into
+ * a URL, a redirect's Location, percent-encodes it. A form that has no such spelling (a lone
+ * surrogate) is kept as it is.
+ */
+function urlSpellings(form: string): string[] {
+  try {
+    return [form, encodeURIComponent(form)];
+  } catch {
+    return [form];
+  }
+}
+
+/**
+ * `form` and its spelling inside a JSON string (`\"`, `\\`): the engine and the client write a
+ * CKAN error object that has no message again with JSON.stringify (a validation error,
+ * `{"name": ["…"]}`), and a credential with a quote in it is spelled with a backslash there.
+ */
+function jsonSpellings(form: string): string[] {
+  return [form, JSON.stringify(form).slice(1, -1)];
 }
 
 /** Resolve a Location header against the current URL; undefined if missing or malformed. */

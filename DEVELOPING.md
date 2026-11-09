@@ -382,9 +382,14 @@ don't reveal it), every URL in a message goes through `redactUrl`, and the base 
 userinfo (raw and percent-decoded) and the forms a server echoes it back in (the `Basic`
 value, the decoded `user:password`, the password alone from 4 characters, the user name
 in its place when there is no password:
-`echoedCredentialForms`) are scrubbed from error bodies and details, a CKAN
-`success: false` message, redirect targets, transport error text and the `cause` chain
-(`RequestEngine.scrub`). The CLI maps a `404` and CKAN's `Not Found Error` sent with HTTP 200
+`echoedCredentialForms`; each also percent-encoded and as a JSON string spells it) are
+scrubbed from error bodies and details, a CKAN `success: false` message and `__type`,
+redirect targets, an answer's Content-Type and charset, transport error text and the `cause`
+chain (`RequestEngine.scrub`). A detail is scrubbed again once decoded, since a JSON escape
+(`\u00e4`, `\"`) hides an echo from the scrub of the body as sent; `GovDataApiError.body`
+stays as sent unless its decoded text still holds an echo behind an escape, and then is the
+decoded JSON written again with it replaced by `***` (`""` for a body too deeply nested to
+write again). The CLI maps a `404` and CKAN's `Not Found Error` sent with HTTP 200
 (`GovDataActionError.isNotFound`) to exit code `4`, other errors to `1`.
 
 **Retry / backoff.** Transient `429` (rate limit) and `503` responses are

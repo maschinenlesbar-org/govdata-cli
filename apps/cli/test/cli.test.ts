@@ -650,44 +650,6 @@ test("the URL search of the redaction is linear: a 1 MB argument without '://' i
   }
 });
 
-test("the redaction of stdout is linear in the answer when the run carries credentials (B)", async () => {
-  // With a URL with userinfo in argv, every stdout text is redacted. The scheme regex this
-  // replaces took seconds for a 200 KB `a.a.…` answer; the linear pass takes milliseconds.
-  const value = "a.".repeat(100_000);
-  const cli = makeCli(() => jsonResponse(ckan({ title: value })));
-  const started = performance.now();
-  assert.equal(await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "package", "d1"], cli.deps), 0, cli.err.join("\n"));
-  const ms = performance.now() - started;
-  assert.ok(cli.out.join("\n").includes(value));
-  assert.ok(ms < 1500, `${Math.round(ms)} ms`);
-});
-
-test("the redaction of stdout hides the userinfo of a URL glued onto the one before it (B2)", async () => {
-  // The URL regex redacted both glued URLs; a linear pass that searched on after the authority it
-  // read printed the second userinfo.
-  const cli = makeCli(() => jsonResponse(ckan({ title: "https://host://u:p1@h and https://u:p2@x://v:q3@w" })));
-  assert.equal(await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "--compact", "package", "d1"], cli.deps), 0, cli.err.join("\n"));
-  const out = cli.out.join("\n");
-  assert.ok(out.includes("https://host://***@h and https://***@x://***@w"), out);
-  for (const secret of ["u:p1", "u:p2", "v:q3"]) assert.ok(!out.includes(secret), out);
-  // Other text is left alone, and a URL's own userinfo is hidden.
-  const plain = makeCli(() => jsonResponse(ckan({ title: "see ftp://user:other@h.example/x and http://a@b@c.example/x?y=u@v, mail@example.org" })));
-  assert.equal(await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "--compact", "package", "d1"], plain.deps), 0);
-  assert.ok(plain.out.join("\n").includes("see ftp://***@h.example/x and http://***@c.example/x?y=u@v, mail@example.org"), plain.out.join("\n"));
-});
-
-test("a refused --base-url whose userinfo WHATWG reads after slashes or backslashes never echoes the password (F3)", async () => {
-  // commander echoes a rejected value; `http:///u:pw@h` and `https:\\u:pw@h` carry `u:pw`, which a
-  // userinfo read after "://" missed.
-  for (const base of ["https:\\\\alice:pw1-Secret@127.0.0.1:9", "http:///alice:pw1-Secret@h.example/?q=1", "http:alice:pw1-Secret@h.example", "https://alice:pw1-Secret@h.example\\@x"]) {
-    const cli = makeCli(() => jsonResponse(ckan([])));
-    assert.equal(await run(["--base-url", base, "tags"], cli.deps), 1, base);
-    assert.equal(cli.mt.calls.length, 0);
-    const err = cli.err.join("\n");
-    assert.ok(!err.includes("pw1-Secret"), err);
-  }
-});
-
 test("a --base-url typed without its scheme never names its user name or token (F5)", async () => {
   // `T0kenS3cret:@h.example` parses as a URL whose scheme is the token, lower-cased
   // ("t0kens3cret:"), which no exact-string redaction matches: `Unsupported scheme` named it.

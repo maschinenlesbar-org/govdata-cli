@@ -549,7 +549,25 @@ everything that drives the CLI is in `apps/cli/test/`.
   file under `ulimit -f` exits 1 with an ERROR record of `govdata.output`, never 0. P27 (a big or odd answer is printed or
   refused in one clean record, within memory: 8 M numbers with `--compact` under a 256 MB
   heap, 20 MB of DEL escaped under 512 MB, 90 MB of DEL an ERROR of `govdata.output`; runs
-  the built bin, 30 s; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN).
+  the built bin, 30 s; a lone surrogate or invalid bytes replaced with U+FFFD and one WARN; an
+  answer in two million one-byte chunks read under a 256 MB heap). From the security audit
+  2026-10-27: P28 hostile error answers (a number with a long run of zeros and a run of
+  control-string introducers cost milliseconds; a 16 MB error message and 6 million lone
+  surrogates end cleanly within a small heap; a credential echoed with JSON escapes, in a value
+  the client quotes or in a redirect's Location never reaches an error; the adapter's error
+  body is CKAN's error object, `quotedBody` its success:false envelope on HTTP 200, and
+  `REDIRECT_ERROR` the redirect-limit message, since govdata follows redirects), P29 base-URL
+  credentials (a userinfo without a password is a token, scrubbed in every form; a backslash in
+  the base URL refused, and a scheme not followed by exactly `//` and the host, never echoing
+  its password; requests go to the parsed host; the stdout redaction is linear, glued URLs
+  included; `USAGE_EXIT` 1), P30 output links (copied with `HAS_OUTPUT_OPTION = false` and
+  stand-ins for the `-o` kit's types: every test is skipped, govdata has no `-o`), P31 the
+  release pipeline (the SBOM tool locked in `tools/sbom/`, installed without scripts, never
+  through `npx`; pack, SBOM and release separate jobs, only the release job with `contents:
+  write`, and it runs only `gh` on a tarball checked against the pack job's sha256; reads
+  `release.yml` as text, no adapter). P27's and P28's bin runs start a process (30 s), as do
+  `hostile-answers.test.ts` (a 16 MB CKAN error message on HTTP 500 and in success:false) and
+  the client's `scanNumbers` memory test.
 
 ## Continuous integration
 

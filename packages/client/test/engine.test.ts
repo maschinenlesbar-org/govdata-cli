@@ -925,3 +925,17 @@ test("an answer longer than V8's longest string is a GovDataParseError naming th
   const failing = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "text/plain", 500)).transport });
   await assert.rejects(failing.getJson("/x"), (err: unknown) => err instanceof GovDataApiError && err.status === 500 && err.body === "");
 });
+
+test("a number with a long run of zeros is refused in linear time (A)", async () => {
+  // The trailing-zero regex `/0+$/` tried a match at every zero of a run that doesn't end the
+  // literal: 1.<100 000 zeros>1e300 took about 15 s, past --timeout (the scan runs once the answer is in).
+  const literal = `1.${"0".repeat(100_000)}1e300`;
+  const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(`{"n":${literal}}`, "application/json")).transport });
+  const start = performance.now();
+  await assert.rejects(e.getJson("/x"), (err: unknown) => err instanceof GovDataParseError && /cannot be represented exactly/.test(err.message));
+  const ms = performance.now() - start;
+  assert.ok(ms < 1000, `${Math.round(ms)} ms`);
+  // The count of zeros still sets the exponent: trailing zeros in the fraction are no digits.
+  const g = new RequestEngine({ transport: makeMockTransport(() => rawResponse(`{"n":9007199254740992.${"0".repeat(50_000)}}`, "application/json")).transport });
+  assert.equal((await g.getJson<{ n: number }>("/x")).n, 2 ** 53);
+});

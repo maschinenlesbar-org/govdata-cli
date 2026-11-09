@@ -1118,3 +1118,57 @@ test("a credential in an answer's Content-Type or charset is scrubbed from the p
     for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret) && !seen.includes(encodeURIComponent(secret)), `${contentType}: ${seen.slice(0, 2000)}`);
   }
 });
+
+/** `text` with every run of percent escapes decoded where it is valid UTF-8. */
+const percentDecoded = (text: string): string =>
+  text.replace(/(?:%[0-9a-fA-F]{2})+/g, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run;
+    }
+  });
+
+test("a credential in a redirect's Location is scrubbed, in its path and its query, from every error that names it (D2)", async () => {
+  const locations = [
+    `https://elsewhere.example/login?user=alice&pw=${encodeURIComponent(ECHO_PW)}`,
+    `https://elsewhere.example/login?pw=${ECHO_PW}`,
+    `https://elsewhere.example/${encodeURIComponent(`alice:${ECHO_PW}`)}/x`,
+    `https://elsewhere.example/auth?basic=${ECHO_BASIC}`,
+    `/relative/${ECHO_PW}`,
+  ];
+  const redirect = (location: string): HttpResponse => ({ status: 302, headers: { location }, body: Buffer.alloc(0) });
+  for (const location of locations) {
+    // Answered with the same 302 forever: the error names the last hop it reached and its target.
+    const loop = new RequestEngine({ baseUrl: ECHO_BASE, maxRetries: 0, transport: async () => redirect(location) });
+    const err = await loop.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof GovDataApiError && /^HTTP 302 .*stopped after 5 redirects/.test(err.message), String(err));
+    // One hop, then an error answer, a 401 (the dropped-credentials hint), a broken answer, a
+    // CKAN success:false and a failed request: each names the URL it reached.
+    const answers: Array<() => HttpResponse> = [
+      () => rawResponse("{}", "application/json", 500),
+      () => rawResponse("{}", "application/json", 401),
+      () => rawResponse("<html>", "text/html"),
+      () => rawResponse('{"success":false,"error":{"message":"no"}}', "application/json"),
+      () => {
+        throw new Error("connection reset");
+      },
+    ];
+    const errors: unknown[] = [err];
+    for (const answer of answers) {
+      let calls = 0;
+      const transport = async (): Promise<HttpResponse> => (calls++ === 0 ? redirect(location) : answer());
+      const hop = new GovDataClient({ baseUrl: ECHO_BASE, maxRetries: 0, transport });
+      errors.push(await hop.packageShow("a1").catch((caught: unknown) => caught));
+    }
+    for (const e of errors) {
+      assert.ok(e instanceof Error, String(e));
+      const seen = percentDecoded(everythingOf(e) + String((e as { url?: unknown }).url));
+      for (const secret of ECHO_SECRETS) assert.ok(!seen.includes(secret), `${location}: ${seen.slice(0, 2000)}`);
+    }
+  }
+  // A Location that does not parse is quoted as it came, scrubbed.
+  const bad = new RequestEngine({ baseUrl: ECHO_BASE, transport: async () => redirect(`http://[::1/${ECHO_PW}`) });
+  const err = await bad.getJson("/x").catch((caught: unknown) => caught);
+  assert.ok(err instanceof GovDataApiError && /redirect to http:\/\/\[::1\/\*\*\* not followed/.test(err.message), String(err));
+});

@@ -658,6 +658,24 @@ export class RequestEngine {
     return `${base}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
+  /**
+   * The URL a redirect leads to as messages and errors show it: the Location with the base URL's
+   * credentials scrubbed as sent, before resolving percent-encodes what is left of them in a new
+   * spelling (`'` as `%27` in a query), then resolved against the URL shown so far, its userinfo
+   * left out. A Location the scrub made unparseable (a credential in its host) is shown as scrubbed.
+   */
+  private shownTarget(location: string, shown: string): string {
+    const sent = this.scrub(location);
+    try {
+      const target = new URL(sent, shown);
+      target.username = "";
+      target.password = "";
+      return target.href;
+    } catch {
+      return sent;
+    }
+  }
+
   /** Perform a request with Accept negotiation and transient-error retries. */
   async request(
     method: string,
@@ -669,6 +687,9 @@ export class RequestEngine {
     // absolute) keeps it and one to another origin or scheme drops it. A transport such
     // as fetch also refuses a URL with credentials outright.
     let url = this.composeUrl(withoutUserinfo(this.#baseUrl), path, options.query);
+    // The URL as messages, errors and `RawResponse.url` show it: after a redirect, the Location
+    // with the base URL's credentials scrubbed (shownTarget); `url` is what is requested.
+    let shown = url;
     let headers: Record<string, string> = {
       Accept: options.accept,
       "User-Agent": this.userAgent,
@@ -701,7 +722,7 @@ export class RequestEngine {
         // retried — a slow upstream should not be asked again at once.
         if (idempotent && hasTransientCode(cause) && attempt < this.maxRetries) {
           attempt += 1;
-          await this.backOff(attempt, this.retryDelayMs * attempt, url);
+          await this.backOff(attempt, this.retryDelayMs * attempt, shown);
           continue;
         }
         // The default transport rejects with GovDataNetworkError only; an injected one
@@ -711,7 +732,7 @@ export class RequestEngine {
         if (cause instanceof GovDataError && !(cause instanceof GovDataNetworkError)) throw cause;
         const reason = cause instanceof Error ? cause.message : String(cause);
         throw new GovDataNetworkError(
-          `${method} ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`,
+          `${method} ${redactUrl(shown)} failed: ${sanitizeServerText(this.scrub(reason))}`,
           { cause: this.scrubCause(cause) },
         );
       }
@@ -721,7 +742,7 @@ export class RequestEngine {
       const invalid = responseProblem(response);
       if (invalid !== undefined) {
         throw new GovDataNetworkError(
-          `${method} ${redactUrl(url)} failed: the transport returned an invalid response (${invalid}).`,
+          `${method} ${redactUrl(shown)} failed: the transport returned an invalid response (${invalid}).`,
         );
       }
       // A transport must not follow redirects itself (`redirect: "manual"`): one that did
@@ -730,7 +751,7 @@ export class RequestEngine {
       const finalUrl = (response as { url?: unknown }).url;
       if (typeof finalUrl === "string" && finalUrl !== "" && originOf(finalUrl) !== originOf(url)) {
         throw new GovDataNetworkError(
-          `${method} ${redactUrl(url)} failed: the transport followed a redirect to another origin ` +
+          `${method} ${redactUrl(shown)} failed: the transport followed a redirect to another origin ` +
             `(${sanitizeServerText(redactUrl(this.scrub(finalUrl)))}); a transport must not follow redirects ` +
             `(HttpRequest.redirect is "manual").`,
         );
@@ -743,7 +764,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a custom
       // one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new GovDataNetworkError(`${method} ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
+        throw new GovDataNetworkError(`${method} ${redactUrl(shown)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
       const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
@@ -755,7 +776,7 @@ export class RequestEngine {
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
           const backoff = this.retryDelayMs * attempt;
-          await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), url, status);
+          await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), shown, status);
           continue;
         }
       }
@@ -769,19 +790,20 @@ export class RequestEngine {
       // that supports file: or data: must not be steered there by a hostile redirect.
       if (next !== undefined && next.protocol !== "http:" && next.protocol !== "https:") {
         throw new GovDataNetworkError(
-          `Refusing to follow redirect to unsupported protocol "${sanitizeServerText(next.protocol)}" for ${method} ${redactUrl(url)}`,
+          `Refusing to follow redirect to unsupported protocol "${sanitizeServerText(this.scrub(next.protocol))}" for ${method} ${redactUrl(shown)}`,
         );
       }
       if (next !== undefined && redirects >= this.maxRedirects) {
         // A loop (or a long chain): say how far it got rather than a bare 3xx.
         // (With maxRedirects 0 nothing was followed; the plain text says enough.)
-        throw this.toApiError(method, url, status, body, location, redirects || undefined);
+        throw this.toApiError(method, shown, status, body, location, redirects || undefined);
       }
       if (next !== undefined) {
         // Userinfo in a Location is not used: credentials come from the base URL only,
         // as the Authorization header, never from a server.
         next.username = "";
         next.password = "";
+        const nextShown = this.shownTarget(location as string, shown);
         // Credential-strip guard: if the redirect crosses origin (scheme + host +
         // port, so an https->http downgrade counts), keep only the engine's own
         // non-credential headers, so the base URL's Authorization (and any future
@@ -795,11 +817,12 @@ export class RequestEngine {
             dropped =
               from.protocol === "http:" && next.protocol === "https:" && from.hostname === next.hostname
                 ? "the server redirected http→https, which dropped the base URL's credentials; use an https base URL"
-                : `the redirect to ${next.origin} dropped the base URL's credentials (they are sent to their own origin only)`;
+                : `the redirect to ${originOf(nextShown)} dropped the base URL's credentials (they are sent to their own origin only)`;
           }
           headers = engineHeadersOnly(headers);
         }
         url = next.toString();
+        shown = nextShown;
         redirects += 1;
         continue;
       }
@@ -810,7 +833,7 @@ export class RequestEngine {
       if (status < 200 || status >= 300) {
         throw this.toApiError(
           method,
-          url,
+          shown,
           status,
           body,
           location,
@@ -824,7 +847,7 @@ export class RequestEngine {
         );
       }
 
-      return { data: body, contentType, status, url };
+      return { data: body, contentType, status, url: shown };
     }
   }
 

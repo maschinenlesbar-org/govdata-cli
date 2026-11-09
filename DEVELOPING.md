@@ -447,7 +447,11 @@ attacker nothing, so no private-address block is imposed. Only 301/302/303/307/3
 with a parseable `Location` are followed; any other 3xx (300, 304, 305, 306), a
 missing or malformed `Location` and the redirect limit surface as a
 `GovDataApiError` with a `location` field: `HTTP 302 for GET …: redirect to <target>
-not followed`, plus `(stopped after 5 redirects)` at the limit.
+not followed`, plus `(stopped after 5 redirects)` at the limit. After a redirect, messages show
+the URL a `Location` led to with the base URL's credentials scrubbed from it (in its path and
+query too, as sent and percent-encoded), before it is resolved; so do an error's `url`, the
+`onRetry` event's `url` and `getAnswer`'s `url`. A `Location` that doesn't parse is quoted
+scrubbed.
 
 **`maxResponseBytes`.** A hard cap on response body size (default 100 MiB; `0` =
 unlimited) defending against memory exhaustion from a hostile/buggy endpoint. The

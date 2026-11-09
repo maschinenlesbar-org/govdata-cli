@@ -462,7 +462,8 @@ Text in an answer is never changed silently (decision D2 of the 2026-10-21 fix p
 engine decodes with a `fatal` TextDecoder and, on bytes that are not valid in the charset,
 decodes again with U+FFFD and counts what it replaced; a lone surrogate written as a JSON
 escape (`\ud800` without its pair, which `jq` refuses, and the whole output with it) becomes
-`\ufffd` too (`wellFormedEscapes`, one linear pass). The answer is delivered, never refused
+`\ufffd` too (`wellFormedEscapes`, one linear pass; the repaired text and `scanNumbers`' quoted
+members are joined by a `TextBuilder` in batches, so millions of repairs fit a small heap). The answer is delivered, never refused
 for one bad character, and the engine option `onWarning(message)` is told once per answer:
 `GET <url>: 2 characters of the answer were not valid text (invalid bytes or a lone
 surrogate) and replaced with U+FFFD.` A throw in it is swallowed. The CLI's `action()` logs

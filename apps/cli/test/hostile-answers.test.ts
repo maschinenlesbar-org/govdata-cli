@@ -95,3 +95,13 @@ test("an answer in two million one-byte chunks is read within a small heap", STA
   assert.equal(run.code, 0, run.stderr.slice(0, 500));
   assert.deepEqual(JSON.parse(run.stdout), { id: "a1" });
 });
+
+test("an answer of millions of lone surrogate escapes is repaired within a small heap (C)", STARTS_A_PROCESS, async () => {
+  // 6 million repairs (36 MB): one `+=` each exhausted a 128 MB heap; batched, 96 MB suffice.
+  const n = 6_000_000;
+  const body = `{"help":"h","success":true,"result":{"id":"a1","x":"${"\\ud800".repeat(n)}"}}`;
+  const run = await runWithRawAnswer(jsonAnswer(200, body), 128, ["package", "a1"]);
+  noCrash(run, "lone surrogates");
+  assert.equal(run.code, 0, run.stderr.slice(0, 500));
+  assert.match(run.stderr, new RegExp(`WARN  \\[govdata\\.api\\] GET \\S+: ${n} characters of the answer were not valid text`));
+});

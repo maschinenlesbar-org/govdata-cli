@@ -171,6 +171,7 @@ packages/client/     # @maschinenlesbar.org/govdata-client — private, shipped 
   test/              # tests that only touch the client, + the transport helpers
 tools/pack/          # prepack/postpack: ship the client (dist/node_modules) and commander in the tarball
 tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tools/sbom/          # the CycloneDX SBOM tool, own lockfile (release.yml's sbom job only)
 tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
 ```
 
@@ -557,9 +558,16 @@ GitHub Actions workflows under `.github/workflows/`:
 - **ci.yml** — type-check, build and test on Node 22/24/26 for every push and PR; then pack the
   real tarball, check the pack left nothing behind, install it globally with the registry out
   of reach and run the bin.
-- **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
-  `apps/cli/package.json`, test, write the SBOMs (scoped to the `apps/cli` workspace), then
-  `npm pack --workspace apps/cli`, and create a GitHub Release with the tarball.
+- **release.yml** — on a `v*` tag (made by `npm run bump`), three jobs: `pack` (contents:
+  read) verifies the tag matches `apps/cli/package.json`, writes the notes, tests, runs
+  `npm pack --workspace apps/cli` and records the tarball's and the notes' sha256 as job
+  outputs; `sbom` (contents: read) writes the two CycloneDX SBOMs (scoped to the `apps/cli`
+  workspace) with the tool locked in `tools/sbom/` (`npm ci --ignore-scripts --prefix
+  tools/sbom`, never `npx`); `release`, the only job with `contents: write`, checks the
+  downloaded files against those digests and runs only `gh release create` with the four
+  assets. To update the SBOM tool, change its version in `tools/sbom/package.json` and run
+  `npm install --package-lock-only --ignore-scripts` there; don't chain its install into an
+  npm script (the `tools/docs/` rule).
 - **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — build the project website (`site/`, English and German) with the TypeDoc API docs
   under `/api/`, and deploy both to GitHub Pages on each `v*` tag.

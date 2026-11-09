@@ -144,3 +144,16 @@ test("baseUrlProblem: an absolute http(s) URL without a query or fragment", () =
   assert.equal(baseUrlProblem("https://x/?q=1"), "A base URL cannot have a query (?) or fragment (#).");
   assert.equal(baseUrlProblem("https://x/#f"), "A base URL cannot have a query (?) or fragment (#).");
 });
+
+test("baseUrlProblem: no backslash, and the scheme followed by exactly // and the host (F, F4)", () => {
+  // WHATWG ends an http(s) authority at "\" and repairs `http:host`, `http:/host`, `http:///host`
+  // silently: the host requested would not be the one typed. The reasons quote nothing of the value.
+  for (const v of ["https://h.example\\@other.example", "https://u:pw@h.example\\x", "https:\\\\h.example", "https://h.example/a\\b"]) {
+    assert.equal(baseUrlProblem(v), 'A base URL cannot contain a backslash (\\); write "/" instead.', v);
+  }
+  for (const v of ["http:h.example", "http:/h.example", "http:///h.example", "HTTPS:h.example", "https:////h.example"]) {
+    assert.equal(baseUrlProblem(v), 'Expected an absolute http(s) URL ("https://" and the host).', v);
+  }
+  assert.equal(baseUrlProblem("HTTPS://H.example"), undefined);
+  assert.equal(baseUrlProblem("http:///user:s3cret@h.example/?q=1"), "A base URL cannot have a query (?) or fragment (#).");
+});

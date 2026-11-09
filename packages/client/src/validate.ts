@@ -251,7 +251,11 @@ export function headerValueProblem(value: unknown): string | undefined {
  * - an absolute URL with an http(s) scheme (`file:`, `ftp:` … never reach a
  *   transport);
  * - no query or fragment: request paths are appended as a string, so a `?` or `#`
- *   would swallow every path (`http://h/#f` requests `/` for every command).
+ *   would swallow every path (`http://h/#f` requests `/` for every command);
+ * - no backslash: WHATWG ends an http(s) authority at `\`, so a text that reads the value
+ *   differently (`https://u:pw@a.example\@b.example`) would reach another host;
+ * - `http://` or `https://` followed by the host: WHATWG repairs `http:host`, `http:/host` and
+ *   `http:///host` silently, and the host requested would not be the one typed.
  *
  * Userinfo (`https://user:pw@host`) is allowed: the engine sends it as Basic auth,
  * e.g. for a mirror; a `%` in it must start a valid escape (`%25` for a literal one). The reasons never quote the value, so a credential in it cannot
@@ -277,6 +281,9 @@ export function baseUrlProblem(value: unknown): string | undefined {
     return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  // WHATWG reads a "\" in an http(s) URL as "/", so it ends the host: in
+  // `https://u:pw@a.example\@b.example` every reader of the base URL has to agree where.
+  if (value.includes("\\")) return 'A base URL cannot contain a backslash (\\); write "/" instead.';
   // The userinfo is percent-decoded for the Authorization header; a "%" that isn't an
   // escape fails there ("URI malformed") at request time. Reject it here.
   for (const part of [url.username, url.password]) {
@@ -286,5 +293,8 @@ export function baseUrlProblem(value: unknown): string | undefined {
       return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
     }
   }
+  // WHATWG skips any slashes after "http:" and repairs `http:host`, `http:/host` and
+  // `http:///host` into `http://host` silently: the host requested would not be the one typed.
+  if (!/^https?:\/\/[^/]/i.test(value)) return 'Expected an absolute http(s) URL ("https://" and the host).';
   return undefined;
 }

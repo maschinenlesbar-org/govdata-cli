@@ -109,6 +109,13 @@ test("--base-url / baseUrl: a malformed base URL is the same validation error on
     ["https://x/?q=1", /A base URL cannot have a query \(\?\) or fragment \(#\)\./],
     ["https://x/#f", /A base URL cannot have a query \(\?\) or fragment \(#\)\./],
     ["not-a-url", /Expected an absolute http\(s\) URL\./],
+    ["https://h.example\\@other.example", /A base URL cannot contain a backslash \(\\\); write "\/" instead\./],
+    ["https:\\\\h.example", /A base URL cannot contain a backslash/],
+    ["http:h.example", /Expected an absolute http\(s\) URL \("https:\/\/" and the host\)\./],
+    ["http:/h.example", /"https:\/\/" and the host/],
+    ["http:///h.example", /"https:\/\/" and the host/],
+    ["HTTPS:h.example", /"https:\/\/" and the host/],
+    ["http:///user:s3cret@h.example/?q=1", /A base URL cannot have a query/],
     ["", /Expected an absolute http\(s\) URL\./],
     ["   ", /Expected an absolute http\(s\) URL\./],
   ];
@@ -122,5 +129,6 @@ test("--base-url / baseUrl: a malformed base URL is the same validation error on
     const error = result.lib.error as Error;
     assert.ok(!(error instanceof GovDataNetworkError), "not a network error");
     assert.match(error.message, /^Invalid base URL: /);
+    assert.ok(!result.cli.err.includes("s3cret") && !error.message.includes("s3cret"), result.cli.err);
   }
 });

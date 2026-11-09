@@ -675,3 +675,15 @@ test("the redaction of stdout hides the userinfo of a URL glued onto the one bef
   assert.equal(await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "--compact", "package", "d1"], plain.deps), 0);
   assert.ok(plain.out.join("\n").includes("see ftp://***@h.example/x and http://***@c.example/x?y=u@v, mail@example.org"), plain.out.join("\n"));
 });
+
+test("a refused --base-url whose userinfo WHATWG reads after slashes or backslashes never echoes the password (F3)", async () => {
+  // commander echoes a rejected value; `http:///u:pw@h` and `https:\\u:pw@h` carry `u:pw`, which a
+  // userinfo read after "://" missed.
+  for (const base of ["https:\\\\alice:pw1-Secret@127.0.0.1:9", "http:///alice:pw1-Secret@h.example/?q=1", "http:alice:pw1-Secret@h.example", "https://alice:pw1-Secret@h.example\\@x"]) {
+    const cli = makeCli(() => jsonResponse(ckan([])));
+    assert.equal(await run(["--base-url", base, "tags"], cli.deps), 1, base);
+    assert.equal(cli.mt.calls.length, 0);
+    const err = cli.err.join("\n");
+    assert.ok(!err.includes("pw1-Secret"), err);
+  }
+});

@@ -87,12 +87,20 @@ never a raw `TypeError`.
 `baseUrl` is checked as given, before its trailing slashes are stripped, by the exported
 `validateBaseUrl()` (the rule is `baseUrlProblem`, which `--base-url` uses too): a blank
 value, whitespace around or in it or a control character (`new URL()` trims and drops
-tab/newline silently, but the engine glues the raw value into every request URL, so
-`https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`), anything but an
-absolute http(s) URL, a query or fragment, and a `%` in the user name or password that
-doesn't start an escape (write a literal `%` as `%25`) all throw `GovDataValidationError`
-`Invalid base URL: …` at construction — a configuration mistake, never a
-`GovDataNetworkError`. Only `undefined` selects the default. Userinfo is allowed (sent as
+tab/newline silently, and `https://ckan.govdata.de/ ` would otherwise request `/%20/api/3/...`),
+anything but an absolute http(s) URL, a query or fragment, a backslash (`A base URL cannot
+contain a backslash (\); write "/" instead.`: WHATWG ends an http(s) authority there, so
+`https://u:pw@a.example\@b.example` read as text names another host), a scheme not followed by
+exactly `//` and the host (`http:host`, `http:/host`, `http:///host`, which WHATWG repairs
+silently: `Expected an absolute http(s) URL ("https://" and the host).`), and a `%` in the user
+name or password that doesn't start an escape (write a literal `%` as `%25`) all throw
+`GovDataValidationError` `Invalid base URL: …` at construction — a configuration mistake, never a
+`GovDataNetworkError`. Only `undefined` selects the default. Requests go to the base URL as the
+WHATWG parser reads it (`new URL(baseUrl).href`, trailing slashes stripped): the host
+lower-cased, a default port dropped, the path percent-encoded where WHATWG does it; a custom
+transport and the messages see that spelling. `credentialsIn` reads the userinfo where WHATWG
+does: after the slashes and backslashes a special scheme skips (`http:///u:pw@h`,
+`https:\\u:pw@h`), up to a backslash too. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
 (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every URL argument
 (`credentialsIn`, exported; the value of a `key=value` pair too, `--param id=<url>`, and its

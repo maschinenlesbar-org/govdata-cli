@@ -1172,3 +1172,61 @@ test("a credential in a redirect's Location is scrubbed, in its path and its que
   const err = await bad.getJson("/x").catch((caught: unknown) => caught);
   assert.ok(err instanceof GovDataApiError && /redirect to http:\/\/\[::1\/\*\*\* not followed/.test(err.message), String(err));
 });
+
+test("credentialsIn ends the authority of a special scheme at a backslash (F)", async () => {
+  const { credentialsIn } = await import("../src/errors.js");
+  // WHATWG sends `alice:pw` to api.example here; reading up to the last "@" took `alice:pw@api.example\`.
+  assert.deepEqual(credentialsIn("https://alice:pw@api.example\\@evil.example"), ["alice:pw"]);
+  assert.equal(new URL("https://alice:pw@api.example\\@evil.example").password, "pw");
+  // Another scheme ends its authority at "/", "?" or "#" only.
+  assert.deepEqual(credentialsIn("foo://alice:pw@api.example\\@evil.example"), ["alice:pw@api.example\\"]);
+});
+
+test("credentialsIn skips the slashes and backslashes WHATWG skips after a special scheme (F3)", async () => {
+  const { credentialsIn } = await import("../src/errors.js");
+  // `http:///u:pw@h`, `https:\\u:pw@h` and `http:u:pw@h` all carry `u:pw` for WHATWG; read
+  // after "://", the userinfo was missed, so a refused --base-url echoed the password in clear.
+  for (const value of [
+    "http:alice:pw@h.example",
+    "http:/alice:pw@h.example",
+    "http:///alice:pw@h.example/x",
+    "https:////alice:pw@h.example",
+    "HTTPS:\\\\alice:pw@h.example",
+    "wss:\\/alice:pw@h.example",
+    "ftp:alice:pw@h.example",
+  ]) {
+    assert.deepEqual(credentialsIn(value), ["alice:pw"], value);
+    assert.equal(new URL(value).password, "pw", value);
+  }
+  // Another scheme needs "//" before an authority: `foo:u:p@h` and `foo:///u:p@h` carry none.
+  assert.deepEqual(credentialsIn("foo:u:p@h.example"), []);
+  assert.deepEqual(credentialsIn("foo:///u:p@h.example"), []);
+  assert.equal(new URL("foo:///u:p@h.example").password, "");
+});
+
+test("a base URL with a backslash, or whose scheme is not followed by // and the host, is refused at construction, never echoing the password (F, F4)", () => {
+  for (const baseUrl of [
+    "https://alice:s3cret@api.example\\@evil.example",
+    "https:\\\\alice:s3cret@api.example",
+    "http:alice:s3cret@api.example",
+    "http:/alice:s3cret@api.example",
+    "http:///alice:s3cret@api.example",
+    "HTTPS:alice:s3cret@api.example",
+  ]) {
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: async () => jsonResponse({}) }),
+      (err: unknown) => err instanceof GovDataValidationError && !err.message.includes("s3cret"),
+      baseUrl,
+    );
+  }
+});
+
+test("requests go to the host of the parsed base URL, spelled as it parses (F)", async () => {
+  const mt = makeMockTransport(() => jsonResponse({}));
+  await new RequestEngine({ baseUrl: "https://API.Example:443/v1/", transport: mt.transport }).getJson("/x");
+  assert.equal(mt.last().url, "https://api.example/v1/x");
+  const auth = makeMockTransport(() => jsonResponse({}));
+  await new RequestEngine({ baseUrl: "https://alice:pw@API.Example/a@b/", transport: auth.transport }).getJson("/x");
+  assert.equal(auth.last().url, "https://api.example/a@b/x");
+  assert.equal(auth.last().headers?.["Authorization"], `Basic ${Buffer.from("alice:pw").toString("base64")}`);
+});

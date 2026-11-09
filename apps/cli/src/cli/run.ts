@@ -18,6 +18,7 @@ import {
   echoedCredentialForms,
   redactCredentials,
   redactSecrets,
+  redactUrlUserinfo,
 } from "@maschinenlesbar.org/govdata-client/internal/errors";
 
 /** The exit code of a usage error: commander's own for a rejected option value. */
@@ -121,15 +122,6 @@ function escapeCommanderError(message: string): string {
 }
 
 /**
- * Replace the userinfo of every URL in `text` with `***`, the form `redactUrl` gives
- * (`https://user:secret@host` becomes `https://***@host`). Text-based, so it also covers
- * a URL that does not parse; a backstop behind the exact-string redaction below.
- */
-export function redactUserinfo(text: string): string {
-  return text.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#']*@/gi, "$1***@");
-}
-
-/**
  * The options whose value is a base URL: a `user:password@host` given there without its
  * scheme is still a credential (anywhere else a bare `a:b@c` is not).
  */
@@ -211,7 +203,7 @@ export function redactionFor(argv: readonly string[]): Redaction {
   const echoedList = [...echoed].sort((a, b) => b.length - a.length);
   const passwordList = [...passwords].sort((a, b) => b.length - a.length);
   const out = (text: string): string => {
-    let result = redactUserinfo(redactCredentials(text, list));
+    let result = redactUrlUserinfo(redactCredentials(text, list));
     for (const form of encoded) result = result.split(form).join("***%40");
     return redactSecrets(result, echoedList);
   };

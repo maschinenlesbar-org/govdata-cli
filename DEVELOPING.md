@@ -115,7 +115,11 @@ echoes a userinfo back in are replaced too: the `Basic` value and the decoded
 only, since it may well occur in the data. A userinfo without a password (`TOKEN@host`,
 `TOKEN:@host`) is a token: the engine sends it as Basic `TOKEN:`, and the token takes the
 password's place (the Basic value of `TOKEN:` and `TOKEN:` on both streams, the token alone
-on stderr). `redactUrl` falls back to the same
+on stderr). Behind the exact strings, the userinfo of any other URL in stdout text is
+replaced by pattern (`redactUrlUserinfo`, client `errors.ts`): one linear pass, each `://`
+found with indexOf and the search going on right after it, so a URL glued onto the one before
+it (`https://host://u:p@h`) is caught too; it runs over the whole printed answer, where a regex
+tried at every word boundary took seconds for a 200 KB answer of `a.a.…`. `redactUrl` falls back to the same
 text-based cut (`redactCredentials`, exported) for a value that doesn't parse as a URL.
 
 ### Methods

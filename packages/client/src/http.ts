@@ -8,7 +8,7 @@
 
 import http from "node:http";
 import https from "node:https";
-import { GovDataNetworkError, credentialsIn, cutForMessage, redactCredentials, redactUrl } from "./errors.js";
+import { GovDataNetworkError, credentialsIn, cutForMessage, redactCredentials, redactUrl, typedUrlCredentials } from "./errors.js";
 
 export interface HttpRequest {
   method: string;
@@ -67,10 +67,11 @@ export const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * `url` for a message, its userinfo redacted; one typed without its scheme (`user:pw@host`,
- * `TOKEN:@host`) is read as if it had one, since `redactUrl` finds a userinfo only after a scheme.
+ * `TOKEN:@host`) or with a mistyped one (`http//user:pw@host`) is read as a URL all the same
+ * (`typedUrlCredentials`), since `redactUrl` finds a userinfo only after a scheme.
  */
 function shownUrl(url: string): string {
-  return credentialsIn(url).length > 0 ? redactUrl(url) : redactCredentials(url, credentialsIn(`http://${url}`));
+  return credentialsIn(url).length > 0 ? redactUrl(url) : redactCredentials(url, typedUrlCredentials(url));
 }
 
 /**

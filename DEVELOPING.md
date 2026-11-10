@@ -103,7 +103,9 @@ does: after the slashes and backslashes a special scheme skips (`http:///u:pw@h`
 `https:\\u:pw@h`), up to a backslash too. Userinfo is allowed (sent as
 Basic auth) and never quoted in a message. The CLI also redacts on output: `run.ts`
 (`redactionFor`, `withRedactedOutput`) takes the exact userinfo of every URL argument
-(`credentialsIn`, exported; the value of a `key=value` pair too, `--param id=<url>`, and its
+(`credentialsIn`, exported; a base URL is read as a URL however its scheme is typed,
+`typedUrlCredentials`: missing, `alice:pw@host`, or mistyped, `http//alice:pw@host` with the
+colon left out, whose userinfo is everything between the first slashes and the last `@`; the value of a `key=value` pair too, `--param id=<url>`, and its
 percent-encoded form, as a request URL in an error echoes it) and replaces it with `***` in
 everything it prints —
 commander's usage errors, which echo rejected values (a `--base-url` with a query, an

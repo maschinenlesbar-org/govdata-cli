@@ -57,6 +57,11 @@ export interface PackageSearchParams {
    * CKAN's `facet.field` JSON list; counts come back in `search_facets`.
    */
   facet_field?: string[] | undefined;
+  /**
+   * The most values per facet field: a positive integer, or -1 for every value. Sent as
+   * `facet.limit`, only with `facet_field`. CKAN's default is 50, with no sign that more exist.
+   */
+  facet_limit?: number | undefined;
 }
 
 /** Parameters for the `*_list` endpoints. */

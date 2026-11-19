@@ -7,7 +7,7 @@
 //   client.action("organization_list")   // generic escape hatch
 
 import { bigIntegerKeysOption, RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
-import type { QueryParams, QueryValue } from "./query.js";
+import { buildQueryString, type QueryParams, type QueryValue } from "./query.js";
 import { GovDataActionError, GovDataParseError, GovDataValidationError, cutForMessage, quoteValue } from "./errors.js";
 import {
   assertValid,
@@ -155,7 +155,7 @@ function assertFlag(name: string, value: unknown): void {
   if (value !== undefined && typeof value !== "boolean") throw wrongType(name, "a boolean", value);
 }
 
-const SEARCH_KEYS = ["q", "fq", "rows", "start", "sort", "facet_field"] as const;
+const SEARCH_KEYS = ["q", "fq", "rows", "start", "sort", "facet_field", "facet_limit"] as const;
 const PACKAGE_LIST_KEYS = ["limit", "offset"] as const;
 const GROUP_LIST_KEYS = ["limit", "offset", "all_fields"] as const;
 
@@ -164,6 +164,17 @@ function assertCount(name: string, value: number | undefined): void {
   if (value === undefined) return;
   if (!Number.isSafeInteger(value) || value < 0) {
     throw invalid(name, "a non-negative integer", value);
+  }
+}
+
+/**
+ * Check a facet limit: a positive integer, or -1 for every value. CKAN's default is 50, and it
+ * says nothing when a facet has more values than that.
+ */
+function assertFacetLimit(value: number | undefined): void {
+  if (value === undefined) return;
+  if (!Number.isSafeInteger(value) || (value < 1 && value !== -1)) {
+    throw invalid("facet_limit", "a positive integer or -1 (every value)", value);
   }
 }
 
@@ -201,6 +212,53 @@ function isSearchResult(value: unknown): boolean {
 /** The error for an answer that does not have the shape the caller relies on, naming the request (`GET <url>`). */
 function shapeError(request: string, expected: string): GovDataParseError {
   return new GovDataParseError(`${request}: unexpected response shape: expected ${expected}.`);
+}
+
+/**
+ * The `package_search` parameters `packageSearch(params)` sends, checked first (GovDataValidationError
+ * before any request: an unknown key, a refused text value, a string where a list belongs, a NaN or
+ * negative number would otherwise go out, or be dropped). See `packageSearch` for how each one is
+ * sent.
+ */
+export function packageSearchQuery(params: PackageSearchParams = {}): QueryParams {
+  assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
+  const q = given(params.q);
+  const sort = given(params.sort);
+  const fqGiven = given(params.fq);
+  const facetGiven = given(params.facet_field);
+  const rows = given(params.rows);
+  const start = given(params.start);
+  const facetLimit = given(params.facet_limit);
+  assertOptional("q", q, textProblem);
+  assertList("fq", fqGiven, textProblem);
+  assertOptional("sort", sort, sortProblem);
+  assertList("facet_field", facetGiven, fieldProblem);
+  assertCount("rows", rows);
+  assertCount("start", start);
+  assertFacetLimit(facetLimit);
+  const fq = fqGiven ?? [];
+  const facetFields = (facetGiven ?? []).map(normalizeToken);
+  return {
+    q,
+    fq_list: fq.length === 1 ? [fq[0]!, fq[0]!] : fq.length > 1 ? fq : undefined,
+    rows,
+    start,
+    sort,
+    "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
+    "facet.limit": facetFields.length > 0 ? facetLimit : undefined,
+  };
+}
+
+/**
+ * A request as `action(name, params)` sends it, under the Action API's base
+ * (`<base>/api/3/action/`): the action's name and its query string (`package_show?id=x`), the
+ * parameters checked and normalised as they go out. What an answer's source names.
+ */
+export function actionRequest(name: string, params: QueryParams = {}): string {
+  const action = name.trim();
+  if (!ACTION_NAME.test(action)) throw new GovDataValidationError(`Invalid CKAN action name: ${quoteValue(name)}`);
+  const qs = buildQueryString(prune(params));
+  return qs === "" ? action : `${action}?${qs}`;
 }
 
 export class GovDataClient {
@@ -306,40 +364,17 @@ export class GovDataClient {
    * filter applied twice selects the same datasets). Wrapping it in parentheses
    * instead would break a negated filter: Solr matches nothing for a nested
    * `(-organization:x)`. Facet fields go out as the JSON list CKAN expects in
-   * `facet.field`; it rejects `facet_field` with HTTP 400. The search text `q` and each
+   * `facet.field`; it rejects `facet_field` with HTTP 400. `facet_limit` goes out as `facet.limit`
+   * (a positive integer or -1 for every value), only with facet fields. The search text `q` and each
    * filter go out as text, trimmed and in NFC (`textProblem`, `normalizeText`); the sort
    * expression (`sortProblem`: `<field> asc|desc`, …) and each facet field (`fieldProblem`: a
    * Solr field name) as tokens (`normalizeToken`). A parameter given as `null` means "not
    * given", like `undefined`.
    */
   async packageSearch(params: PackageSearchParams = {}): Promise<PackageSearchResult> {
-    // Checked before any request: an unknown key, a refused text value, a string where
-    // a list belongs or a NaN/negative number would otherwise go out (or be dropped).
-    assertKeys("packageSearch", "package_search", params, SEARCH_KEYS);
-    const q = given(params.q);
-    const sort = given(params.sort);
-    const fqGiven = given(params.fq);
-    const facetGiven = given(params.facet_field);
-    const rows = given(params.rows);
-    const start = given(params.start);
-    assertOptional("q", q, textProblem);
-    assertList("fq", fqGiven, textProblem);
-    assertOptional("sort", sort, sortProblem);
-    assertList("facet_field", facetGiven, fieldProblem);
-    assertCount("rows", rows);
-    assertCount("start", start);
-    const fq = fqGiven ?? [];
-    const facetFields = (facetGiven ?? []).map(normalizeToken);
     return this.typed<PackageSearchResult>(
       "package_search",
-      {
-        q,
-        fq_list: fq.length === 1 ? [fq[0]!, fq[0]!] : fq.length > 1 ? fq : undefined,
-        rows,
-        start,
-        sort,
-        "facet.field": facetFields.length > 0 ? JSON.stringify(facetFields) : undefined,
-      },
+      packageSearchQuery(params),
       isSearchResult,
       "an object with a numeric count and a results array",
     );

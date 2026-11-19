@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { GovDataClient } from "./client.js";
+export { GovDataClient, actionRequest, packageSearchQuery } from "./client.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,
@@ -47,3 +47,5 @@ export {
 export type { Problem } from "./validate.js";
 
 export * from "./types.js";
+
+export * from "./operations.js";

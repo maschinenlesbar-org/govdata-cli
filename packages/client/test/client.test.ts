@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GovDataClient } from "../src/client.js";
+import { GovDataClient, actionRequest, packageSearchQuery } from "../src/client.js";
 import {
   GovDataActionError,
   GovDataError,
@@ -103,6 +103,32 @@ test("packageSearch sends facet_field as CKAN's facet.field JSON list", async ()
   const url = new URL(mt.last().url);
   assert.equal(url.searchParams.get("facet.field"), '["organization","res_format"]');
   assert.equal(url.searchParams.has("facet_field"), false);
+});
+
+test("packageSearch sends facet_limit as facet.limit (-1: every value), only with facet fields", async () => {
+  // CKAN returns 50 values per facet unless told otherwise, with no sign that more exist.
+  const mt = makeMockTransport(() => jsonResponse(ckan({ count: 0, results: [] })));
+  await clientWith(mt).packageSearch({ rows: 0, facet_field: ["res_format"], facet_limit: -1 });
+  assert.equal(new URL(mt.last().url).searchParams.get("facet.limit"), "-1");
+  await clientWith(mt).packageSearch({ rows: 0, facet_field: ["organization"], facet_limit: 11 });
+  assert.equal(new URL(mt.last().url).searchParams.get("facet.limit"), "11");
+  await clientWith(mt).packageSearch({ rows: 0, facet_limit: 11 });
+  assert.equal(new URL(mt.last().url).searchParams.has("facet.limit"), false);
+  for (const bad of [0, -2, 1.5, Number.NaN]) {
+    await assert.rejects(clientWith(mt).packageSearch({ facet_field: ["tags"], facet_limit: bad }), (err: unknown) => err instanceof GovDataValidationError && /facet_limit/.test(err.message));
+  }
+  assert.equal(mt.calls.length, 3, "a refused limit sends nothing");
+});
+
+test("actionRequest names a request as it is sent: the action, then the checked and normalised query", () => {
+  assert.equal(actionRequest("package_show", { id: " abc " }), "package_show?id=abc");
+  assert.equal(actionRequest("group_list"), "group_list");
+  assert.equal(
+    actionRequest("package_search", packageSearchQuery({ q: "Rad verkehr", fq: ["groups:tran"], rows: 0 })),
+    "package_search?q=Rad%20verkehr&fq_list=groups%3Atran&fq_list=groups%3Atran&rows=0",
+  );
+  assert.throws(() => actionRequest("../x"), GovDataValidationError);
+  assert.throws(() => actionRequest("package_show", { id: " " }), GovDataValidationError);
 });
 
 test("packageSearch omits facet.field when no facet fields are given", async () => {

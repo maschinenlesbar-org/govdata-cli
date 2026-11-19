@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { handleOutputErrors, stderrAfterStdout } from "../src/cli/io.js";
+import { exitOnSignalsAsPid1, handleOutputErrors, stderrAfterStdout } from "../src/cli/io.js";
 import { createLogger } from "../src/cli/log.js";
 import { processLogger } from "../src/cli/run.js";
 
@@ -125,4 +125,26 @@ test("stdout to a regular file gets every byte or an error: a short write is nev
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/** A process stand-in with a pid: records its signal listeners and exits. */
+function fakeProcess(pid: number) {
+  const emitter = new EventEmitter();
+  const exits: number[] = [];
+  return { emitter, exits, proc: { pid, once: (event: string, listener: () => void) => emitter.once(event, listener), exit: (code: number) => void exits.push(code) } };
+}
+
+test("as PID 1 (a container's first process), SIGINT, SIGTERM and SIGHUP exit 130, 143 and 129: the kernel drops a default-action signal sent to PID 1", () => {
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129]] as const) {
+    const { emitter, exits, proc } = fakeProcess(1);
+    exitOnSignalsAsPid1(proc);
+    emitter.emit(signal);
+    assert.deepEqual(exits, [code], signal);
+  }
+});
+
+test("not PID 1, no signal listener is installed: Node's default action stays, and a FIFO's blocked open() stays interruptible", () => {
+  const { emitter, proc } = fakeProcess(4242);
+  exitOnSignalsAsPid1(proc);
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) assert.equal(emitter.listenerCount(signal), 0, signal);
 });

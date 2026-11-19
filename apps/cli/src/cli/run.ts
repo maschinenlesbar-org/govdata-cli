@@ -6,7 +6,8 @@ import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
 import { OutputError } from "./output.js";
-import { createLogger, logFormatFromArgv, type Logger } from "./log.js";
+import { createLogger, LOG_PROGRAM, logFormatFromArgv, type Logger } from "./log.js";
+import { EnvironmentError } from "./shared.js";
 import {
   GovDataActionError,
   GovDataApiError,
@@ -282,12 +283,17 @@ export function processLogger(argv: readonly string[]): Logger {
  */
 function areaOf(err: GovDataError): string {
   if (err instanceof OutputError) return "output";
+  if (err instanceof EnvironmentError) return "cli";
   if (err instanceof GovDataNetworkError) return "http";
   if (err instanceof GovDataParseError || err instanceof GovDataActionError) return "api";
   return "cli";
 }
 
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
+  // In the container image the entrypoint is the program, so `docker run <image> search Haushalt`;
+  // people copy the npm form and type `docker run <image> govdata search Haushalt`. A leading
+  // program name is dropped, so both work (no command is named like the program).
+  if (argv[0] === LOG_PROGRAM) argv = argv.slice(1);
   // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
   const program = buildProgram(deps);

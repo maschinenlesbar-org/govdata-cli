@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Command, InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
+import { readContainerLimits } from "./limits.js";
 import { GovDataClient } from "@maschinenlesbar.org/govdata-client/internal/client";
 import { MAX_TIMEOUT_MS } from "@maschinenlesbar.org/govdata-client/internal/http";
 import { DEFAULT_BASE_URL, MAX_RETRIES } from "@maschinenlesbar.org/govdata-client/internal/engine";
@@ -37,6 +38,8 @@ export const VERSION = readVersion();
 export const defaultDeps: CliDeps = {
   io: defaultIO,
   createClient: (options) => new GovDataClient(options),
+  // In a container: the memory and pids limits (cgroup), for action()'s checks.
+  limits: () => readContainerLimits(),
 };
 
 /** commander value-parser for `--log-format`. */

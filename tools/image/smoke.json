@@ -1,0 +1,237 @@
+{
+  "comment": "What tools/image/smoke.mjs needs that is particular to this repo: the bin (its log topic), a command that makes one request, the exit code of a network error, the mock's answer to that request (by path, under --base-url http://mock:8080), and a string the printed answer contains. The answer is the live one for a search for Trinkwasserbrunnen (two datasets, at most three files each, the fields the operations read), recorded on 2026-11-20.",
+  "bin": "govdata",
+  "command": [
+    "search",
+    "Trinkwasserbrunnen",
+    "--rows",
+    "2"
+  ],
+  "networkErrorExit": 1,
+  "answers": {
+    "/api/3/action/package_search": {
+      "help": "https://ckan.govdata.de/api/3/action/help_show?name=package_search",
+      "success": true,
+      "result": {
+        "count": 27,
+        "sort": "score desc, metadata_modified desc",
+        "results": [
+          {
+            "id": "a86ea76b-5648-4e7f-8dbe-cc88027a1443",
+            "name": "trinkwasserbrunnen6a2dc",
+            "title": "Trinkwasserbrunnen",
+            "notes": " Orte von Interesse (XErleben) - Trinkwasserbrunnen in Dortmund.",
+            "url": "https://open-data.dortmund.de/explore/dataset/trinkwasserbrunnen/",
+            "num_resources": 15,
+            "license_id": "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+            "license_title": "Datenlizenz Deutschland – Zero – Version 2.0",
+            "metadata_created": "2026-09-11T22:54:49.032300",
+            "metadata_modified": "2026-11-18T05:02:32.656615",
+            "maintainer": null,
+            "maintainer_email": null,
+            "organization": {
+              "name": "open-nrw",
+              "title": "Open.NRW"
+            },
+            "groups": [
+              {
+                "name": "heal",
+                "title": "Gesundheit",
+                "display_name": "Gesundheit"
+              },
+              {
+                "name": "agri",
+                "title": "Landwirtschaft, Fischerei, Forstwirtschaft und Nahrungsmittel",
+                "display_name": "Landwirtschaft, Fischerei, Forstwirtschaft und Nahrungsmittel"
+              }
+            ],
+            "tags": [
+              {
+                "name": "doapp"
+              },
+              {
+                "name": "orte-von-interesse"
+              }
+            ],
+            "extras": [
+              {
+                "key": "issued",
+                "value": "2026-11-12T02:01:49.659000+00:00"
+              },
+              {
+                "key": "metadata_harvested_portal",
+                "value": "http://open.nrw/"
+              },
+              {
+                "key": "metadata_original_html",
+                "value": "https://open-data.dortmund.de/explore/dataset/trinkwasserbrunnen/"
+              },
+              {
+                "key": "modified",
+                "value": "2026-11-12T02:01:49.659000+00:00"
+              },
+              {
+                "key": "publisher_name",
+                "value": "Stadt Dortmund"
+              }
+            ],
+            "resources": [
+              {
+                "id": "0bab57d3-6106-482c-9432-4b7778b7e89a",
+                "name": "csv",
+                "description": "Trinkwasserbrunnen (csv)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/CSV",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/csv?use_labels=true",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              },
+              {
+                "id": "df9dd0c9-ce16-4859-8282-6ab34015cb9a",
+                "name": "json",
+                "description": "Trinkwasserbrunnen (json)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/JSON",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/json",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              },
+              {
+                "id": "7916c998-c370-48dc-81b0-b672757b7721",
+                "name": "fgb",
+                "description": "Trinkwasserbrunnen (fgb)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/OCTET",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/fgb",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              }
+            ]
+          },
+          {
+            "id": "b0b8be3a-3151-4128-bea0-6249c3a45522",
+            "name": "trinkwasserbrunnena017f",
+            "title": "Trinkwasserbrunnen",
+            "notes": "Der Datensatz zeigt die Standorte der Trinkwasserbrunnen in Berlin an. Mit den Trinkwasserbrunnen wird kostenlos und öffentlich zugänglich Trinkwasser bereitgestellt. Die Trinkwasserbrunnen sind von Mai bis Oktober in Betrieb und werden von den Berliner Wasserbetrieben mit Unterstützung des Landes Berlin aufgestellt und betrieben.",
+            "url": null,
+            "num_resources": 1,
+            "license_id": "",
+            "license_title": "",
+            "metadata_created": "2026-11-04T11:12:31.033246",
+            "metadata_modified": "2026-11-17T19:53:17.126497",
+            "maintainer": null,
+            "maintainer_email": null,
+            "organization": {
+              "name": "gdi-de",
+              "title": "GDI-DE"
+            },
+            "groups": [
+              {
+                "name": "regi",
+                "title": "Regionen und Städte",
+                "display_name": "Regionen und Städte"
+              },
+              {
+                "name": "tran",
+                "title": "Verkehr",
+                "display_name": "Verkehr"
+              }
+            ],
+            "tags": [
+              {
+                "name": "berlin"
+              },
+              {
+                "name": "berliner-wasserbetriebe"
+              },
+              {
+                "name": "brunnen"
+              },
+              {
+                "name": "geodaten"
+              },
+              {
+                "name": "kaiserbrunnen"
+              },
+              {
+                "name": "karten"
+              },
+              {
+                "name": "open-data"
+              },
+              {
+                "name": "opendata"
+              },
+              {
+                "name": "sachdaten"
+              },
+              {
+                "name": "trinkbrunnen"
+              },
+              {
+                "name": "trinkwasser"
+              },
+              {
+                "name": "trinkwasserbrunnen"
+              }
+            ],
+            "extras": [
+              {
+                "key": "access_rights",
+                "value": "http://inspire.ec.europa.eu/metadata-codelist/LimitationsOnPublicAccess/noLimitations"
+              },
+              {
+                "key": "contact_email",
+                "value": "Silke.block@bwb.de"
+              },
+              {
+                "key": "contact_name",
+                "value": "Berliner Wasserbetriebe"
+              },
+              {
+                "key": "issued",
+                "value": "2025-06-15"
+              },
+              {
+                "key": "metadata_harvested_portal",
+                "value": "http://ims.geoportal.de/"
+              },
+              {
+                "key": "modified",
+                "value": "2025-12-15T09:29:37.348945+00:00"
+              },
+              {
+                "key": "publisher_email",
+                "value": "Silke.block@bwb.de"
+              },
+              {
+                "key": "publisher_name",
+                "value": "Berliner Wasserbetriebe"
+              }
+            ],
+            "resources": [
+              {
+                "id": "bd20b5e2-31d3-47b4-9af5-53864668f25c",
+                "name": "Downloaddienst - Trinkwasserbrunnen (WFS)",
+                "description": "Downloaddienst - Trinkwasserbrunnen (WFS)",
+                "format": "HTML",
+                "url": "https://gdi.berlin.de/services/wfs/trinkwasserbrunnen?request=GetCapabilities&service=WFS",
+                "license": "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+                "size": null,
+                "mimetype": "Text/HTML",
+                "last_modified": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "expectStdout": "trinkwasserbrunnen6a2dc"
+}

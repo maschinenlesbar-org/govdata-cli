@@ -1,0 +1,59 @@
+{
+  "name": "@maschinenlesbar.org/govdata-mcp",
+  "version": "0.8.0",
+  "description": "MCP server for GovData, Germany's central open-data catalogue: find datasets, list their downloadable files with each file's licence, and count the catalogue by publisher, format, licence or theme, for AI agents (stdio and Streamable HTTP)",
+  "type": "module",
+  "bin": {
+    "govdata-mcp": "dist/src/mcp/index.js"
+  },
+  "files": [
+    "dist/src",
+    "dist/node_modules",
+    "!dist/src/**/*.map",
+    "LICENSING.md",
+    "DATA_LICENSE.md",
+    "CONTRIBUTING.md"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "prepack": "tsc -b ../../tsconfig.json && node ../../tools/pack/prepack.mjs",
+    "postpack": "node ../../tools/pack/postpack.mjs",
+    "test": "node --test $(node -p \"+process.versions.node.split('.')[0] >= 24 ? '--test-timeout=5000' : ''\") dist/test/*.test.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "govdata",
+    "open-data",
+    "ckan",
+    "germany"
+  ],
+  "author": "Sebastian Schürmann <sebs@2xs.org>",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maschinenlesbar-org/govdata-cli.git",
+    "directory": "apps/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/maschinenlesbar-org/govdata-cli/issues"
+  },
+  "homepage": "https://maschinenlesbar.org/govdata-cli/",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/sebs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0"
+  },
+  "bundleDependencies": [
+    "@modelcontextprotocol/server",
+    "@modelcontextprotocol/core",
+    "zod"
+  ]
+}

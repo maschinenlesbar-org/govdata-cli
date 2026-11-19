@@ -1,0 +1,1280 @@
+{
+  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream's answer per path (under --base-url http://127.0.0.1:<port>), how many tools the server lists, and the calls to make with what each must answer. The answers are live ones recorded on 2026-11-20: a search for Trinkwasserbrunnen (three datasets, at most three files each) with the catalogue's organizations and Radverkehr's formats as its facets, and the record of trinkwasserbrunnen-wuppertal02be6; the mock answers by path only, so every search sees that one answer.",
+  "answers": {
+    "/api/3/action/package_search": {
+      "help": "https://ckan.govdata.de/api/3/action/help_show?name=package_search",
+      "success": true,
+      "result": {
+        "count": 27,
+        "sort": "score desc, metadata_modified desc",
+        "results": [
+          {
+            "id": "a86ea76b-5648-4e7f-8dbe-cc88027a1443",
+            "name": "trinkwasserbrunnen6a2dc",
+            "title": "Trinkwasserbrunnen",
+            "notes": " Orte von Interesse (XErleben) - Trinkwasserbrunnen in Dortmund.",
+            "url": "https://open-data.dortmund.de/explore/dataset/trinkwasserbrunnen/",
+            "num_resources": 15,
+            "license_id": "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+            "license_title": "Datenlizenz Deutschland – Zero – Version 2.0",
+            "metadata_created": "2026-09-11T22:54:49.032300",
+            "metadata_modified": "2026-11-18T05:02:32.656615",
+            "maintainer": null,
+            "maintainer_email": null,
+            "organization": {
+              "name": "open-nrw",
+              "title": "Open.NRW"
+            },
+            "groups": [
+              {
+                "name": "heal",
+                "title": "Gesundheit",
+                "display_name": "Gesundheit"
+              },
+              {
+                "name": "agri",
+                "title": "Landwirtschaft, Fischerei, Forstwirtschaft und Nahrungsmittel",
+                "display_name": "Landwirtschaft, Fischerei, Forstwirtschaft und Nahrungsmittel"
+              }
+            ],
+            "tags": [
+              {
+                "name": "doapp"
+              },
+              {
+                "name": "orte-von-interesse"
+              }
+            ],
+            "extras": [
+              {
+                "key": "issued",
+                "value": "2026-11-12T02:01:49.659000+00:00"
+              },
+              {
+                "key": "metadata_harvested_portal",
+                "value": "http://open.nrw/"
+              },
+              {
+                "key": "metadata_original_html",
+                "value": "https://open-data.dortmund.de/explore/dataset/trinkwasserbrunnen/"
+              },
+              {
+                "key": "modified",
+                "value": "2026-11-12T02:01:49.659000+00:00"
+              },
+              {
+                "key": "publisher_name",
+                "value": "Stadt Dortmund"
+              }
+            ],
+            "resources": [
+              {
+                "id": "0bab57d3-6106-482c-9432-4b7778b7e89a",
+                "name": "csv",
+                "description": "Trinkwasserbrunnen (csv)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/CSV",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/csv?use_labels=true",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              },
+              {
+                "id": "df9dd0c9-ce16-4859-8282-6ab34015cb9a",
+                "name": "json",
+                "description": "Trinkwasserbrunnen (json)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/JSON",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/json",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              },
+              {
+                "id": "7916c998-c370-48dc-81b0-b672757b7721",
+                "name": "fgb",
+                "description": "Trinkwasserbrunnen (fgb)",
+                "format": "http://publications.europa.eu/resource/authority/file-type/OCTET",
+                "url": "https://open-data.dortmund.de/api/v2/catalog/datasets/trinkwasserbrunnen/exports/fgb",
+                "license": "https://www.govdata.de/dl-de/zero-2-0",
+                "size": null,
+                "mimetype": null,
+                "modified": "2026-11-12T02:01:49.659000+00:00",
+                "last_modified": null
+              }
+            ]
+          },
+          {
+            "id": "b0b8be3a-3151-4128-bea0-6249c3a45522",
+            "name": "trinkwasserbrunnena017f",
+            "title": "Trinkwasserbrunnen",
+            "notes": "Der Datensatz zeigt die Standorte der Trinkwasserbrunnen in Berlin an. Mit den Trinkwasserbrunnen wird kostenlos und öffentlich zugänglich Trinkwasser bereitgestellt. Die Trinkwasserbrunnen sind von Mai bis Oktober in Betrieb und werden von den Berliner Wasserbetrieben mit Unterstützung des Landes Berlin aufgestellt und betrieben.",
+            "url": null,
+            "num_resources": 1,
+            "license_id": "",
+            "license_title": "",
+            "metadata_created": "2026-11-04T11:12:31.033246",
+            "metadata_modified": "2026-11-17T19:53:17.126497",
+            "maintainer": null,
+            "maintainer_email": null,
+            "organization": {
+              "name": "gdi-de",
+              "title": "GDI-DE"
+            },
+            "groups": [
+              {
+                "name": "regi",
+                "title": "Regionen und Städte",
+                "display_name": "Regionen und Städte"
+              },
+              {
+                "name": "tran",
+                "title": "Verkehr",
+                "display_name": "Verkehr"
+              }
+            ],
+            "tags": [
+              {
+                "name": "berlin"
+              },
+              {
+                "name": "berliner-wasserbetriebe"
+              },
+              {
+                "name": "brunnen"
+              },
+              {
+                "name": "geodaten"
+              },
+              {
+                "name": "kaiserbrunnen"
+              },
+              {
+                "name": "karten"
+              },
+              {
+                "name": "open-data"
+              },
+              {
+                "name": "opendata"
+              },
+              {
+                "name": "sachdaten"
+              },
+              {
+                "name": "trinkbrunnen"
+              },
+              {
+                "name": "trinkwasser"
+              },
+              {
+                "name": "trinkwasserbrunnen"
+              }
+            ],
+            "extras": [
+              {
+                "key": "access_rights",
+                "value": "http://inspire.ec.europa.eu/metadata-codelist/LimitationsOnPublicAccess/noLimitations"
+              },
+              {
+                "key": "contact_email",
+                "value": "Silke.block@bwb.de"
+              },
+              {
+                "key": "contact_name",
+                "value": "Berliner Wasserbetriebe"
+              },
+              {
+                "key": "issued",
+                "value": "2025-06-15"
+              },
+              {
+                "key": "metadata_harvested_portal",
+                "value": "http://ims.geoportal.de/"
+              },
+              {
+                "key": "modified",
+                "value": "2025-12-15T09:29:37.348945+00:00"
+              },
+              {
+                "key": "publisher_email",
+                "value": "Silke.block@bwb.de"
+              },
+              {
+                "key": "publisher_name",
+                "value": "Berliner Wasserbetriebe"
+              }
+            ],
+            "resources": [
+              {
+                "id": "bd20b5e2-31d3-47b4-9af5-53864668f25c",
+                "name": "Downloaddienst - Trinkwasserbrunnen (WFS)",
+                "description": "Downloaddienst - Trinkwasserbrunnen (WFS)",
+                "format": "HTML",
+                "url": "https://gdi.berlin.de/services/wfs/trinkwasserbrunnen?request=GetCapabilities&service=WFS",
+                "license": "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+                "size": null,
+                "mimetype": "Text/HTML",
+                "last_modified": null
+              }
+            ]
+          },
+          {
+            "id": "d1405623-6691-47ce-b5b2-b93991e1f93f",
+            "name": "trinkwasserbrunnen-wuppertald83e7",
+            "title": "Trinkwasserbrunnen Wuppertal",
+            "notes": "Der Datensatz umfasst die Standorte von (Stand 10/2026) 11 als Punktgeometrien modellierten von der Stadt Wuppertal bereitgestellten im Sommer öffentlich zugänglichen Trinkwasserbrunnen im Wuppertaler Stadtgebiet. Die Stadt Wuppertal und ihre Betriebe und Gesellschaften betreiben zur Anpassung an den Klimawandel den Aufbau eines Netzes solcher Trinkwasserbrunnen. Die Standorte der Trinkwasserbrunn [cut for the fixture]",
+            "url": null,
+            "num_resources": 6,
+            "license_id": "",
+            "license_title": "",
+            "metadata_created": "2026-09-19T22:05:28.692253",
+            "metadata_modified": "2026-11-18T04:20:32.151771",
+            "maintainer": null,
+            "maintainer_email": null,
+            "organization": {
+              "name": "open-nrw",
+              "title": "Open.NRW"
+            },
+            "groups": [
+              {
+                "name": "ener",
+                "title": "Energie",
+                "display_name": "Energie"
+              },
+              {
+                "name": "gove",
+                "title": "Regierung und öffentlicher Sektor",
+                "display_name": "Regierung und öffentlicher Sektor"
+              },
+              {
+                "name": "envi",
+                "title": "Umwelt",
+                "display_name": "Umwelt"
+              }
+            ],
+            "tags": [
+              {
+                "name": "digital-zwilling"
+              },
+              {
+                "name": "gdi-w"
+              },
+              {
+                "name": "geo"
+              },
+              {
+                "name": "hitzeaktionsplan"
+              },
+              {
+                "name": "hitzetage"
+              },
+              {
+                "name": "hitzewelle"
+              },
+              {
+                "name": "infrastruktur_bauen_wohnen"
+              },
+              {
+                "name": "klimawandel"
+              },
+              {
+                "name": "leitungswasser"
+              },
+              {
+                "name": "opendata"
+              },
+              {
+                "name": "smart.wuppertal"
+              },
+              {
+                "name": "teilzwilling"
+              },
+              {
+                "name": "trinkbrunnennetz"
+              },
+              {
+                "name": "trinkwasserspender"
+              },
+              {
+                "name": "trinkwasserversorgung"
+              },
+              {
+                "name": "umwelt_klima"
+              },
+              {
+                "name": "urbaner-digitaler-zwilling"
+              },
+              {
+                "name": "waw"
+              },
+              {
+                "name": "wuppertal"
+              }
+            ],
+            "extras": [
+              {
+                "key": "access_rights",
+                "value": "http://publications.europa.eu/resource/authority/access-right/PUBLIC"
+              },
+              {
+                "key": "contact_email",
+                "value": "geodatenzentrum@stadt.wuppertal.de"
+              },
+              {
+                "key": "contact_name",
+                "value": "Stadt Wuppertal"
+              },
+              {
+                "key": "issued",
+                "value": "2025-04-23"
+              },
+              {
+                "key": "metadata_harvested_portal",
+                "value": "http://open.nrw/"
+              },
+              {
+                "key": "modified",
+                "value": "2026-10-23"
+              },
+              {
+                "key": "publisher_email",
+                "value": "geodatenzentrum@stadt.wuppertal.de"
+              },
+              {
+                "key": "publisher_name",
+                "value": "Stadt Wuppertal"
+              }
+            ],
+            "resources": [
+              {
+                "id": "6aa2606f-db25-444e-a7a3-79c3a4bf88bb",
+                "name": "Trinkwasserbrunnen Wuppertal",
+                "description": "Trinkwasserbrunnen Wuppertal",
+                "format": "JSON",
+                "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG4326_JSON.json",
+                "license": "https://creativecommons.org/licenses/by/4.0/legalcode.de",
+                "size": null,
+                "mimetype": "application/json",
+                "modified": "2026-10-28T23:56:18.011379",
+                "last_modified": null
+              },
+              {
+                "id": "7c0f892b-007d-40a0-80a0-6d1b7543f952",
+                "name": "Trinkwasserbrunnen Wuppertal",
+                "description": "Trinkwasserbrunnen Wuppertal",
+                "format": "ZIP",
+                "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG25832_SHAPE.zip",
+                "license": "https://creativecommons.org/licenses/by/4.0/legalcode.de",
+                "size": null,
+                "mimetype": "application/zip",
+                "modified": "2026-10-28T23:56:18.011452",
+                "last_modified": null
+              },
+              {
+                "id": "f8ebbcfe-06ce-4afe-8a19-afdc89114122",
+                "name": "Trinkwasserbrunnen Wuppertal",
+                "description": "Trinkwasserbrunnen Wuppertal",
+                "format": "ZIP",
+                "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG3857_SHAPE.zip",
+                "license": "https://creativecommons.org/licenses/by/4.0/legalcode.de",
+                "size": null,
+                "mimetype": "application/zip",
+                "modified": "2026-10-28T23:56:18.011503",
+                "last_modified": null
+              }
+            ]
+          }
+        ],
+        "search_facets": {
+          "organization": {
+            "title": "organization",
+            "items": [
+              {
+                "name": "open-data-bayern",
+                "display_name": "open.bydata",
+                "count": 26285
+              },
+              {
+                "name": "umweltbundesamt",
+                "display_name": "Umweltbundesamt",
+                "count": 222
+              },
+              {
+                "name": "transparenzportal-hamburg",
+                "display_name": "Transparenzportal Hamburg",
+                "count": 14862
+              },
+              {
+                "name": "transparenzportal-bremen",
+                "display_name": "Transparenzportal Bremen",
+                "count": 168
+              },
+              {
+                "name": "statistisches-bundesamt",
+                "display_name": "Statistisches Bundesamt",
+                "count": 3184
+              },
+              {
+                "name": "stadt-oldenburg-oldb",
+                "display_name": "Stadt Oldenburg (Oldb)",
+                "count": 91
+              },
+              {
+                "name": "stadt-greifswald",
+                "display_name": "Stadt Greifswald",
+                "count": 38
+              },
+              {
+                "name": "sonstige",
+                "display_name": "Sonstige",
+                "count": 3
+              },
+              {
+                "name": "swo-netz-gmbh",
+                "display_name": "SWO Netz GmbH",
+                "count": 4
+              },
+              {
+                "name": "robert-koch-institut",
+                "display_name": "Robert Koch-Institut",
+                "count": 39
+              },
+              {
+                "name": "regionalstatistik",
+                "display_name": "Regionalstatistik",
+                "count": 751
+              },
+              {
+                "name": "paul-ehrlich-institut",
+                "display_name": "Paul-Ehrlich-Institut",
+                "count": 48
+              },
+              {
+                "name": "opendata-hro",
+                "display_name": "OpenData.HRO",
+                "count": 244
+              },
+              {
+                "name": "openagrar",
+                "display_name": "OpenAgrar",
+                "count": 330
+              },
+              {
+                "name": "open-nrw",
+                "display_name": "Open.NRW",
+                "count": 10075
+              },
+              {
+                "name": "open-data-hessen",
+                "display_name": "Open Data Hessen",
+                "count": 790
+              },
+              {
+                "name": "open-data-brandenburg",
+                "display_name": "Open Data Brandenburg",
+                "count": 19467
+              },
+              {
+                "name": "open-data-baden-wurttemberg",
+                "display_name": "Open Data Baden-Württemberg",
+                "count": 1915
+              },
+              {
+                "name": "mcloud",
+                "display_name": "Mobilithek",
+                "count": 3501
+              },
+              {
+                "name": "metropolregion-rhein-neckar",
+                "display_name": "Metropolregion Rhein-Neckar",
+                "count": 354
+              },
+              {
+                "name": "mri",
+                "display_name": "Max Rubner-Institut",
+                "count": 2
+              },
+              {
+                "name": "land-schleswig-holstein",
+                "display_name": "Land Schleswig-Holstein",
+                "count": 29236
+              },
+              {
+                "name": "land-sachsen-anhalt",
+                "display_name": "Land Sachsen-Anhalt",
+                "count": 200
+              },
+              {
+                "name": "open-data-portal-rheinland-pfalz",
+                "display_name": "Land Rheinland-Pfalz",
+                "count": 16458
+              },
+              {
+                "name": "land-niedersachsen",
+                "display_name": "Land Niedersachsen",
+                "count": 562
+              },
+              {
+                "name": "land-brandenburg",
+                "display_name": "Land Brandenburg",
+                "count": 139
+              },
+              {
+                "name": "itzbund",
+                "display_name": "ITZBund",
+                "count": 2
+              },
+              {
+                "name": "zoll",
+                "display_name": "Generalzolldirektion",
+                "count": 10
+              },
+              {
+                "name": "gdi-de",
+                "display_name": "GDI-DE",
+                "count": 31753
+              },
+              {
+                "name": "fli",
+                "display_name": "Friedrich-Loeffler-Institut",
+                "count": 2
+              },
+              {
+                "name": "freistaat-sachsen",
+                "display_name": "Freistaat Sachsen",
+                "count": 3836
+              },
+              {
+                "name": "bkm",
+                "display_name": "Die Beauftragte der Bundesregierung für Kultur und Medien",
+                "count": 1
+              },
+              {
+                "name": "dpma",
+                "display_name": "Deutsches Patent- und Markenamt",
+                "count": 28
+              },
+              {
+                "name": "deutsche-nationalbibliothek",
+                "display_name": "Deutsche Nationalbibliothek",
+                "count": 17
+              },
+              {
+                "name": "bfdi",
+                "display_name": "Der Bundesbeauftragte für den Datenschutz und die Informationsfreiheit",
+                "count": 39
+              },
+              {
+                "name": "bzst",
+                "display_name": "Bundeszentralamt für Steuern",
+                "count": 2
+              },
+              {
+                "name": "bva",
+                "display_name": "Bundesverwaltungsamt",
+                "count": 2
+              },
+              {
+                "name": "bsa",
+                "display_name": "Bundessortenamt",
+                "count": 2
+              },
+              {
+                "name": "bmz",
+                "display_name": "Bundesministerium für wirtschaftliche Zusammenarbeit und Entwicklung",
+                "count": 3
+              },
+              {
+                "name": "bmwe",
+                "display_name": "Bundesministerium für Wirtschaft und Energie",
+                "count": 47
+              },
+              {
+                "name": "bmg",
+                "display_name": "Bundesministerium für Gesundheit (BMG)",
+                "count": 1
+              },
+              {
+                "name": "bundesministerium-fur-bildung-und-forschung",
+                "display_name": "Bundesministerium für Forschung, Technologie und Raumfahrt",
+                "count": 212
+              },
+              {
+                "name": "bmfsfj",
+                "display_name": "Bundesministerium für Familie, Senioren, Frauen und Jugend",
+                "count": 74
+              },
+              {
+                "name": "bmel",
+                "display_name": "Bundesministerium für Ernährung und Landwirtschaft",
+                "count": 38
+              },
+              {
+                "name": "bmas",
+                "display_name": "Bundesministerium für Arbeit und Soziales",
+                "count": 88
+              },
+              {
+                "name": "bmi",
+                "display_name": "Bundesministerium des Innern und Heimat",
+                "count": 1405
+              },
+              {
+                "name": "bmvg",
+                "display_name": "Bundesministerium der Verteidigung",
+                "count": 4
+              },
+              {
+                "name": "bmf",
+                "display_name": "Bundesministerium der Finanzen",
+                "count": 58
+              },
+              {
+                "name": "bundesinstitut-fur-risikobewertung",
+                "display_name": "Bundesinstitut für Risikobewertung",
+                "count": 4
+              },
+              {
+                "name": "bbsr",
+                "display_name": "Bundesinstitut für Bau-, Stadt- und Raumforschung (BBSR) im Bundesamt für Bauwesen und Raumordnung (BBR)",
+                "count": 9
+              },
+              {
+                "name": "badv",
+                "display_name": "Bundesausgleichsamt",
+                "count": 2
+              },
+              {
+                "name": "bundesarchiv",
+                "display_name": "Bundesarchiv",
+                "count": 2
+              },
+              {
+                "name": "bam",
+                "display_name": "Bundesanstalt für Materialforschung und -prüfung (BAM)",
+                "count": 5
+              },
+              {
+                "name": "baua",
+                "display_name": "Bundesanstalt für Arbeitsschutz und Arbeitsmedizin ",
+                "count": 15
+              },
+              {
+                "name": "bafa",
+                "display_name": "Bundesamt für Wirtschaft und Ausfuhrkontrolle",
+                "count": 5
+              },
+              {
+                "name": "bvl",
+                "display_name": "Bundesamt für Verbraucherschutz und Lebensmittelsicherheit",
+                "count": 23
+              },
+              {
+                "name": "bundesamt-fur-justiz",
+                "display_name": "Bundesamt für Justiz",
+                "count": 1203
+              },
+              {
+                "name": "bundesagentur-fur-arbeit",
+                "display_name": "Bundesagentur für Arbeit",
+                "count": 17
+              },
+              {
+                "name": "berlin-open-data",
+                "display_name": "Berlin Open Data",
+                "count": 1000
+              },
+              {
+                "name": "auswaertiges-amt",
+                "display_name": "Auswärtiges Amt",
+                "count": 7
+              }
+            ]
+          },
+          "res_format": {
+            "title": "res_format",
+            "items": [
+              {
+                "name": "https://w3id.org/mdp/schema/file_media_type#ANY_OTHER_MEDIATYPE",
+                "display_name": "https://w3id.org/mdp/schema/file_media_type#ANY_OTHER_MEDIATYPE",
+                "count": 3
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/ZIP",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/ZIP",
+                "count": 3
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/XML",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/XML",
+                "count": 29
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/XLSX",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/XLSX",
+                "count": 4
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/XLS",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/XLS",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/WMS_SRVC",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/WMS_SRVC",
+                "count": 39
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/WFS_SRVC",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/WFS_SRVC",
+                "count": 43
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/SHP",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/SHP",
+                "count": 18
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/RDF_XML",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/RDF_XML",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/RDF_TURTLE",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/RDF_TURTLE",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/PDF",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/PDF",
+                "count": 13
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/PARQUET",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/PARQUET",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/ODT",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/ODT",
+                "count": 1
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/OCTET",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/OCTET",
+                "count": 4
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/N3",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/N3",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/KML",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/KML",
+                "count": 22
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/JSON_LD",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/JSON_LD",
+                "count": 5
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/JSON",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/JSON",
+                "count": 39
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/JPEG",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/JPEG",
+                "count": 2
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/HTML",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/HTML",
+                "count": 64
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/GPX",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/GPX",
+                "count": 4
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/GPKG",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/GPKG",
+                "count": 2
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/GML",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/GML",
+                "count": 30
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/GEOJSON",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/GEOJSON",
+                "count": 45
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/CSV",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/CSV",
+                "count": 71
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/BIN",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/BIN",
+                "count": 27
+              },
+              {
+                "name": "http://publications.europa.eu/resource/authority/file-type/ATOM",
+                "display_name": "http://publications.europa.eu/resource/authority/file-type/ATOM",
+                "count": 11
+              },
+              {
+                "name": "gpx",
+                "display_name": "gpx",
+                "count": 1
+              },
+              {
+                "name": "application/x-7z-compressed",
+                "display_name": "application/x-7z-compressed",
+                "count": 2
+              },
+              {
+                "name": "ZIP",
+                "display_name": "ZIP",
+                "count": 23
+              },
+              {
+                "name": "XSD",
+                "display_name": "XSD",
+                "count": 6
+              },
+              {
+                "name": "XLSX",
+                "display_name": "XLSX",
+                "count": 1
+              },
+              {
+                "name": "WMS",
+                "display_name": "WMS",
+                "count": 7
+              },
+              {
+                "name": "WFS",
+                "display_name": "WFS",
+                "count": 4
+              },
+              {
+                "name": "TXT",
+                "display_name": "TXT",
+                "count": 1
+              },
+              {
+                "name": "Shapefiles",
+                "display_name": "Shapefiles",
+                "count": 1
+              },
+              {
+                "name": "Shape, CSV",
+                "display_name": "Shape, CSV",
+                "count": 1
+              },
+              {
+                "name": "Shape",
+                "display_name": "Shape",
+                "count": 1
+              },
+              {
+                "name": "STA",
+                "display_name": "STA",
+                "count": 1
+              },
+              {
+                "name": "SHP",
+                "display_name": "SHP",
+                "count": 1
+              },
+              {
+                "name": "PNG",
+                "display_name": "PNG",
+                "count": 1
+              },
+              {
+                "name": "PDF",
+                "display_name": "PDF",
+                "count": 1
+              },
+              {
+                "name": "OAF",
+                "display_name": "OAF",
+                "count": 4
+              },
+              {
+                "name": "MQTT",
+                "display_name": "MQTT",
+                "count": 1
+              },
+              {
+                "name": "KML",
+                "display_name": "KML",
+                "count": 2
+              },
+              {
+                "name": "JSON",
+                "display_name": "JSON",
+                "count": 14
+              },
+              {
+                "name": "JPEG",
+                "display_name": "JPEG",
+                "count": 7
+              },
+              {
+                "name": "HTML",
+                "display_name": "HTML",
+                "count": 8
+              },
+              {
+                "name": "Geopackage",
+                "display_name": "Geopackage",
+                "count": 1
+              },
+              {
+                "name": "GeoJSON",
+                "display_name": "GeoJSON",
+                "count": 1
+              },
+              {
+                "name": "GPX",
+                "display_name": "GPX",
+                "count": 6
+              },
+              {
+                "name": "ESRI Hub",
+                "display_name": "ESRI Hub",
+                "count": 1
+              },
+              {
+                "name": "Download",
+                "display_name": "Download",
+                "count": 10
+              },
+              {
+                "name": "CSV",
+                "display_name": "CSV",
+                "count": 13
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/3/action/package_show": {
+      "help": "https://ckan.govdata.de/api/3/action/help_show?name=package_search",
+      "success": true,
+      "result": {
+        "id": "6f221eaa-50a3-4fe4-8571-0cca6025f471",
+        "name": "trinkwasserbrunnen-wuppertal02be6",
+        "title": "Trinkwasserbrunnen Wuppertal",
+        "notes": "<p>Der Datensatz umfasst die Standorte von (Stand 10/2026) 11 als Punktgeometrien modellierten von der Stadt Wuppertal bereitgestellten im Sommer öffentlich zugänglichen Trinkwasserbrunnen im Wuppertaler Stadtgebiet. Die Stadt Wuppertal und ihre Betriebe und Gesellschaften betreiben zur Anpassung an den Klimawandel den Aufbau eines Netzes solcher Trinkwasserbrunnen. Die Standorte der Trinkwasserbr [cut for the fixture]",
+        "url": null,
+        "num_resources": 8,
+        "license_id": "",
+        "license_title": "",
+        "metadata_created": "2026-09-11T19:55:56.376845",
+        "metadata_modified": "2026-11-18T02:27:33.798210",
+        "maintainer": "Stadt Wuppertal, Klimaschutz und Klimamanagement (307.11)",
+        "maintainer_email": null,
+        "organization": {
+          "name": "open-nrw",
+          "title": "Open.NRW"
+        },
+        "groups": [
+          {
+            "name": "gove",
+            "title": "Regierung und öffentlicher Sektor",
+            "display_name": "Regierung und öffentlicher Sektor"
+          },
+          {
+            "name": "regi",
+            "title": "Regionen und Städte",
+            "display_name": "Regionen und Städte"
+          },
+          {
+            "name": "envi",
+            "title": "Umwelt",
+            "display_name": "Umwelt"
+          }
+        ],
+        "tags": [
+          {
+            "name": "bauen-und-wohnen"
+          },
+          {
+            "name": "digital-zwilling"
+          },
+          {
+            "name": "gdi-w"
+          },
+          {
+            "name": "geo"
+          },
+          {
+            "name": "hitzeaktionsplan"
+          },
+          {
+            "name": "hitzetage"
+          },
+          {
+            "name": "hitzewelle"
+          },
+          {
+            "name": "infrastruktur"
+          },
+          {
+            "name": "klimawandel"
+          },
+          {
+            "name": "leitungswasser"
+          },
+          {
+            "name": "opendata"
+          },
+          {
+            "name": "smart.wuppertal"
+          },
+          {
+            "name": "teilzwilling"
+          },
+          {
+            "name": "trinkbrunnennetz"
+          },
+          {
+            "name": "trinkwasserspender"
+          },
+          {
+            "name": "trinkwasserversorgung"
+          },
+          {
+            "name": "umwelt-und-klima"
+          },
+          {
+            "name": "urbaner-digitaler-zwilling"
+          },
+          {
+            "name": "waw"
+          },
+          {
+            "name": "wuppertal"
+          }
+        ],
+        "extras": [
+          {
+            "key": "access_rights",
+            "value": "öffentlich "
+          },
+          {
+            "key": "contact_name",
+            "value": "Stadt Wuppertal, Klimaschutz und Klimamanagement (307.11)"
+          },
+          {
+            "key": "issued",
+            "value": "2025-04-29T08:42:13+02:00"
+          },
+          {
+            "key": "metadata_harvested_portal",
+            "value": "http://open.nrw/"
+          },
+          {
+            "key": "modified",
+            "value": "2026-10-23T10:22:18+02:00"
+          },
+          {
+            "key": "publisher_name",
+            "value": "Stadt Wuppertal, Ressort 102 Vermessung, Katasteramt und Geodaten"
+          },
+          {
+            "key": "publisher_url",
+            "value": "https://www.wuppertal.de/vv/oe/102.php"
+          }
+        ],
+        "resources": [
+          {
+            "id": "f2a24c83-fd94-4059-9235-0b9c7c89f954",
+            "name": "Trinkwasserbrunnen Wuppertal, WGS84 Länge/Breite, GeoJSON",
+            "description": "<div>Inhalt: Trinkwasserbrunnen Wuppertal<br />\nKoordinatensystem: WGS84/Geographische Länge und Breite (EPSG:4326)<br / [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/GEOJSON",
+            "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG4326_JSON.json",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": "application/json",
+            "modified": "2026-04-17T12:19:53+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "91034175-497c-4f6d-9d9d-d3c0026f9c88",
+            "name": "Trinkwasserbrunnen Wuppertal, ETRS89/UTM32, GeoJSON",
+            "description": "<div>Inhalt: Trinkwasserbrunnen Wuppertal<br />\nKoordinatensystem: ETRS89/UTM32 (EPSG:25832)<br />\nFormat (MIME-Type): G [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/GEOJSON",
+            "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG25832_JSON.json",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": "application/json",
+            "modified": "2025-04-29T09:22:56+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "0d3de0e7-3640-4c0a-ab3d-069d61f8252d",
+            "name": "Trinkwasserbrunnen Wuppertal, WGS84 Länge/Breite, KML",
+            "description": "<div>Inhalt: Trinkwasserbrunnen Wuppertal<br />\nKoordinatensystem: WGS84/Geographische Länge und Breite (EPSG:4326)<br / [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/KML",
+            "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG4326_KML.zip",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": "application/zip",
+            "modified": "2025-04-29T09:25:52+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "539d6bfc-6b57-4529-b3b3-3ba99de1859e",
+            "name": "Trinkwasserbrunnen Wuppertal, WGS84 Web Mercator, Shape",
+            "description": "<div>Inhalt: Trinkwasserbrunnen Wuppertal<br />\nKoordinatensystem: WGS84/Web Mercator (Auxiliary Sphere) (EPSG:3857)<br  [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/SHP",
+            "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG3857_SHAPE.zip",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": "application/zip",
+            "modified": "2025-04-29T09:32:03+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "e5e3d9ad-dcc6-4ee8-ae1b-d7e699e162e9",
+            "name": "Trinkwasserbrunnen Wuppertal, ETRS89/UTM32, Shape",
+            "description": "<div>Inhalt: Trinkwasserbrunnen Wuppertal<br />\nKoordinatensystem: ETRS89/UTM32 (EPSG:25832)<br />\nFormat (MIME-Type): E [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/SHP",
+            "url": "https://daten.wuppertal.de/Umwelt_Klima/Trinkwasserbrunnen_EPSG25832_SHAPE.zip",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": "application/zip",
+            "modified": "2025-04-29T09:36:13+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "e76ec8ff-eb3c-445a-b343-e42f1980ec0b",
+            "name": "Wuppertal ATOM Feed Trinkwasserbrunnen",
+            "description": "<div>Der ATOM Feed Downloadservice für Trinkwasserbrunnen in Wuppertal stellt einen Datensatz zum Download bereit, der ( [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/ATOM",
+            "url": "http://www.gis-rest.nrw.de/atomFeed/rest/atom/c0a79c52-f193-4443-b484-cb0fa29cfc9d",
+            "license": "http://dcat-ap.de/def/licenses/cc-by/4.0",
+            "licenseAttributionByText": "<p>Datenquelle: CC-BY-4.0 - Stadt Wuppertal - offenedaten-wuppertal.de</p>\n",
+            "size": null,
+            "mimetype": null,
+            "modified": "2026-10-23T10:22:18+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "7afeea01-0505-4204-96ab-04fefebdad0d",
+            "name": "DigiTal Zwilling: Trinkwasserbrunnenkarte Wuppertal",
+            "description": "<div>Inhalt: interaktive Karte der öffentlich zugänglichen Trinkwasserbrunnen in Wuppertal<br />\nTechnologie: DigiTal Zw [cut for the fixture]",
+            "format": "HTML",
+            "url": "https://digital-twin-wuppertal-live.github.io/generic-topicmap/#/Trinkbrunnenkarte_Wuppertal",
+            "license": "http://dcat-ap.de/def/licenses/other-opensource",
+            "size": null,
+            "mimetype": null,
+            "modified": "2025-04-29T09:55:29+02:00",
+            "last_modified": null
+          },
+          {
+            "id": "fc234bb1-0456-41f1-991c-8866d12c48c0",
+            "name": "Metadaten zum Datensatz Trinkwasserbrunnen Wuppertal, ISO 19115, XML",
+            "description": "<div>Vollständiger Metadatensatz</div>\n\n<div>Datensatz: Trinkwasserbrunnen Wuppertal<br />\nFormat: XML (Schema gemäß ISO [cut for the fixture]",
+            "format": "http://publications.europa.eu/resource/authority/file-type/XML",
+            "url": "https://registry.gdi-de.org/id/de.nw/WUP-GUID_53dd801e-f9e7-495c-981b-06018b597886",
+            "license": "http://dcat-ap.de/def/licenses/cc-zero",
+            "size": null,
+            "mimetype": null,
+            "modified": "2026-08-03T10:45:52+02:00",
+            "last_modified": null
+          }
+        ]
+      }
+    }
+  },
+  "tools": 5,
+  "calls": [
+    {
+      "name": "findDatasets",
+      "arguments": {
+        "query": "Trinkwasserbrunnen",
+        "limit": 3
+      },
+      "expect": {
+        "status": "ok",
+        "total": 27,
+        "datasets.0.publisher": "Stadt Dortmund",
+        "datasets.2.licences.0.label": "CC BY 4.0"
+      }
+    },
+    {
+      "name": "countDatasets",
+      "arguments": {
+        "query": "Radverkehr",
+        "facets": [
+          "format"
+        ],
+        "limit": 3
+      },
+      "expect": {
+        "status": "ok",
+        "facets.0.values.0.value": "CSV",
+        "facets.0.values.0.count": 84
+      }
+    },
+    {
+      "name": "listFiles",
+      "arguments": {
+        "query": "Trinkwasserbrunnen"
+      },
+      "expect": {
+        "status": "ok",
+        "datasets.0.files.0.kind": "generated"
+      }
+    },
+    {
+      "name": "getDataset",
+      "arguments": {
+        "id": "trinkwasserbrunnen-wuppertal02be6"
+      },
+      "expect": {
+        "status": "ok",
+        "dataset.licences.0.label": "CC BY 4.0"
+      }
+    },
+    {
+      "name": "listOrganizations",
+      "arguments": {
+        "name": "Statistisches"
+      },
+      "expect": {
+        "status": "ok",
+        "organizations.0.name": "statistisches-bundesamt"
+      }
+    },
+    {
+      "name": "findDatasets",
+      "arguments": {
+        "query": "x",
+        "limit": 500
+      },
+      "error": true
+    }
+  ]
+}

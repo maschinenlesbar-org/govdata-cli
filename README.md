@@ -41,6 +41,57 @@ Check it works:
 govdata --help
 ```
 
+### Docker
+
+From 0.9.0 every release is also a container image for linux/amd64 and linux/arm64 on the
+GitHub Container Registry, made from the same tarball as the npm package. It needs no Node.js and no
+install:
+
+```bash
+docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+  ghcr.io/maschinenlesbar-org/govdata-cli:latest search Haushalt --rows 5
+```
+
+The image's entrypoint is the program, so the command follows the image name directly;
+`… govdata-cli:latest govdata search Haushalt` works too.
+
+In a container with a memory limit (`--memory`) the default `--max-response-bytes` is an eighth
+of that limit (at most the usual 100 MiB), so an oversized answer is refused with a clear
+error instead of the container being killed for memory. A search with many rows of large
+datasets can be several megabytes; most answers are small.
+The CLI needs at least 12 processes and threads (`--pids-limit 12`): below that it refuses with
+an error, and with 4 or fewer Node.js itself hangs before the CLI can check.
+
+`latest` is the newest release. For scripts, name a release and pin its digest, which the
+[release notes](https://github.com/maschinenlesbar-org/govdata-cli/releases) give:
+`…/govdata-cli:0.9.0@sha256:<digest>`. Each image carries signed build provenance;
+check it with
+
+```bash
+gh attestation verify oci://ghcr.io/maschinenlesbar-org/govdata-cli:latest \
+  --repo maschinenlesbar-org/govdata-cli
+```
+
+### MCP server
+
+From 0.9.0 GovData is also an [MCP](https://modelcontextprotocol.io/) server for AI agents,
+`@maschinenlesbar.org/govdata-mcp` (command `govdata-mcp`, image
+`ghcr.io/maschinenlesbar-org/govdata-mcp`): five read-only tools, to find datasets with friendly
+filters (an organization by name, the publishing body, a theme, a file format in all its
+spellings) and the licences their files really carry, count the catalogue by organization,
+format, licence, theme or tag (sorted, a format's spellings folded), list the download links of
+matching datasets with each link's kind and licence, read one dataset's full record, and list the
+catalogue's organizations, on stdio or Streamable HTTP. Setup for Claude Code, Claude Desktop and
+VS Code: [MCP.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/MCP.md).
+
+```bash
+npm i -g @maschinenlesbar.org/govdata-mcp
+claude mcp add govdata -- govdata-mcp
+```
+
+The catalogue's metadata are DL-DE Zero 2.0; every result says so, and that each file carries its
+publisher's own licence.
+
 ## Quickstart
 
 No setup needed — the API is open and requires no key. Your first search:
@@ -275,6 +326,7 @@ keeping the last value.
   concept explained.
 - **[DEVELOPING.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/DEVELOPING.md)** — TypeScript library usage, architecture,
   testing, CI.
+- **[MCP.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/MCP.md)** — the MCP server: tools, setup, options.
 - **[SKILLS.md](https://github.com/maschinenlesbar-org/govdata-cli/blob/main/SKILLS.md)** — Claude Code Agent Skills bundled with this repo
   (dataset finder, catalogue stats, resource harvest), installable as a plugin.
 

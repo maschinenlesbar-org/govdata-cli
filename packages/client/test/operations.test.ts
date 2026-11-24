@@ -473,3 +473,8 @@ test("a blank raw filter is refused under the name the caller gave, filters, bef
   await assert.rejects(findDatasets(clientOf(mock), { query: "x", filters: ["tags:radverkehr", " "] }), /^GovDataValidationError: Invalid filters: /);
   assert.equal(mock.calls.length, 0);
 });
+
+test("a dataset's id from GovData's older page link too (…/suche/-/details/NAME, still in many documents)", () => {
+  assert.equal(datasetIdFrom("https://www.govdata.de/web/guest/suche/-/details/luftqualitat-und-larmbelastung"), "luftqualitat-und-larmbelastung");
+  assert.equal(datasetIdFrom("https://www.govdata.de/web/guest/suche/-/details/haushalt-2020?x=1#top"), "haushalt-2020");
+});

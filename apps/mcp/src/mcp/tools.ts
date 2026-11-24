@@ -204,7 +204,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       "licences are the files' (distinct); licence the dataset-level one, empty for most datasets: never report it as the licence when the files say otherwise. modified is when the catalogue record changed; sourceModified when the publisher says the data did. kind of each file as in listFiles: only file and generated can be fetched. An unknown name is status empty: take the name from a fresh findDatasets answer (titles are not names).",
       RULES,
     ].join("\n\n"),
-    inputSchema: input({ id: { type: "string", minLength: 1, maxLength: 300, description: "The dataset's name (slug, from findDatasets), its id, or the link to its page (…/dataset/NAME, …/suche/daten/NAME)." } }, ["id"]),
+    inputSchema: input({ id: { type: "string", minLength: 1, maxLength: 300, description: "The dataset's name (slug, from findDatasets), its id, or the link to its page (…/dataset/NAME, …/suche/daten/NAME, the older …/suche/-/details/NAME)." } }, ["id"]),
     outputSchema: output({ dataset: obj }),
     source: source("package_show"),
     async run(args, context) {

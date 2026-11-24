@@ -1074,10 +1074,13 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
 
 // ---- getDataset ------------------------------------------------------------------------------
 
-/** A dataset's slug or id from itself or a link to its page (…/dataset/NAME, …/suche/daten/NAME). */
+/**
+ * A dataset's slug or id from itself or a link to its page (…/dataset/NAME, …/suche/daten/NAME, and
+ * GovData's older …/suche/-/details/NAME).
+ */
 export function datasetIdFrom(value: string): string {
   const text = value.trim();
-  const link = /^https?:\/\/[^/]+\/(?:[^?#]*\/)?(?:dataset|daten)\/([^/?#]+)\/?(?:[?#].*)?$/i.exec(text);
+  const link = /^https?:\/\/[^/]+\/(?:[^?#]*\/)?(?:dataset|daten|details)\/([^/?#]+)\/?(?:[?#].*)?$/i.exec(text);
   if (link === null) return text;
   try {
     return decodeURIComponent(link[1] as string);

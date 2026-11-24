@@ -81,7 +81,8 @@ sum is an upper bound). The licence is read from each file, since the dataset-le
 for most datasets. An organization that fits several is reported with the candidates, never guessed;
 an unknown dataset or an empty search is said in words, with what to try. A text over 2000
 characters is cut and ends in `…[cut, N characters in all]`, and the answer says `truncated`. A
-failure is a tool error that says what to change.
+failure is a tool error that says what to change (one over 5000 characters loses its middle, never
+its end, where the reason is).
 
 ## Options
 

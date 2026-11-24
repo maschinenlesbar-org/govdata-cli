@@ -10,6 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
+import { DEADLINE_HINT, SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
 import { govdataApi, jsonResponse, makeMockTransport } from "./helpers.js";
 
@@ -166,4 +167,19 @@ test("listFiles: counts and notes say they cover every dataset scanned, also tho
   const notes = (content["notes"] as string[]).join(" | ");
   assert.match(notes, /Not every link in the 12 datasets scanned is a file/);
   assert.match(notes, /link\(s\) in the 12 datasets scanned carry someone's key/);
+});
+
+test("the deadline's and the size cap's advice fit every tool: each option they name comes with the tools that take it", async () => {
+  const schemas = new Map(TOOLS.map((tool) => [tool.name, Object.keys((tool.inputSchema as { properties: Record<string, unknown> }).properties)]));
+  for (const text of [DEADLINE_HINT, SIZE_HINT]) {
+    const pairs = [...text.matchAll(/(\w+) \((\w+(?:, \w+)*)\)/g)];
+    assert.ok(pairs.length >= 2, text);
+    for (const [, option, tools] of pairs) {
+      for (const tool of (tools as string).split(", ")) assert.ok(schemas.get(tool)?.includes(option as string), `${tool} takes no ${option}: ${text}`);
+    }
+    for (const option of ["limit", "facets", "format"]) {
+      assert.ok(!new RegExp(`\\b${option}\\b`).test(text) || pairs.some(([, named]) => named === option), `${option} named without its tools: ${text}`);
+    }
+  }
+  assert.match(SIZE_HINT, /getDataset/, "a dataset too large for getDataset: what to call instead");
 });

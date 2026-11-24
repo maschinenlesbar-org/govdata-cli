@@ -118,9 +118,10 @@ search is said in words, with what to try. A failure is a tool error that says w
 - **Results are data.** Text from the API is cleaned (control, bidi and zero-width characters
   removed), but it is still other people's text: a model can be told things in it. The server
   can't act on that (it has no tool that writes), but other tools in the same session could.
-- **Stops cleanly.** On `docker stop` (SIGTERM) or Ctrl-C the HTTP server takes no new
-  connection and lets calls in flight answer for up to 5 s, then exits 143 (130); a second signal
-  ends it at once. On stdio it ends at once, and when stdin ends.
+- **Stops cleanly.** On `docker stop` (SIGTERM) or Ctrl-C the HTTP server takes no new connection
+  and lets calls in flight answer for up to 5 s, then exits 143 (130); a second signal ends it at
+  once. On stdio a signal ends it at once; when stdin ends, it first answers the requests it has
+  read (each within its call deadline), then exits.
 - **In a container** it needs at least 12 processes and threads (`--pids-limit`) and about
   256 MB of memory. The answers it reads are small (a search reads at most 50 datasets; a
   facet count reads no datasets).

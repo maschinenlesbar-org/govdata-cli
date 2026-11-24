@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GovDataClient } from "../src/client.js";
-import { GovDataValidationError } from "../src/errors.js";
+import { GovDataApiError, GovDataValidationError } from "../src/errors.js";
 import {
   countDatasets,
   datasetIdFrom,
@@ -27,7 +27,7 @@ import {
 } from "../src/operations.js";
 import type { HttpRequest } from "../src/http.js";
 import { govdataApi } from "./govdata.js";
-import { jsonResponse, makeMockTransport } from "./helpers.js";
+import { jsonResponse, makeMockTransport, rawResponse } from "./helpers.js";
 
 const clientOf = (mock: ReturnType<typeof govdataApi>) => new GovDataClient({ transport: mock.transport, maxRetries: 0 });
 const params = (request: HttpRequest | undefined) => new URL(request?.url ?? "http://x/").searchParams;
@@ -400,4 +400,15 @@ test("countDatasets: a value folded from many spellings lists ten of them and co
   const csv = answer.facets[0]?.values[0];
   assert.deepEqual([csv?.value, csv?.count, csv?.upperBound, csv?.variants?.length, csv?.moreVariants], ["CSV", 4500, true, 10, 1490]);
   assert.ok(JSON.stringify(answer).length < 5000);
+});
+
+// ---- upstream failures -----------------------------------------------------------------------
+
+test("getDataset: only CKAN's own \"Not Found Error\" means no such dataset; another 404 (a proxy's page, a wrong base path) is an error", async () => {
+  const html = new GovDataClient({ transport: makeMockTransport(() => rawResponse("<html>Seite nicht gefunden</html>", "text/html", 404)).transport, maxRetries: 0 });
+  await assert.rejects(getDataset(html, { id: "luftqualitat" }), (err: unknown) => err instanceof GovDataApiError && err.status === 404);
+  const foreign = new GovDataClient({ transport: makeMockTransport(() => jsonResponse({ detail: "Not Found" }, 404)).transport, maxRetries: 0 });
+  await assert.rejects(getDataset(foreign, { id: "luftqualitat" }), GovDataApiError);
+  const ckan = await getDataset(clientOf(govdataApi()), { id: "luftqualitat" });
+  assert.equal(ckan.status, "empty", "CKAN's envelope with HTTP 404");
 });

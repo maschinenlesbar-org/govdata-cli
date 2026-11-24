@@ -1071,9 +1071,13 @@ export interface GetDatasetAnswer extends Omit<AnswerBase, "ambiguous"> {
   dataset?: DatasetRecord;
 }
 
-/** Whether CKAN answered "no such dataset" (HTTP 404, or `Not Found Error` with HTTP 200). */
+/**
+ * Whether CKAN answered "no such dataset": its `Not Found Error` envelope, with HTTP 404 or 200.
+ * Another 404 (a proxy's or outage page, a base URL with the API path twice) is not an answer about
+ * the dataset, and stays an error.
+ */
 function isNotFound(err: unknown): boolean {
-  return (err instanceof GovDataApiError && err.status === 404) || (err instanceof GovDataActionError && err.errorType === "Not Found Error");
+  return (err instanceof GovDataApiError && err.status === 404 && err.detail?.startsWith("Not Found Error:") === true) || (err instanceof GovDataActionError && err.errorType === "Not Found Error");
 }
 
 /**

@@ -1058,9 +1058,9 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
   }
   const odd = (["template", "broken", "page", "api"] as const).filter((kind) => (kinds.get(kind) ?? 0) > 0);
   if (odd.length > 0) {
-    answer.notes.push(`Not every link is a file: ${odd.map((kind) => `${kinds.get(kind)} ${kind}`).join(", ")}. Only kind file and generated can be fetched; name the others as what they are.`);
+    answer.notes.push(`Not every link in the ${scanned.length} datasets scanned is a file: ${odd.map((kind) => `${kinds.get(kind)} ${kind}`).join(", ")}. Only kind file and generated can be fetched; name the others as what they are.`);
   }
-  if (keys > 0) answer.notes.push(`${keys} link(s) carry someone's key or token in the query, as the publisher published them (keyInLink).`);
+  if (keys > 0) answer.notes.push(`${keys} link(s) in the ${scanned.length} datasets scanned carry someone's key or token in the query, as the publisher published them (keyInLink).`);
   if (skipped.datasetsWithoutFiles > 0 && counts.files > 0) answer.notes.push(`${skipped.datasetsWithoutFiles} of the datasets scanned have no file to list here (files []): ${filters.format === undefined ? "" : `none in ${filters.format}, `}${params.includeServices === true ? "" : "only services, "}or links without a URL or repeated.`);
   if (counts.files > 0) answer.notes.push("Full-text search matches loosely: check each dataset's title before harvesting it, and drop the off-topic ones, saying which.");
   return trace.done(answer);

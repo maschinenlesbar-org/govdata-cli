@@ -73,7 +73,7 @@ test("listFiles: each link's kind, services left out and counted, links without 
   assert.ok(files.some((f) => f.kind === "template"));
   assert.ok(files.some((f) => f.kind === "broken"));
   assert.deepEqual((content["skipped"] as { noUrl: number }).noUrl, 2);
-  assert.match((content["notes"] as string[]).join(" "), /Not every link is a file/);
+  assert.match((content["notes"] as string[]).join(" "), /Not every link in the 12 datasets scanned is a file/);
   const trink = (await connection.call("listFiles", { query: "Trinkwasserbrunnen" })).structuredContent ?? {};
   assert.ok((trink["skipped"] as { services: number }).services >= 3);
   await connection.close();
@@ -155,4 +155,15 @@ test("listFiles: under the size cap, nextOffset starts after the last dataset sh
   await connection.close();
   assert.deepEqual(shown, [...new Set(shown)], "no dataset comes back on the next page");
   assert.ok(shown.length >= 4);
+});
+
+test("listFiles: counts and notes say they cover every dataset scanned, also those a size cut leaves out for the next page", async () => {
+  const description = listTools().find((t) => t.name === "listFiles")?.description ?? "";
+  assert.match(description, /counts, skipped and the notes cover every dataset scanned.*truncated.*again/s);
+  const connection = await connect({ transport: govdataApi() });
+  const content = (await connection.call("listFiles", { query: "Fahrradzählstellen", limit: 12 })).structuredContent ?? {};
+  await connection.close();
+  const notes = (content["notes"] as string[]).join(" | ");
+  assert.match(notes, /Not every link in the 12 datasets scanned is a file/);
+  assert.match(notes, /link\(s\) in the 12 datasets scanned carry someone's key/);
 });

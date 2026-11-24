@@ -73,8 +73,9 @@ For scripts and shared configs, pin a release and its digest from the
 | `listOrganizations` | The catalogue's organizations (Länder portals and federal bodies) with their slugs and dataset counts; by name, those that contain it. |
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
-`source` it came from and the data licence. Counts come from the catalogue's total, never from
-paging. GovData stores one format under two spellings (CSV and an EU vocabulary URI): a format
+`source` it came from (an answer a redirect fetched from another host says so there: "…
+(answered by https://other.example after a redirect)", and a WARN record names both) and the data
+licence. Counts come from the catalogue's total, never from paging. GovData stores one format under two spellings (CSV and an EU vocabulary URI): a format
 filter matches both, a count folds them (and says when the sum is an upper bound). The licence is
 read from each file, since the dataset-level field is empty for most datasets. An organization
 that fits several is reported with the candidates, never guessed; an unknown dataset or an empty

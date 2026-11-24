@@ -82,9 +82,10 @@ since the dataset-level field is empty for most datasets. An organization that f
 reported with the candidates, never guessed; an unknown dataset or an empty search is said in words,
 with what to try. A text over 2000 characters is cut and ends in `…[cut, N characters in all]`, and
 the answer says `truncated`. An answer over `--max-result-chars` loses entries from the end of its
-lists, then has its longest texts cut further (each with that mark), and says `truncated`; one that
-can't be cut down so far is a tool error that says to ask for less. A failure is a tool error that
-says what to change (one over 5000 characters loses its middle, never its end, where the reason is).
+lists (a page keeps its first entry, so `nextOffset` always moves on), then has its longest texts
+cut further (each with that mark), and says `truncated`; one that can't be cut down so far is a tool
+error that says to ask for less. A failure is a tool error that says what to change (one over 5000
+characters loses its middle, never its end, where the reason is).
 
 ## Options
 

@@ -595,7 +595,19 @@ async function filterQueriesOf(
     fq.push(...filters.filters);
   }
   const notes: string[] = [];
-  if (checked.format !== undefined) fq.push(await formatFilterIn(client, trace, filters.query?.trim(), [...fq], checked.format, notes));
+  if (checked.format !== undefined) {
+    const filter = await formatFilterIn(client, trace, filters.query?.trim(), [...fq], checked.format, notes);
+    if (typeof filter !== "string") {
+      return {
+        answer: {
+          status: "empty",
+          searched,
+          reason: `None of the ${filter.others} datasets matching the other filters has a file in ${checked.format} (in any spelling): countDatasets with facets ["format"] and the same filters lists the formats they have.`,
+        },
+      };
+    }
+    fq.push(filter);
+  }
   return { fq, searched, notes, ...(checked.format === undefined ? {} : { format: checked.format }) };
 }
 
@@ -607,14 +619,16 @@ export const MAX_FORMAT_SPELLINGS = 25;
  * other filters really have (one format-facet request, read whole): every raw value countDatasets
  * folds into the format, whatever its spelling (ArcGIS Hub's URI per portal, the IANA media type,
  * the lower-case EU URI, a trailing space). The MAX_FORMAT_SPELLINGS most used are named, and a
- * note says what the rest leave out. With none there, the static spellings (`formatFilter`).
+ * note says what the rest leave out. When datasets match the other filters but none has the format,
+ * how many match them (`others`), for an answer that says so; when none match, the usual spellings
+ * (`formatFilter`), and the search says nothing matches.
  */
-async function formatFilterIn(client: GovDataClient, trace: Trace, q: string | undefined, fq: string[], format: string, notes: string[]): Promise<string> {
+async function formatFilterIn(client: GovDataClient, trace: Trace, q: string | undefined, fq: string[], format: string, notes: string[]): Promise<string | { others: number }> {
   const result = await trace.search(client, { q, fq, rows: 0, facet_field: [FACETS.format], facet_limit: -1 });
   const spellings = facetItems(result, FACETS.format, trace)
     .filter((item) => formatOf(item.name) === format)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  if (spellings.length === 0) return formatFilter(format);
+  if (spellings.length === 0) return result.count > 0 ? { others: result.count } : formatFilter(format);
   const named = spellings.slice(0, MAX_FORMAT_SPELLINGS);
   if (spellings.length > named.length) {
     const left = spellings.slice(named.length).reduce((sum, item) => sum + item.count, 0);

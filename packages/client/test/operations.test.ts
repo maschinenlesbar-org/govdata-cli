@@ -555,3 +555,18 @@ test("a format under more spellings than a filter names: the most used are named
   assert.equal(answer.total, 25);
   assert.ok(answer.notes.some((n) => n.includes("30 spellings") && n.includes("up to 5 datasets")), answer.notes.join(" | "));
 });
+
+test("a format the matching datasets don't have is said as such, not \"try fewer words\"", async () => {
+  const { mock, client } = catalogue([{ name: "a", resources: [{ format: "CSV", url: "https://x.example/a.csv" }] }]);
+  for (const operation of [findDatasets, countDatasets, listFiles] as const) {
+    const before = mock.calls.length;
+    const answer = await operation(client, { query: "x", format: "XYZ" });
+    assert.equal(answer.status, "empty");
+    assert.equal(answer.total, 0);
+    assert.match(answer.reason ?? "", /^None of the 1 datasets matching the other filters has a file in XYZ.*countDatasets with facets \["format"\]/);
+    assert.doesNotMatch(answer.reason ?? "", /fewer or broader words/);
+    assert.equal(mock.calls.length, before + 1, "only the format's spellings were read");
+  }
+  const none = await findDatasets(catalogue([]).client, { query: "x", format: "CSV" });
+  assert.match(none.reason ?? "", /^No dataset matches/, "nothing matching the other filters either: the usual answer");
+});

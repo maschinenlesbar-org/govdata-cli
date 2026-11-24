@@ -393,3 +393,11 @@ test("countDatasets: the licence note counts every dataset with a licence, not o
   assert.equal(answer.facets[0]?.values.length, 1);
   assert.ok(answer.notes.some((n) => n.includes("only 2200 of 5000 datasets carry")), answer.notes.join(" | "));
 });
+
+test("countDatasets: a value folded from many spellings lists ten of them and counts the rest", async () => {
+  const hubs = Array.from({ length: 1500 }, (_, i): [string, number] => [`https://hub-${i}.opendata.arcgis.com/api/feed/dcat-ap/ftype/CSV`, 3]);
+  const answer = await countDatasets(facetsClient(5000, { res_format: items([...hubs, ["application/x-foo", 7]]) }), { facets: ["format"], limit: 5 });
+  const csv = answer.facets[0]?.values[0];
+  assert.deepEqual([csv?.value, csv?.count, csv?.upperBound, csv?.variants?.length, csv?.moreVariants], ["CSV", 4500, true, 10, 1490]);
+  assert.ok(JSON.stringify(answer).length < 5000);
+});

@@ -693,6 +693,8 @@ export type FacetName = keyof typeof FACETS;
 const FOLDED: ReadonlySet<FacetName> = new Set(["format", "licence"]);
 
 export const DEFAULT_FACET_VALUES = 10;
+/** The most raw spellings a folded value lists (one ArcGIS hub URI per portal adds up). */
+export const MAX_VARIANTS = 10;
 export const MAX_FACET_VALUES = 100;
 
 export interface CountDatasetsParams extends DatasetFilters {
@@ -708,8 +710,10 @@ export interface FacetValue {
   label?: string;
   /** Datasets, not files: a dataset with ten CSV files counts once for CSV. */
   count: number;
-  /** The raw values folded into this one. */
+  /** The raw values folded into this one (the MAX_VARIANTS largest). */
   variants?: string[];
+  /** How many more raw values were folded into this one than `variants` lists. */
+  moreVariants?: number;
   /** The count is a sum over several spellings: a dataset with two of them counts twice. */
   upperBound?: boolean;
 }
@@ -774,7 +778,7 @@ function countsOf(facet: FacetName, items: FacetItem[], limit: number): FacetCou
         : (licenceOf(item.name)?.label ?? (item.label ?? item.name).replace(/\s*\(ältere DCAT-AP\.de Version\)\s*$/, ""));
     if (key === undefined) {
       other.count += item.count;
-      if (other.variants.length < 10) other.variants.push(item.name);
+      if (other.variants.length < MAX_VARIANTS) other.variants.push(item.name);
       continue;
     }
     const group = groups.get(key) ?? { value: key, count: 0, variants: [] };
@@ -787,7 +791,8 @@ function countsOf(facet: FacetName, items: FacetItem[], limit: number): FacetCou
       const variants = group.variants ?? [];
       const value: FacetValue = { value: group.value, count: group.count };
       if (variants.length > 1) {
-        value.variants = variants;
+        value.variants = variants.slice(0, MAX_VARIANTS);
+        if (variants.length > MAX_VARIANTS) value.moreVariants = variants.length - MAX_VARIANTS;
         value.upperBound = true;
       } else if (variants[0] !== group.value) {
         value.variants = variants;

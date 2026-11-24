@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { formatFilter } from "@maschinenlesbar.org/govdata-client";
 import { listTools } from "../src/mcp/server.js";
 import { connect } from "./harness.js";
-import { govdataApi } from "./helpers.js";
+import { govdataApi, jsonResponse, makeMockTransport } from "./helpers.js";
 
 const API = "https://ckan.govdata.de/api/3/action";
 
@@ -103,4 +103,17 @@ test("listOrganizations: slugs with dataset counts; a city is not one, and the a
   assert.equal(city["status"], "empty");
   assert.match(String(city["reason"]), /publisherName/);
   await connection.close();
+});
+
+test("countDatasets: a format with 1500 spellings still fits the size cap, with every facet asked for", async () => {
+  const hubs = Array.from({ length: 1500 }, (_, i) => ({ name: `https://hub-${i}.opendata.arcgis.com/api/feed/dcat-ap/ftype/CSV`, display_name: "CSV", count: 3 }));
+  const transport = makeMockTransport(() =>
+    jsonResponse({ help: "", success: true, result: { count: 5000, results: [], search_facets: { res_format: { items: hubs }, tags: { items: [{ name: "radverkehr", display_name: "radverkehr", count: 9 }] } } } }),
+  );
+  const connection = await connect({ transport });
+  const result = await connection.call("countDatasets", { facets: ["format", "tag"], limit: 5 });
+  await connection.close();
+  const facets = (result.structuredContent?.["facets"] ?? []) as { facet: string; values: { value: string; count: number; moreVariants?: number }[] }[];
+  assert.deepEqual(facets.map((f) => [f.facet, f.values[0]?.value, f.values[0]?.count]), [["format", "CSV", 4500], ["tag", "radverkehr", 9]], result.content[0]?.text);
+  assert.equal(facets[0]?.values[0]?.moreVariants, 1490);
 });

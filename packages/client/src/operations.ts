@@ -501,6 +501,8 @@ function checkFilters(filters: DatasetFilters): { format?: string; theme?: Theme
   for (const [name, value] of [["query", filters.query], ["organization", filters.organization], ["publisherName", filters.publisherName]] as const) {
     if (value !== undefined && value.trim() === "") throw new GovDataValidationError(`Invalid ${name}: expected a non-empty value.`);
   }
+  // Checked here too, not only by the client (which names its own parameter, fq).
+  if (filters.filters?.some((f) => typeof f !== "string" || f.trim() === "")) throw new GovDataValidationError("Invalid filters: expected non-empty Solr filter queries, got a blank one.");
   return checked;
 }
 

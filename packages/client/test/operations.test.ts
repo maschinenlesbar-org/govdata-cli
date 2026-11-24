@@ -467,3 +467,9 @@ test("\"online\" in the format field names no format: counted in other, refused 
   for (const value of ["ONLINE", "onLine", "online"]) assert.equal(formatOf(value), undefined, value);
   await assert.rejects(findDatasets(clientOf(govdataApi()), { format: "ONLINE" }), GovDataValidationError);
 });
+
+test("a blank raw filter is refused under the name the caller gave, filters, before any request", async () => {
+  const mock = govdataApi();
+  await assert.rejects(findDatasets(clientOf(mock), { query: "x", filters: ["tags:radverkehr", " "] }), /^GovDataValidationError: Invalid filters: /);
+  assert.equal(mock.calls.length, 0);
+});

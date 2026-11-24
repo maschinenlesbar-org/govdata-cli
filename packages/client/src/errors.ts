@@ -401,6 +401,8 @@ export class GovDataParseError extends GovDataError {}
 /**
  * An input the library refuses before sending any request: a client option or a
  * method parameter that breaks one of the rules in `validate.ts`. The message is
- * `Invalid <name>: <reason>`. The CLI reports it as a usage error.
+ * `Invalid <name>: <reason>`. The CLI reports it as a usage error. The use cases (operations.ts)
+ * also throw it for a query or filter that GovData's search could not parse (CKAN's "Search Error",
+ * HTTP 409), saying what to change, with the API's error as its `cause`.
  */
 export class GovDataValidationError extends GovDataError {}

@@ -20,6 +20,7 @@
 // request an answer made is kept (`requestsOf(answer)`), as the client sends it, for its source.
 
 import { actionRequest, packageSearchQuery, type GovDataClient } from "./client.js";
+import { sanitizeServerText } from "./engine.js";
 import { GovDataActionError, GovDataApiError, GovDataParseError, GovDataValidationError } from "./errors.js";
 import type { JsonObject, JsonValue, PackageSearchParams, PackageSearchResult } from "./types.js";
 
@@ -45,7 +46,12 @@ class Trace {
   async search(client: GovDataClient, params: PackageSearchParams): Promise<PackageSearchResult> {
     const request = actionRequest("package_search", packageSearchQuery(params));
     this.requests.push(request);
-    const result = await client.packageSearch(params);
+    let result: PackageSearchResult;
+    try {
+      result = await client.packageSearch(params);
+    } catch (err) {
+      throw searchError(err) ?? err;
+    }
     this.asked.set(result, request);
     return result;
   }
@@ -59,6 +65,33 @@ class Trace {
     REQUESTS.set(answer, [...this.requests]);
     return answer;
   }
+}
+
+/**
+ * CKAN's "Search Error" (HTTP 409: Solr could not parse the query or a filter) as an error that says
+ * what to change, with Solr's own reason when CKAN's message carries one; else undefined. CKAN's
+ * message is mostly its dump of the Solr parameters, which cut the reason off.
+ */
+function searchError(err: unknown): GovDataValidationError | undefined {
+  const text = err instanceof GovDataApiError && err.status === 409 ? err.detail : err instanceof GovDataActionError && err.errorType === "Search Error" ? err.message : undefined;
+  if (text === undefined || !/Search Error/i.test(text)) return undefined;
+  // The error's message is cut; the whole of CKAN's message is in the body it keeps.
+  let whole = text;
+  if (err instanceof GovDataApiError) {
+    try {
+      const message: unknown = (JSON.parse(err.body) as { error?: { message?: unknown } } | null)?.error?.message;
+      if (typeof message === "string") whole = message;
+    } catch {
+      // Not JSON: the message is all there is.
+    }
+  }
+  const found = /\bReason: (?:[\w.]*SyntaxError: )?([^\]]{1,300})/.exec(whole.slice(0, 65_536))?.[1];
+  const reason = found === undefined ? undefined : sanitizeServerText(found);
+  return new GovDataValidationError(
+    `Invalid query or filters: GovData's search (Solr) could not parse them${reason === undefined ? "" : `: ${reason}`} ` +
+      "Check the Solr syntax: close every parenthesis and quote, put a phrase in double quotes, escape a special character (+ - ! ( ) { } [ ] ^ \" ~ * ? : \\ /) with a backslash, or search with plain words.",
+    { cause: err },
+  );
 }
 
 // ---- reading CKAN's JSON ---------------------------------------------------------------------

@@ -478,3 +478,16 @@ test("a dataset's id from GovData's older page link too (…/suche/-/details/NAM
   assert.equal(datasetIdFrom("https://www.govdata.de/web/guest/suche/-/details/luftqualitat-und-larmbelastung"), "luftqualitat-und-larmbelastung");
   assert.equal(datasetIdFrom("https://www.govdata.de/web/guest/suche/-/details/haushalt-2020?x=1#top"), "haushalt-2020");
 });
+
+test("a query Solr can't parse is an error that says so and what to change, with Solr's reason, not CKAN's parameter dump", async () => {
+  const dump = `{'q': 'title:(', 'rows': 2, 'fq': ['+capacity:public -dataset_type:harvest ${"x".repeat(400)}']}`;
+  const message = `Search error: 'SOLR returned an error running query: ${dump} Error: SolrError('Solr responded with an error (HTTP 400): [Reason: org.apache.solr.search.SyntaxError: Cannot parse 'title:(': Encountered "<EOF>" at line 1, column 7.]')'`;
+  const client = new GovDataClient({ transport: makeMockTransport(() => jsonResponse({ help: "", success: false, error: { __type: "Search Error", message } }, 409)).transport, maxRetries: 0 });
+  await assert.rejects(findDatasets(client, { query: "title:(" }), (err: unknown) => {
+    assert.ok(err instanceof GovDataValidationError, String(err));
+    assert.match(err.message, /^Invalid query or filters: GovData's search \(Solr\) could not parse them: Cannot parse 'title:\(': Encountered "<EOF>" at line 1, column 7\. .*parenthesis.*double quotes/);
+    assert.doesNotMatch(err.message, /capacity:public/);
+    assert.ok(err.cause instanceof GovDataApiError);
+    return true;
+  });
+});

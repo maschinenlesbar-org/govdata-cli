@@ -117,3 +117,42 @@ test("countDatasets: a format with 1500 spellings still fits the size cap, with 
   assert.deepEqual(facets.map((f) => [f.facet, f.values[0]?.value, f.values[0]?.count]), [["format", "CSV", 4500], ["tag", "radverkehr", 9]], result.content[0]?.text);
   assert.equal(facets[0]?.values[0]?.moreVariants, 1490);
 });
+
+/**
+ * A mock package_search over `datasets`: every query and filter matches them all (as a format filter
+ * can match a dataset whose files listFiles then leaves out: a service, another spelling), paged by
+ * start and rows; the format facet counted from them.
+ */
+function searchOver(datasets: { name: string; resources: { format: string; url: string }[] }[]) {
+  return makeMockTransport((request) => {
+    const url = new URL(request.url);
+    const start = Number(url.searchParams.get("start") ?? "0");
+    const rows = Number(url.searchParams.get("rows") ?? "10");
+    const matching = datasets;
+    const formats = new Map<string, number>();
+    for (const d of matching) for (const format of new Set(d.resources.map((r) => r.format))) formats.set(format, (formats.get(format) ?? 0) + 1);
+    const items = [...formats].map(([name, count]) => ({ name, display_name: name, count }));
+    return jsonResponse({ help: "", success: true, result: { count: matching.length, results: matching.slice(start, start + rows).map((d) => ({ ...d, num_resources: d.resources.length })), search_facets: { res_format: { items } } } });
+  });
+}
+
+test("listFiles: under the size cap, nextOffset starts after the last dataset shown, also when datasets without a matching file lie between", async () => {
+  const datasets = Array.from({ length: 30 }, (_, i) => ({
+    name: `d${i}`,
+    resources: i % 2 === 0 ? [{ format: "PDF", url: `https://x.example/${i}.pdf` }] : Array.from({ length: 6 }, (_, j) => ({ format: "CSV", url: `https://x.example/${i}/${"lang".repeat(40)}-${j}.csv` })),
+  }));
+  const connection = await connect({ transport: searchOver(datasets), config: { maxResultChars: 4000 } });
+  const shown: string[] = [];
+  let offset = 0;
+  for (let call = 0; call < 4; call++) {
+    const content = (await connection.call("listFiles", { query: "x", format: "CSV", limit: 10, offset })).structuredContent ?? {};
+    const names = (content["datasets"] as { name: string; files: unknown[] }[]).filter((d) => d.files.length > 0).map((d) => d.name);
+    shown.push(...names);
+    assert.equal(typeof content["nextOffset"], "number", JSON.stringify(content).slice(0, 300));
+    assert.ok((content["nextOffset"] as number) > offset);
+    offset = content["nextOffset"] as number;
+  }
+  await connection.close();
+  assert.deepEqual(shown, [...new Set(shown)], "no dataset comes back on the next page");
+  assert.ok(shown.length >= 4);
+});

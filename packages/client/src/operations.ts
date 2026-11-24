@@ -924,6 +924,7 @@ export interface FileEntry {
   keyInLink?: true;
 }
 
+/** One dataset scanned: its files to list; `files` [] (and the name alone) when it has none here. */
 export interface DatasetFiles {
   name: string;
   title?: string;
@@ -938,6 +939,7 @@ export interface ListFilesAnswer extends AnswerBase {
   offset: number;
   /** Datasets read for this page. */
   datasetsScanned: number;
+  /** Every dataset scanned, in the page's order (paging is over datasets): `files` [] for one without a file to list. */
   datasets: DatasetFiles[];
   counts: { files: number; fetchable: number; knownBytes: number; sizeUnknown: number };
   skipped: { noUrl: number; services: number; otherFormat: number; duplicates: number; datasetsWithoutFiles: number };
@@ -1025,11 +1027,15 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
       kinds.set(file.kind, (kinds.get(file.kind) ?? 0) + 1);
       if (file.keyInLink === true) keys++;
     }
+    const name = textOf(dataset["name"]) ?? textOf(dataset["id"]) ?? "";
+    // Every dataset scanned has its entry, in the page's order, so a page cut short at its n-th
+    // entry goes on at offset + n; one without a file to list is its name alone.
     if (files.length === 0) {
       skipped.datasetsWithoutFiles++;
+      datasets.push({ name, files });
       continue;
     }
-    const entry: DatasetFiles = { name: textOf(dataset["name"]) ?? textOf(dataset["id"]) ?? "", files };
+    const entry: DatasetFiles = { name, files };
     const title = textOf(dataset["title"]);
     if (title !== undefined) entry.title = title;
     const organization = isObject(dataset["organization"]) ? textOf(dataset["organization"]["title"]) : undefined;
@@ -1046,7 +1052,7 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
   } else if (scanned.length === 0) {
     answer.status = "empty";
     answer.reason = `The page at offset ${offset} is past the end: ${result.count} datasets match.`;
-  } else if (datasets.length === 0) {
+  } else if (counts.files === 0) {
     answer.status = "empty";
     answer.reason = `None of the ${scanned.length} datasets scanned has a file${filters.format === undefined ? "" : ` in ${filters.format}`}${params.includeServices === true ? "" : " (services left out)"}${answer.nextOffset === undefined ? "" : "; the next page may"}.`;
   }
@@ -1055,7 +1061,8 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
     answer.notes.push(`Not every link is a file: ${odd.map((kind) => `${kinds.get(kind)} ${kind}`).join(", ")}. Only kind file and generated can be fetched; name the others as what they are.`);
   }
   if (keys > 0) answer.notes.push(`${keys} link(s) carry someone's key or token in the query, as the publisher published them (keyInLink).`);
-  if (datasets.length > 0) answer.notes.push("Full-text search matches loosely: check each dataset's title before harvesting it, and drop the off-topic ones, saying which.");
+  if (skipped.datasetsWithoutFiles > 0 && counts.files > 0) answer.notes.push(`${skipped.datasetsWithoutFiles} of the datasets scanned have no file to list here (files []): ${filters.format === undefined ? "" : `none in ${filters.format}, `}${params.includeServices === true ? "" : "only services, "}or links without a URL or repeated.`);
+  if (counts.files > 0) answer.notes.push("Full-text search matches loosely: check each dataset's title before harvesting it, and drop the off-topic ones, saying which.");
   return trace.done(answer);
 }
 

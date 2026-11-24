@@ -449,3 +449,16 @@ test("findDatasets and listFiles never give a nextOffset past MAX_OFFSET: the la
     assert.equal(before.nextOffset, 99_950);
   }
 });
+
+test("a link that is not an absolute http(s) URL is kind invalid, never fetchable: another scheme, a relative path, a line break or control inside", async () => {
+  for (const url of ["javascript:alert(document.cookie)", "data:text/html;base64,PHNjcmlwdD4=", "file:///etc/passwd", "ftp://ftp.example.org/data.csv", "/relative/path/file.csv", "https://x.example/data.csv\n.exe", "https://x.example/a\u0007.csv", "HTTPS:/x.example/a.csv"]) {
+    assert.equal(linkKind(url, "CSV"), "invalid", url);
+  }
+  assert.equal(linkKind("HTTPS://x.example/a.csv", "CSV"), "file");
+  assert.equal(linkKind("https://x.example/Daten 2020.csv", "CSV"), "file", "a space is left to the fetcher");
+  const answer = await getDataset(showing({ name: "d", resources: [{ url: "javascript:alert(1)", format: "HTML" }, { url: "ftp://ftp.example.org/data.csv", format: "CSV" }] }), { id: "d" });
+  assert.deepEqual(answer.dataset?.files.map((f) => f.kind), ["invalid", "invalid"]);
+  const files = await listFiles(new GovDataClient({ transport: makeMockTransport(() => jsonResponse({ help: "", success: true, result: { count: 1, results: [{ name: "d", resources: [{ url: "/relative/file.csv", format: "CSV" }, { url: "https://x.example/a.csv", format: "CSV" }] }], search_facets: {} } })).transport, maxRetries: 0 }), { query: "x" });
+  assert.deepEqual([files.counts.files, files.counts.fetchable], [2, 1]);
+  assert.ok(files.notes.some((n) => n.includes("1 invalid")), files.notes.join(" | "));
+});

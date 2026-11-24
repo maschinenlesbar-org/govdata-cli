@@ -68,7 +68,7 @@ For scripts and shared configs, pin a release and its digest from the
 |---|---|
 | `findDatasets` | Datasets for a topic and filters (organization by name, publisher, theme, file format, only with files), a page at a time: name, title, organization, publisher, dates, number of files, formats and the licences the files carry. |
 | `countDatasets` | How many datasets match, and their distribution by organization, file format, licence, theme or tag: sorted, a format's spellings and a licence's variants folded into one value. |
-| `listFiles` | The files of the matching datasets as a download manifest, grouped by dataset: each link with its kind (file, generated on request, service, landing page, template, broken), format, size, its own licence and attribution text. |
+| `listFiles` | The files of the matching datasets as a download manifest, grouped by dataset: each link with its kind (file, generated on request, service, landing page, template, broken, invalid: no http or https link), format, size, its own licence and attribution text. |
 | `getDataset` | One dataset by its name, id or page link: description, publisher and contact, themes, tags, dates, where it was harvested from, every file with its licence. |
 | `listOrganizations` | The catalogue's organizations (Länder portals and federal bodies) with their slugs and dataset counts; by name, those that contain it. |
 

@@ -358,9 +358,11 @@ function distinctLicences(values: unknown[]): Licence[] {
  * What a resource's link is: `file` (a file name at the end), `generated` (a file built on request:
  * an export or download endpoint, a WFS GetFeature), `service` (a map or feature service, an OGC
  * API, a feed: not a file), `page` (a landing page), `api` (another API call), `template` (a
- * placeholder such as {yyyymm} or _yyyy. to fill in), `broken` (cut off by the harvester).
+ * placeholder such as {yyyymm} or _yyyy. to fill in), `broken` (cut off by the harvester),
+ * `invalid` (not an absolute http or https URL: another scheme such as ftp:, file:, javascript: or
+ * data:, a relative path, or a line break or another control character inside).
  */
-export type LinkKind = "file" | "generated" | "service" | "page" | "api" | "template" | "broken";
+export type LinkKind = "file" | "generated" | "service" | "page" | "api" | "template" | "broken" | "invalid";
 
 /** The link with a percent-encoded query (`%3f`, as harvested) read as a query. */
 function decodedLink(url: string): string {
@@ -387,6 +389,8 @@ export function hasKeyInLink(url: string): boolean {
 
 /** The kind of a resource's link (see LinkKind), from the link and its format. */
 export function linkKind(url: string, format: string | undefined): LinkKind {
+  // A space is left to the fetcher (most encode it), a line break or another control is not.
+  if (!/^https?:\/\/[^/\\]/i.test(url) || /[\x00-\x1f\x7f-\x9f\u2028\u2029]/.test(url)) return "invalid";
   const link = decodedLink(url);
   const [path = "", query = ""] = link.split(/\?/, 2);
   // A "{" with a "}" after it, found with indexOf: the regular expression `/\{[^}]*\}/` rescanned
@@ -1056,7 +1060,7 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
     answer.status = "empty";
     answer.reason = `None of the ${scanned.length} datasets scanned has a file${filters.format === undefined ? "" : ` in ${filters.format}`}${params.includeServices === true ? "" : " (services left out)"}${answer.nextOffset === undefined ? "" : "; the next page may"}.`;
   }
-  const odd = (["template", "broken", "page", "api"] as const).filter((kind) => (kinds.get(kind) ?? 0) > 0);
+  const odd = (["template", "broken", "invalid", "page", "api"] as const).filter((kind) => (kinds.get(kind) ?? 0) > 0);
   if (odd.length > 0) {
     answer.notes.push(`Not every link in the ${scanned.length} datasets scanned is a file: ${odd.map((kind) => `${kinds.get(kind)} ${kind}`).join(", ")}. Only kind file and generated can be fetched; name the others as what they are.`);
   }

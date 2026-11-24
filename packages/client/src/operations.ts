@@ -206,7 +206,7 @@ const FORMAT_ALIASES: Readonly<Record<string, string>> = {
 };
 
 /** Values in the format field that name no format. */
-const NOT_FORMATS = new Set(["DOWNLOAD", "LINK", "WEBSITE", "WEBSEITE", "DATEI", "FILE", "DATA", "DATEN"]);
+const NOT_FORMATS = new Set(["DOWNLOAD", "LINK", "WEBSITE", "WEBSEITE", "DATEI", "FILE", "DATA", "DATEN", "ONLINE"]);
 
 /** Formats that are services, not files. */
 export const SERVICE_FORMATS: ReadonlySet<string> = new Set(["WMS", "WFS", "WCS", "WMTS", "OAF", "ATOM", "CSW", "SOS", "WPS", "MQTT"]);

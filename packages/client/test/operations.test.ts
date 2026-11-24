@@ -462,3 +462,8 @@ test("a link that is not an absolute http(s) URL is kind invalid, never fetchabl
   assert.deepEqual([files.counts.files, files.counts.fetchable], [2, 1]);
   assert.ok(files.notes.some((n) => n.includes("1 invalid")), files.notes.join(" | "));
 });
+
+test("\"online\" in the format field names no format: counted in other, refused as a format filter", async () => {
+  for (const value of ["ONLINE", "onLine", "online"]) assert.equal(formatOf(value), undefined, value);
+  await assert.rejects(findDatasets(clientOf(govdataApi()), { format: "ONLINE" }), GovDataValidationError);
+});

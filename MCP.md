@@ -81,11 +81,12 @@ a count folds them (and says when the sum is an upper bound). The licence is rea
 since the dataset-level field is empty for most datasets. An organization that fits several is
 reported with the candidates, never guessed; an unknown dataset or an empty search is said in words,
 with what to try. A text over 2000 characters is cut and ends in `…[cut, N characters in all]`, and
-the answer says `truncated`. An answer over `--max-result-chars` loses entries from the end of its
-lists, each down to its first entry (so a page's `nextOffset` always moves on), then has its longest
-texts cut further (each with that mark), and says `truncated`; one that can't be cut down so far is
-a tool error that says to ask for less. A failure is a tool error that says what to change (one over
-5000 characters loses its middle, never its end, where the reason is).
+the answer says `truncated`. An answer over `--max-result-chars` first loses entries from the end of
+its page (`nextOffset` says where to go on), then has its longest texts cut further (each with that
+mark) or, when that isn't enough, its other lists shortened; a list keeps its first entry, `notes`
+stay whole, and the answer says `truncated`. One that can't be cut down so far is a tool error that
+says to ask for less. A failure is a tool error that says what to change (one over 5000 characters
+loses its middle, never its end, where the reason is).
 
 ## Options
 

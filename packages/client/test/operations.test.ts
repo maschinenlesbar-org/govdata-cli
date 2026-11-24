@@ -570,3 +570,14 @@ test("a format the matching datasets don't have is said as such, not \"try fewer
   const none = await findDatasets(catalogue([]).client, { query: "x", format: "CSV" });
   assert.match(none.reason ?? "", /^No dataset matches/, "nothing matching the other filters either: the usual answer");
 });
+
+test("a request longer than GovData takes is refused before it is sent, saying what to shorten, not answered with GovData's \"not available\" page", async () => {
+  const mock = govdataApi();
+  const long = { query: "ä".repeat(500), filters: Array.from({ length: 5 }, (_, i) => `tags:${String(i)}${"ä".repeat(295)}`) };
+  for (const operation of [findDatasets, countDatasets, listFiles] as const) {
+    await assert.rejects(operation(clientOf(mock), long), (err: unknown) => err instanceof GovDataValidationError && /^Invalid query or filters: the request would be \d+ characters long.*8000.*Shorten the query or the filters/.test(err.message));
+  }
+  assert.equal(mock.calls.length, 0);
+  await findDatasets(clientOf(mock), { query: "ä".repeat(500), filters: ["tags:radverkehr"] });
+  assert.equal(mock.calls.length, 1, "the longest query alone still goes out");
+});

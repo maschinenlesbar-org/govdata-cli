@@ -37,6 +37,14 @@ export function requestsOf(answer: object): readonly string[] {
   return REQUESTS.get(answer) ?? [];
 }
 
+/**
+ * The longest search request (under the Action API's base, percent-encoded) the operations send:
+ * GovData answers a much longer one (13 000 characters, seen live) with a redirect to its "not
+ * available" page, which reads as an outage; web servers commonly stop at about 8 KiB per request
+ * line.
+ */
+export const MAX_REQUEST_LENGTH = 8000;
+
 /** The requests of one operation call. */
 class Trace {
   readonly requests: string[] = [];
@@ -45,6 +53,11 @@ class Trace {
 
   async search(client: GovDataClient, params: PackageSearchParams): Promise<PackageSearchResult> {
     const request = actionRequest("package_search", packageSearchQuery(params));
+    if (request.length > MAX_REQUEST_LENGTH) {
+      throw new GovDataValidationError(
+        `Invalid query or filters: the request would be ${request.length} characters long (percent-encoded), and GovData refuses one over about ${MAX_REQUEST_LENGTH} (it answers with its "not available" page). Shorten the query or the filters.`,
+      );
+    }
     this.requests.push(request);
     let result: PackageSearchResult;
     try {

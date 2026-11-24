@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/govdata-mcp",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "MCP server for GovData, Germany's central open-data catalogue: find datasets, list their downloadable files with each file's licence, and count the catalogue by publisher, format, licence or theme, for AI agents (stdio and Streamable HTTP)",
   "type": "module",
   "bin": {

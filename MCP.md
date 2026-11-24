@@ -76,8 +76,9 @@ Every tool only reads. An answer is JSON (`structuredContent` and the same as te
 `source` it came from (whole, never cut like the data; an answer a redirect fetched from another
 host says so there: "… (answered by https://other.example after a redirect)", and a WARN record
 names both) and the data licence. Counts come from the catalogue's total, never from paging. GovData
-stores one format under two spellings (CSV and an EU vocabulary URI): a format filter matches both,
-a count folds them (and says when the sum is an upper bound). The licence is read from each file,
+stores one format under several spellings (CSV, an EU vocabulary URI, ArcGIS Hub's and IANA's
+URIs): a format filter matches every spelling the datasets asked about have (read with one more
+request), a count folds them (and says when the sum is an upper bound). The licence is read from each file,
 since the dataset-level field is empty for most datasets. An organization that fits several is
 reported with the candidates, never guessed; an unknown dataset or an empty search is said in words,
 with what to try. A text over 2000 characters is cut and ends in `…[cut, N characters in all]`, and

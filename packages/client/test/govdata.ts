@@ -3,7 +3,8 @@
 // the Fahrradzählstellen ones at most 10, 3 of Heidelberg's, 2 of München's; long descriptions cut), and a mock of the API over its
 // own paths (`govdataApi()`), which answers from them as CKAN does: package_search by q and
 // fq_list (the format, files and publisher filters applied to the recorded datasets), paged with
-// start and rows, facets cut at facet.limit; package_show by name, an unknown one with CKAN's 404.
+// start and rows, facets cut at facet.limit (for a recorded search, the format facet counted from
+// its matching datasets); package_show by name, an unknown one with CKAN's 404.
 //
 // What they hold:
 // - a search for Trinkwasserbrunnen (27 hits, 6 recorded): Dortmund's 15 exports under
@@ -2072,16 +2073,21 @@ function packageSearch(url: URL): HttpResponse {
   const recorded = q === "Trinkwasserbrunnen" ? SEARCH_TRINKWASSERBRUNNEN : q === "Fahrradzählstellen" ? SEARCH_FAHRRADZAEHLSTELLEN : undefined;
   let count: number;
   let results: Dataset[] = [];
+  let formats: { name: string; display_name: string; count: number }[] | undefined;
   if (recorded !== undefined) {
     const matching = (recorded.results as Dataset[]).filter((d) => fq.every((f) => passes(d, f)));
     count = fq.length === 0 ? recorded.count : matching.length;
     results = matching.slice(start, start + rows);
+    // The format facet of the recorded datasets that match (what the format filter reads its spellings from).
+    const byFormat = new Map<string, number>();
+    for (const d of matching) for (const format of new Set(d.resources.map((r) => r.format))) byFormat.set(format, (byFormat.get(format) ?? 0) + 1);
+    formats = [...byFormat].map(([name, n]) => ({ name, display_name: name, count: n }));
   } else if (fq.length === 0) {
     count = q === "Verkehr" ? FACETS_VERKEHR_TOP6.count : q === "Radverkehr" ? FACETS_RADVERKEHR_ALL.count : q === null ? FACETS_CATALOGUE.count : 0;
   } else {
     count = q === null && fq.length === 1 && fq[0] === 'extras_publisher_name:"Stadt Dortmund"' ? 792 : 0;
   }
-  const facets = count === 0 ? {} : facetsFor(q);
+  const facets = count === 0 ? {} : formats !== undefined ? { res_format: { title: "res_format", items: formats } } : facetsFor(q);
   const searchFacets = Object.fromEntries(
     fields.map((field) => {
       const items = facets[field]?.items ?? [];

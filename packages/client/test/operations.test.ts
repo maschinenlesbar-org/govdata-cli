@@ -56,7 +56,7 @@ test("a format value becomes one short name: the EU URI's tail, _SRVC dropped, f
   assert.equal(formatOf(null), undefined);
 });
 
-test("a format filter ORs every spelling: res_format:CSV alone misses most CSV datasets", () => {
+test("the static format filter (the fallback) ORs the usual spellings: res_format:CSV alone misses most CSV datasets", () => {
   assert.equal(formatFilter("CSV"), `res_format:("CSV" OR "csv" OR "${EU}CSV" OR "text/csv")`);
   assert.match(formatFilter("WMS"), new RegExp(`"${EU}WMS_SRVC"`), "a service's EU URI carries _SRVC");
   assert.match(formatFilter("SHP"), /"Shapefiles"/);
@@ -126,12 +126,19 @@ test("findDatasets: the total, the licences the files carry (not the empty datas
   assert.deepEqual(requestsOf(answer), ["package_search?q=Trinkwasserbrunnen&rows=6&start=0"]);
 });
 
-test("findDatasets with a format: the filter ORs its spellings, and each hit says whether it has the format", async () => {
+/** The spellings a `res_format:("A" OR "B")` filter names. */
+const spellingsIn = (filter: string | undefined): string[] => [...(/^res_format:\((.*)\)$/.exec(filter ?? "")?.[1] ?? "").matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1] as string);
+
+test("findDatasets with a format: the filter ORs the spellings these datasets have (read first), and each hit says whether it has the format", async () => {
   const mock = govdataApi();
   const answer = await findDatasets(clientOf(mock), { query: "Trinkwasserbrunnen", format: "geojson", withFiles: true });
+  const lookup = params(mock.calls[0]);
+  assert.deepEqual([lookup.get("rows"), lookup.get("facet.field"), lookup.get("facet.limit")], ["0", '["res_format"]', "-1"], "the format's spellings, every one");
   const fq = params(mock.last()).getAll("fq_list");
-  assert.ok(fq.includes(formatFilter("GEOJSON")), "the bare name, the lower case and the EU URI");
   assert.ok(fq.includes("num_resources:[1 TO *]"));
+  const spellings = spellingsIn(fq.at(-1));
+  assert.ok(spellings.length > 0 && spellings.every((s) => formatOf(s) === "GEOJSON"), fq.join(" | "));
+  assert.equal(requestsOf(answer).length, 2);
   assert.deepEqual(answer.searched, { query: "Trinkwasserbrunnen", format: "GEOJSON", withFiles: true });
   assert.ok(answer.datasets.length > 0);
   assert.ok(answer.datasets.every((d) => d.hasFormat === true));
@@ -281,7 +288,8 @@ test("listFiles: services left out unless asked for, the same link listed once, 
 test("listFiles with a format: datasets found by both spellings, files kept by format or by file extension", async () => {
   const mock = govdataApi();
   const answer = await listFiles(clientOf(mock), { query: "Fahrradzählstellen", format: "XLSX" });
-  assert.ok(params(mock.last()).getAll("fq_list").includes(formatFilter("XLSX")));
+  const spellings = spellingsIn(params(mock.last()).getAll("fq_list").at(-1));
+  assert.ok(spellings.length > 0 && spellings.every((s) => formatOf(s) === "XLSX"));
   const files = answer.datasets.flatMap((d) => d.files);
   assert.ok(files.length > 0);
   assert.ok(files.every((f) => f.format === "XLSX" || extensionOf(f.url) === "XLSX"));
@@ -490,4 +498,60 @@ test("a query Solr can't parse is an error that says so and what to change, with
     assert.ok(err.cause instanceof GovDataApiError);
     return true;
   });
+});
+
+// ---- the format filter -----------------------------------------------------------------------
+
+/**
+ * A catalogue over `datasets` as CKAN answers: package_search keeps the datasets passing every
+ * `res_format:("A" OR "B")` filter (an exact match of a file's format, as Solr's string field
+ * does; other filters match all), counts the format facet over them, pages by start and rows.
+ */
+function catalogue(datasets: { name: string; resources: { format: string; url: string }[] }[]) {
+  const mock = makeMockTransport((request) => {
+    const url = new URL(request.url);
+    const formats = [...new Set(url.searchParams.getAll("fq_list"))].map((f) => /^res_format:\((.*)\)$/.exec(f)?.[1]).filter((f): f is string => f !== undefined);
+    const spellings = formats.map((f) => [...f.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => (m[1] as string).replace(/\\(.)/g, "$1")));
+    const matching = datasets.filter((d) => spellings.every((s) => d.resources.some((r) => s.includes(r.format))));
+    const counts = new Map<string, number>();
+    for (const d of matching) for (const format of new Set(d.resources.map((r) => r.format))) counts.set(format, (counts.get(format) ?? 0) + 1);
+    const start = Number(url.searchParams.get("start") ?? "0");
+    const rows = Number(url.searchParams.get("rows") ?? "10");
+    const fields = JSON.parse(url.searchParams.get("facet.field") ?? "[]") as string[];
+    const searchFacets = Object.fromEntries(fields.map((field) => [field, { items: field === "res_format" ? [...counts].map(([name, count]) => ({ name, display_name: name, count })) : [] }]));
+    return jsonResponse({ help: "", success: true, result: { count: matching.length, results: matching.slice(start, start + rows).map((d) => ({ ...d, num_resources: d.resources.length })), search_facets: searchFacets } });
+  });
+  return { mock, client: new GovDataClient({ transport: mock.transport, maxRetries: 0 }) };
+}
+
+const CHAM = "https://data-lra-cha.opendata.arcgis.com/api/feed/dcat-ap/ftype/CSV";
+
+test("the format filter matches every spelling the count folds: ArcGIS Hub's URIs, the IANA and lower-case EU URIs, a trailing space", async () => {
+  const datasets = [
+    { name: "cham", resources: [{ format: CHAM, url: "https://x.example/cham" }] },
+    { name: "iana", resources: [{ format: "https://www.iana.org/assignments/media-types/text/csv", url: "https://x.example/iana.csv" }] },
+    { name: "eu-lower", resources: [{ format: `${EU}csv`, url: "https://x.example/eu.csv" }] },
+    { name: "spaced", resources: [{ format: "Csv ", url: "https://x.example/s.csv" }] },
+    { name: "plain", resources: [{ format: "CSV", url: "https://x.example/p.csv" }] },
+    { name: "pdf", resources: [{ format: "pdf ", url: "https://x.example/p.pdf" }] },
+  ];
+  const { client } = catalogue(datasets);
+  const counted = await countDatasets(client, { facets: ["format"] });
+  assert.equal(counted.facets[0]?.values.find((v) => v.value === "CSV")?.count, 5, "the count folds five spellings");
+  const found = await findDatasets(client, { format: "CSV" });
+  assert.deepEqual(found.datasets.map((d) => d.name).sort(), ["cham", "eu-lower", "iana", "plain", "spaced"]);
+  assert.ok(found.datasets.every((d) => d.hasFormat === true));
+  assert.equal((await countDatasets(client, { format: "CSV" })).total, 5, "exact, as the upperBound note promises");
+  assert.deepEqual((await findDatasets(client, { format: "PDF" })).datasets.map((d) => d.name), ["pdf"]);
+  const files = await listFiles(client, { format: "CSV" });
+  assert.equal(files.counts.files, 5);
+});
+
+test("a format under more spellings than a filter names: the most used are named, and a note says what the rest leave out", async () => {
+  const datasets = Array.from({ length: 30 }, (_, i) => ({ name: `d${i}`, resources: [{ format: `https://hub-${i}.opendata.arcgis.com/api/feed/dcat-ap/ftype/CSV`, url: `https://x.example/${i}` }] }));
+  const { mock, client } = catalogue(datasets);
+  const answer = await countDatasets(client, { format: "CSV" });
+  assert.equal(spellingsIn(params(mock.last()).getAll("fq_list").at(-1)).length, 25);
+  assert.equal(answer.total, 25);
+  assert.ok(answer.notes.some((n) => n.includes("30 spellings") && n.includes("up to 5 datasets")), answer.notes.join(" | "));
 });

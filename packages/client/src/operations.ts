@@ -5,7 +5,7 @@
 //   by name, the publishing body, theme, file format, only datasets with files), a page at a time,
 //   each with its formats and the licences its files really carry;
 // - countDatasets (govdata-catalogue-stats): how many datasets match, and how they spread over
-//   organizations, formats, licences, themes and tags: sorted, the two spellings of one format and
+//   organizations, formats, licences, themes and tags: sorted, the spellings of one format and
 //   the variants of one licence folded together, with complete false when CKAN's list was cut;
 // - listFiles (govdata-resource-harvest): the files of the matching datasets as a flat manifest,
 //   each link with its kind (a file, a file generated on request, a service, a landing page, a
@@ -282,7 +282,11 @@ function wantedFormat(value: string): string {
   return format;
 }
 
-/** The spellings GovData stores a format under (bare, lower case, the EU URI, aliases). */
+/**
+ * The usual spellings GovData stores a format under (bare, lower case, the EU URI, aliases): the
+ * filter the operations fall back to when the datasets asked about have none of the format's
+ * spellings (they read the spellings there are first, see formatFilterIn).
+ */
 export function formatSpellings(format: string): string[] {
   const spellings = new Set([format, format.toLowerCase(), `${EU_FILE_TYPE}${format}`]);
   if (SERVICE_FORMATS.has(format)) spellings.add(`${EU_FILE_TYPE}${format}_SRVC`);
@@ -295,7 +299,7 @@ export function formatSpellings(format: string): string[] {
   return [...spellings];
 }
 
-/** The Solr filter for datasets with a file in `format`, in any of its spellings. */
+/** The Solr filter for datasets with a file in `format`, in its usual spellings (formatSpellings). */
 export function formatFilter(format: string): string {
   return `res_format:(${formatSpellings(format).map(phrase).join(" OR ")})`;
 }
@@ -547,7 +551,7 @@ async function filterQueriesOf(
   client: GovDataClient,
   filters: DatasetFilters,
   trace: Trace,
-): Promise<{ fq: string[]; searched: Searched; format?: string } | { answer: Pick<AnswerBase, "status" | "reason" | "ambiguous" | "searched"> }> {
+): Promise<{ fq: string[]; searched: Searched; notes: string[]; format?: string } | { answer: Pick<AnswerBase, "status" | "reason" | "ambiguous" | "searched"> }> {
   const checked = checkFilters(filters);
   const searched: Searched = {};
   const fq: string[] = [];
@@ -581,10 +585,7 @@ async function filterQueriesOf(
     searched["theme"] = checked.theme;
     fq.push(`groups:${checked.theme}`);
   }
-  if (checked.format !== undefined) {
-    searched["format"] = checked.format;
-    fq.push(formatFilter(checked.format));
-  }
+  if (checked.format !== undefined) searched["format"] = checked.format;
   if (filters.withFiles === true) {
     searched["withFiles"] = true;
     fq.push("num_resources:[1 TO *]");
@@ -593,7 +594,33 @@ async function filterQueriesOf(
     searched["filters"] = [...filters.filters];
     fq.push(...filters.filters);
   }
-  return { fq, searched, ...(checked.format === undefined ? {} : { format: checked.format }) };
+  const notes: string[] = [];
+  if (checked.format !== undefined) fq.push(await formatFilterIn(client, trace, filters.query?.trim(), [...fq], checked.format, notes));
+  return { fq, searched, notes, ...(checked.format === undefined ? {} : { format: checked.format }) };
+}
+
+/** The most spellings of one format a filter names (each one goes into the request's URL). */
+export const MAX_FORMAT_SPELLINGS = 25;
+
+/**
+ * The filter for datasets with a file in `format`, from the spellings the datasets matching the
+ * other filters really have (one format-facet request, read whole): every raw value countDatasets
+ * folds into the format, whatever its spelling (ArcGIS Hub's URI per portal, the IANA media type,
+ * the lower-case EU URI, a trailing space). The MAX_FORMAT_SPELLINGS most used are named, and a
+ * note says what the rest leave out. With none there, the static spellings (`formatFilter`).
+ */
+async function formatFilterIn(client: GovDataClient, trace: Trace, q: string | undefined, fq: string[], format: string, notes: string[]): Promise<string> {
+  const result = await trace.search(client, { q, fq, rows: 0, facet_field: [FACETS.format], facet_limit: -1 });
+  const spellings = facetItems(result, FACETS.format, trace)
+    .filter((item) => formatOf(item.name) === format)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  if (spellings.length === 0) return formatFilter(format);
+  const named = spellings.slice(0, MAX_FORMAT_SPELLINGS);
+  if (spellings.length > named.length) {
+    const left = spellings.slice(named.length).reduce((sum, item) => sum + item.count, 0);
+    notes.push(`${format} is stored under ${spellings.length} spellings in these datasets; the filter names the ${named.length} most used, so up to ${left} datasets with only a rarer one are missing. Narrow the search to bring the spellings down.`);
+  }
+  return `res_format:(${named.map((item) => phrase(item.name)).join(" OR ")})`;
 }
 
 /** Throw unless `value` is undefined or an integer in [min, max]. */
@@ -719,7 +746,7 @@ export async function findDatasets(client: GovDataClient, params: FindDatasetsPa
   const searched = { ...filters.searched, ...(sort === "relevance" ? {} : { sort }) };
   const result = await trace.search(client, { q: params.query?.trim(), fq: filters.fq, rows: pageRows(offset, limit), start: offset, sort: SORTS[sort] });
   const datasets = result.results.filter(isObject).map((d) => hitOf(d, filters.format));
-  const answer: FindDatasetsAnswer = { status: "ok", total: result.count, offset, datasets, searched, notes: [] };
+  const answer: FindDatasetsAnswer = { status: "ok", total: result.count, offset, datasets, searched, notes: [...filters.notes] };
   if (result.count === 0) {
     answer.status = "empty";
     answer.reason = "No dataset matches. Try fewer or broader words (Solr matches whole words: Radverkehr, not Rad), fewer filters, or a theme instead of words.";
@@ -878,7 +905,7 @@ function countsOf(facet: FacetName, items: FacetItem[], limit: number): FacetCou
 
 /**
  * How many datasets match, and how they spread over the facets asked for (no datasets fetched).
- * The values are sorted by count (CKAN sends them unsorted); a format's two spellings (CSV and the
+ * The values are sorted by count (CKAN sends them unsorted); a format's spellings (CSV and the
  * EU URI) and a licence's variants (2.0 and 2_0, the older DCAT-AP.de version) are folded into one
  * value, their sum an upper bound; every value of those two is read, so nothing is cut before
  * folding. For the others, complete false says there are more values than listed.
@@ -913,7 +940,7 @@ export async function countDatasets(client: GovDataClient, params: CountDatasets
     total,
     facets: facets.map((facet) => countsOf(facet, facetItems(results.get(facet) as PackageSearchResult, FACETS[facet], trace), limit)),
     searched,
-    notes: [],
+    notes: [...filters.notes],
   };
   if (total === 0) answer.reason = "No dataset matches. Try fewer or broader words, or fewer filters.";
   if (facets.length > 0 && total > 0) answer.notes.push("Counts are datasets, not files. One dataset can carry several values, so the counts don't add up to total.");
@@ -1014,7 +1041,7 @@ function fileOf(resource: JsonObject): FileEntry | "noUrl" {
  * The files of the matching datasets as a manifest, grouped by dataset, a page of datasets at a
  * time: each link with its kind (only `file` and `generated` are fetchable), its format folded, its
  * own licence and attribution (one dataset can mix open and closed files). With a format, only
- * files of it (by format or by file extension; the dataset search matches both spellings). Map and
+ * files of it (by format or by file extension; the dataset search matches every spelling). Map and
  * feature services are left out unless asked for; links without a URL and repeated links are
  * counted, not listed. Nothing is downloaded.
  */
@@ -1083,7 +1110,7 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
     if (publisher !== undefined) entry.publisher = publisher;
     datasets.push(entry);
   }
-  const answer: ListFilesAnswer = { status: "ok", total: result.count, offset, datasetsScanned: scanned.length, datasets, counts, skipped, searched, notes: [] };
+  const answer: ListFilesAnswer = { status: "ok", total: result.count, offset, datasetsScanned: scanned.length, datasets, counts, skipped, searched, notes: [...filters.notes] };
   if (scanned.length > 0) nextPage(answer, offset + scanned.length, result.count);
   if (result.count === 0) {
     answer.status = "empty";

@@ -9,7 +9,6 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatFilter } from "@maschinenlesbar.org/govdata-client";
 import { listTools } from "../src/mcp/server.js";
 import { connect } from "./harness.js";
 import { govdataApi, jsonResponse, makeMockTransport } from "./helpers.js";
@@ -42,8 +41,9 @@ test("findDatasets: an organization by name resolved (both requests in the sourc
   const content = (await connection.call("findDatasets", { query: "Trinkwasserbrunnen", organization: "Open.NRW", format: "GEOJSON" })).structuredContent ?? {};
   assert.equal(content["status"], "ok");
   assert.deepEqual(content["searched"], { query: "Trinkwasserbrunnen", organization: "open-nrw", format: "GEOJSON" });
-  const fq = new URL(transport.calls[1]?.url ?? "").searchParams.getAll("fq_list");
-  assert.deepEqual(fq, ['organization:"open-nrw"', formatFilter("GEOJSON")]);
+  assert.equal(transport.calls.length, 3, "the organizations, the format's spellings in them, the search");
+  const fq = new URL(transport.calls[2]?.url ?? "").searchParams.getAll("fq_list");
+  assert.deepEqual(fq, ['organization:"open-nrw"', 'res_format:("http://publications.europa.eu/resource/authority/file-type/GEOJSON")'], "the spellings these datasets have");
   assert.equal(content["source"], `${API}/{${transport.calls.map((c) => c.url.slice(API.length + 1)).join(",")}}`);
   const ambiguous = (await connection.call("findDatasets", { query: "Haushalt", organization: "Brandenburg" })).structuredContent ?? {};
   assert.equal(ambiguous["status"], "ambiguous");

@@ -844,10 +844,11 @@ export async function countDatasets(client: GovDataClient, params: CountDatasets
   if (facets.includes("format") && answer.facets.some((f) => f.values.some((v) => v.upperBound === true))) {
     answer.notes.push("A format with upperBound sums its spellings (CSV and the EU URI); a dataset with both counts twice. For an exact count, count again with format set: total is exact.");
   }
-  const licences = answer.facets.find((f) => f.facet === "licence");
-  if (licences !== undefined && total > 0) {
-    const withLicence = licences.values.reduce((sum, v) => sum + v.count, 0);
-    answer.notes.push(`The licence facet counts the dataset-level licence, which only about ${Math.min(withLicence, total)} of ${total} datasets carry; most state theirs on each file (findDatasets and listFiles read those).`);
+  if (facets.includes("licence") && total > 0) {
+    // A dataset has one dataset-level licence (license_id), so the sum over every value read
+    // (all of them: the facet is read whole) counts each dataset with one exactly once.
+    const withLicence = facetItems(results.get("licence") as PackageSearchResult, FACETS.licence).reduce((sum, item) => sum + item.count, 0);
+    answer.notes.push(`The licence facet counts the dataset-level licence, which only ${Math.min(withLicence, total)} of ${total} datasets carry; most state theirs on each file (findDatasets and listFiles read those).`);
   }
   return trace.done(answer);
 }

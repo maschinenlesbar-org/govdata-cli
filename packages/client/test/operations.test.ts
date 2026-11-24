@@ -226,7 +226,7 @@ test("countDatasets: licence variants (2.0, 2_0, the older DCAT-AP.de version) a
     variants: ["http://dcat-ap.de/def/licenses/dl-by-de/2.0", "http://dcat-ap.de/def/licenses/dl-by-de/2_0"],
     upperBound: true,
   });
-  assert.ok(answer.notes.some((n) => n.includes("about 13 of 14338")));
+  assert.ok(answer.notes.some((n) => n.includes("only 13 of 14338")));
   assert.equal(requestsOf(answer).length, 2, "every licence value, then the organizations at limit + 1");
 });
 
@@ -382,4 +382,14 @@ test("countDatasets: two different licences are never folded into one value", as
   const dcat = "http://dcat-ap.de/def/licenses/";
   const answer = await countDatasets(facetsClient(5000, { license_id: items([[`${dcat}cc-by-nc-nd/4.0`, 300], [`${dcat}cc-by-nc-sa/4.0`, 200]]) }), { facets: ["licence"] });
   assert.deepEqual(answer.facets[0]?.values.map((v) => [v.value, v.count, v.upperBound]), [["CC BY-NC-ND 4.0", 300, undefined], ["CC BY-NC-SA 4.0", 200, undefined]]);
+});
+
+test("countDatasets: the licence note counts every dataset with a licence, not only the values listed", async () => {
+  const dcat = "http://dcat-ap.de/def/licenses/";
+  const answer = await countDatasets(
+    facetsClient(5000, { license_id: items([[`${dcat}dl-by-de/2.0`, 900], [`${dcat}dl-by-de/2_0`, 800], [`${dcat}cc-zero`, 300], [`${dcat}other-closed`, 200]]) }),
+    { facets: ["licence"], limit: 1 },
+  );
+  assert.equal(answer.facets[0]?.values.length, 1);
+  assert.ok(answer.notes.some((n) => n.includes("only 2200 of 5000 datasets carry")), answer.notes.join(" | "));
 });

@@ -87,7 +87,7 @@ const str = (args: Record<string, unknown>, key: string): string | undefined => 
 const bool = (args: Record<string, unknown>, key: string): boolean | undefined => (typeof args[key] === "boolean" ? (args[key] as boolean) : undefined);
 const list = (args: Record<string, unknown>, key: string): string[] | undefined => (Array.isArray(args[key]) ? (args[key] as string[]) : undefined);
 
-const offset: JsonSchema = { type: "integer", minimum: 0, maximum: MAX_OFFSET, description: "Datasets to skip: where the page starts (default 0)." };
+const offset: JsonSchema = { type: "integer", minimum: 0, maximum: MAX_OFFSET, description: `Datasets to skip: where the page starts (default 0). Paging stops at ${MAX_OFFSET}: a page reads no result past it, and a note says when more match.` };
 const sort: JsonSchema = { type: "string", enum: ["relevance", "modified", "created", "title"], description: "relevance (default), modified (catalogue record changed, newest first), created (newest first), title." };
 
 const filters: Record<string, JsonSchema> = {

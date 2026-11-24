@@ -423,3 +423,29 @@ test("a facet missing from the answer, or not in CKAN's shape, is a shape error 
   const zero = await countDatasets(facetsClient(10, { tags: { items: [{ name: "a", count: 0 }, { name: "b", count: 2 }] } }), { facets: ["tag"] });
   assert.deepEqual(zero.facets[0]?.values.map((v) => v.value), ["b"], "a value with no datasets is left out, as before");
 });
+
+// ---- paging ----------------------------------------------------------------------------------
+
+/** A client whose package_search matches `count` datasets, each with one CSV file, paged by start and rows. */
+const pagedClient = (count: number) => {
+  const mock = makeMockTransport((request) => {
+    const url = new URL(request.url);
+    const start = Number(url.searchParams.get("start") ?? "0");
+    const rows = Number(url.searchParams.get("rows") ?? "10");
+    const results = Array.from({ length: Math.max(0, Math.min(rows, count - start)) }, (_, i) => ({ name: `d${start + i}`, num_resources: 1, resources: [{ format: "CSV", url: `https://x.example/${start + i}.csv` }] }));
+    return jsonResponse({ help: "", success: true, result: { count, results, search_facets: {} } });
+  });
+  return { mock, client: new GovDataClient({ transport: mock.transport, maxRetries: 0 }) };
+};
+
+test("findDatasets and listFiles never give a nextOffset past MAX_OFFSET: the last page stops there and says so", async () => {
+  for (const operation of [findDatasets, listFiles] as const) {
+    const { mock, client } = pagedClient(200_000);
+    const answer = await operation(client, { query: "x", offset: 99_990, limit: 50 });
+    assert.equal(params(mock.last()).get("rows"), "11", "the results up to offset 100000, so no cut of the page can point past it either");
+    assert.equal(answer.nextOffset, undefined);
+    assert.ok(answer.notes.some((n) => n.includes("100000") && /narrow/i.test(n)), answer.notes.join(" | "));
+    const before = await operation(client, { query: "x", offset: 99_900, limit: 50 });
+    assert.equal(before.nextOffset, 99_950);
+  }
+});

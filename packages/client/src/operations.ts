@@ -565,8 +565,22 @@ function checkInteger(name: string, value: number | undefined, min: number, max:
   }
 }
 
-/** The most results a page may start after: CKAN reads further, but nobody pages that far. */
+/**
+ * The most results a page may start after: CKAN reads further, but nobody pages that far. A page
+ * reads no result past it (`pageRows`), so neither its nextOffset nor one a cut of the page sets
+ * points past it.
+ */
 export const MAX_OFFSET = 100_000;
+
+/** The rows a page at `offset` reads: `limit`, but none past MAX_OFFSET. */
+const pageRows = (offset: number, limit: number): number => Math.min(limit, MAX_OFFSET - offset + 1);
+
+/** The next page's offset, or the note that paging stops at MAX_OFFSET. */
+function nextPage(answer: { nextOffset?: number; notes: string[] }, next: number, total: number): void {
+  if (next >= total) return;
+  if (next <= MAX_OFFSET) answer.nextOffset = next;
+  else answer.notes.push(`Paging stops at offset ${MAX_OFFSET}: the other ${total - next} matches can't be paged to. Narrow the search (more words, filters, a theme) or sort differently to reach them.`);
+}
 
 // ---- findDatasets ----------------------------------------------------------------------------
 
@@ -664,7 +678,7 @@ export async function findDatasets(client: GovDataClient, params: FindDatasetsPa
   const filters = await filterQueriesOf(client, params, trace);
   if ("answer" in filters) return trace.done({ ...filters.answer, notes: [], total: 0, offset, datasets: [] });
   const searched = { ...filters.searched, ...(sort === "relevance" ? {} : { sort }) };
-  const result = await trace.search(client, { q: params.query?.trim(), fq: filters.fq, rows: limit, start: offset, sort: SORTS[sort] });
+  const result = await trace.search(client, { q: params.query?.trim(), fq: filters.fq, rows: pageRows(offset, limit), start: offset, sort: SORTS[sort] });
   const datasets = result.results.filter(isObject).map((d) => hitOf(d, filters.format));
   const answer: FindDatasetsAnswer = { status: "ok", total: result.count, offset, datasets, searched, notes: [] };
   if (result.count === 0) {
@@ -674,7 +688,7 @@ export async function findDatasets(client: GovDataClient, params: FindDatasetsPa
     answer.status = "empty";
     answer.reason = `The page at offset ${offset} is past the end: ${result.count} datasets match.`;
   }
-  if (offset + datasets.length < result.count && datasets.length > 0) answer.nextOffset = offset + datasets.length;
+  if (datasets.length > 0) nextPage(answer, offset + datasets.length, result.count);
   const stubs = datasets.filter((d) => d.files === 0).length;
   if (stubs > 0) answer.notes.push(`${stubs} of these datasets have no files (metadata only); withFiles leaves such datasets out.`);
   const titles = new Map<string, number>();
@@ -976,7 +990,7 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
   const filters = await filterQueriesOf(client, params, trace);
   if ("answer" in filters) return trace.done({ ...filters.answer, notes: [], total: 0, offset, datasetsScanned: 0, datasets: [], counts, skipped });
   const searched: Searched = { ...filters.searched, ...(params.includeServices === true ? { includeServices: true } : {}), ...(sort === "relevance" ? {} : { sort }) };
-  const result = await trace.search(client, { q: params.query?.trim(), fq: filters.fq, rows: limit, start: offset, sort: SORTS[sort] });
+  const result = await trace.search(client, { q: params.query?.trim(), fq: filters.fq, rows: pageRows(offset, limit), start: offset, sort: SORTS[sort] });
   const seen = new Set<string>();
   const datasets: DatasetFiles[] = [];
   const kinds = new Map<LinkKind, number>();
@@ -1025,7 +1039,7 @@ export async function listFiles(client: GovDataClient, params: ListFilesParams =
     datasets.push(entry);
   }
   const answer: ListFilesAnswer = { status: "ok", total: result.count, offset, datasetsScanned: scanned.length, datasets, counts, skipped, searched, notes: [] };
-  if (offset + scanned.length < result.count && scanned.length > 0) answer.nextOffset = offset + scanned.length;
+  if (scanned.length > 0) nextPage(answer, offset + scanned.length, result.count);
   if (result.count === 0) {
     answer.status = "empty";
     answer.reason = "No dataset matches. Try fewer or broader words, or fewer filters.";

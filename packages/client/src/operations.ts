@@ -76,11 +76,29 @@ function excerpt(text: string | undefined, max: number): string | undefined {
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
+/**
+ * `html` with each tag replaced by a space: a tag runs from "<" to the next ">"; a "<" with no ">"
+ * after it is text. One pass with indexOf, so linear: the regular expression `/<[^>]*>/` tried a
+ * match at every "<" and, with no ">" after it, rescanned the rest of the text (quadratic: a
+ * publisher's description of 200 000 characters of "<a" took over a minute).
+ */
+function withoutTags(html: string): string {
+  const out: string[] = [];
+  let at = 0;
+  for (let open = html.indexOf("<"); open !== -1; open = html.indexOf("<", at)) {
+    const close = html.indexOf(">", open + 1);
+    if (close === -1) break;
+    out.push(html.slice(at, open), " ");
+    at = close + 1;
+  }
+  out.push(html.slice(at));
+  return out.join("");
+}
+
 /** HTML (an attribution text or a description can arrive as `<p>…</p>`) as plain text, cut at `max`. */
 function plainText(html: string | undefined, max = 1000): string | undefined {
   if (html === undefined) return undefined;
-  const text = html
-    .replace(/<[^>]*>/g, " ")
+  const text = withoutTags(html)
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -329,7 +347,10 @@ export function hasKeyInLink(url: string): boolean {
 export function linkKind(url: string, format: string | undefined): LinkKind {
   const link = decodedLink(url);
   const [path = "", query = ""] = link.split(/\?/, 2);
-  if (/\{[^}]*\}|%7b/i.test(url) || /(^|[_\-/.])(yyyy|yyyymm|yyyymmdd|jjjj|jjjjmm)([_\-/.]|$)/i.test(path)) return "template";
+  // A "{" with a "}" after it, found with indexOf: the regular expression `/\{[^}]*\}/` rescanned
+  // the rest of a link full of "{" without "}" at every one (quadratic).
+  const brace = url.indexOf("{");
+  if ((brace !== -1 && url.indexOf("}", brace + 1) !== -1) || /%7b/i.test(url) || /(^|[_\-/.])(yyyy|yyyymm|yyyymmdd|jjjj|jjjjmm)([_\-/.]|$)/i.test(path)) return "template";
   // Cut off by the harvester: a resource link without its id, or with part of it.
   if (/\/resource\/[0-9a-f-]{1,35}$/i.test(path) || /\/dataset\/[^/]+\/(?:res|reso|resou|resour|resourc|resource)(?:-\d+)?$/i.test(path)) return "broken";
   if (/[?&]request=getfeature/i.test(`?${query}`)) return "generated";

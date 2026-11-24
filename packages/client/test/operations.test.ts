@@ -27,6 +27,7 @@ import {
 } from "../src/operations.js";
 import type { HttpRequest } from "../src/http.js";
 import { govdataApi } from "./govdata.js";
+import { jsonResponse, makeMockTransport } from "./helpers.js";
 
 const clientOf = (mock: ReturnType<typeof govdataApi>) => new GovDataClient({ transport: mock.transport, maxRetries: 0 });
 const params = (request: HttpRequest | undefined) => new URL(request?.url ?? "http://x/").searchParams;
@@ -323,4 +324,23 @@ test("listOrganizations: all 60 with dataset counts, most first; by name, those 
   const none = await listOrganizations(clientOf(govdataApi()), { name: "Stadt Dortmund" });
   assert.equal(none.status, "empty");
   assert.match(none.reason ?? "", /publisherName/);
+});
+
+// ---- publisher text --------------------------------------------------------------------------
+
+/** A client whose package_show answers `dataset` (as GovData's envelope). */
+const showing = (dataset: Record<string, unknown>) =>
+  new GovDataClient({ transport: makeMockTransport(() => jsonResponse({ help: "", success: true, result: dataset })).transport, maxRetries: 0 });
+
+test("getDataset: a description full of \"<\" without \">\" is read in linear time, its tags stripped by the same rules", async () => {
+  const ok = await getDataset(showing({ name: "d", notes: "<p>Daten</p> für x < y", resources: [{ url: "https://x.example/a.csv", licenseAttributionByText: "<b>Quelle:</b> Stadt" }] }), { id: "d" });
+  assert.equal(ok.dataset?.description, "Daten für x < y", "a \"<\" with no \">\" after it is text");
+  assert.equal(ok.dataset?.files[0]?.attribution, "Quelle: Stadt");
+  const hostile = "<a".repeat(100_000);
+  const started = performance.now();
+  const answer = await getDataset(showing({ name: "d", notes: hostile, resources: [{ url: `https://x.example/${"{".repeat(100_000)}.csv`, licenseAttributionByText: hostile }] }), { id: "d" });
+  const took = performance.now() - started;
+  assert.ok(took < 1000, `took ${Math.round(took)} ms: the tag strip rescans the text at every "<"`);
+  assert.equal(answer.dataset?.description?.slice(0, 4), "<a<a");
+  assert.equal(answer.dataset?.files[0]?.kind, "file", "a \"{\" with no \"}\" after it is no placeholder");
 });

@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GovDataClient } from "../src/client.js";
-import { GovDataApiError, GovDataValidationError } from "../src/errors.js";
+import { GovDataApiError, GovDataParseError, GovDataValidationError } from "../src/errors.js";
 import {
   countDatasets,
   datasetIdFrom,
@@ -411,4 +411,15 @@ test("getDataset: only CKAN's own \"Not Found Error\" means no such dataset; ano
   await assert.rejects(getDataset(foreign, { id: "luftqualitat" }), GovDataApiError);
   const ckan = await getDataset(clientOf(govdataApi()), { id: "luftqualitat" });
   assert.equal(ckan.status, "empty", "CKAN's envelope with HTTP 404");
+});
+
+test("a facet missing from the answer, or not in CKAN's shape, is a shape error naming the request, never \"no such organization\" or no values", async () => {
+  const missing = facetsClient(10, {});
+  await assert.rejects(findDatasets(missing, { query: "x", organization: "open-nrw" }), (err: unknown) => err instanceof GovDataParseError && /^package_search\?.*facet\.field.*search_facets\.organization/.test(err.message));
+  const textCount = facetsClient(10, { organization: { items: [{ name: "open-nrw", display_name: "Open.NRW", count: "5" }] } });
+  await assert.rejects(findDatasets(textCount, { query: "x", organization: "open-nrw" }), GovDataParseError);
+  const objectItems = facetsClient(10, { res_format: { items: { CSV: 5 } } });
+  await assert.rejects(countDatasets(objectItems, { facets: ["format"] }), GovDataParseError);
+  const zero = await countDatasets(facetsClient(10, { tags: { items: [{ name: "a", count: 0 }, { name: "b", count: 2 }] } }), { facets: ["tag"] });
+  assert.deepEqual(zero.facets[0]?.values.map((v) => v.value), ["b"], "a value with no datasets is left out, as before");
 });

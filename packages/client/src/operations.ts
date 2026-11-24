@@ -20,7 +20,7 @@
 // request an answer made is kept (`requestsOf(answer)`), as the client sends it, for its source.
 
 import { actionRequest, packageSearchQuery, type GovDataClient } from "./client.js";
-import { GovDataActionError, GovDataApiError, GovDataValidationError } from "./errors.js";
+import { GovDataActionError, GovDataApiError, GovDataParseError, GovDataValidationError } from "./errors.js";
 import type { JsonObject, JsonValue, PackageSearchParams, PackageSearchResult } from "./types.js";
 
 // ---- the requests an answer made -------------------------------------------------------------
@@ -39,10 +39,20 @@ export function requestsOf(answer: object): readonly string[] {
 /** The requests of one operation call. */
 class Trace {
   readonly requests: string[] = [];
+  /** The request each search result answered, for an error about its shape. */
+  private readonly asked = new WeakMap<object, string>();
 
   async search(client: GovDataClient, params: PackageSearchParams): Promise<PackageSearchResult> {
-    this.requests.push(actionRequest("package_search", packageSearchQuery(params)));
-    return client.packageSearch(params);
+    const request = actionRequest("package_search", packageSearchQuery(params));
+    this.requests.push(request);
+    const result = await client.packageSearch(params);
+    this.asked.set(result, request);
+    return result;
+  }
+
+  /** The request that `result` answered. */
+  requestOf(result: PackageSearchResult): string {
+    return this.asked.get(result) ?? "package_search";
   }
 
   done<T extends object>(answer: T): T {
@@ -460,7 +470,7 @@ interface AnswerBase {
 /** The catalogue's organizations with their dataset counts (one facet request). */
 async function organizationsOf(client: GovDataClient, trace: Trace): Promise<OrganizationEntry[]> {
   const result = await trace.search(client, { rows: 0, facet_field: ["organization"], facet_limit: -1 });
-  return facetItems(result, "organization")
+  return facetItems(result, "organization", trace)
     .map((item) => ({ name: item.name, title: item.label ?? item.name, datasets: item.count }))
     .sort((a, b) => b.datasets - a.datasets || a.name.localeCompare(b.name));
 }
@@ -738,16 +748,24 @@ interface FacetItem {
   count: number;
 }
 
-/** A facet's items from a search result (`search_facets.<field>.items`), zero counts dropped. */
-function facetItems(result: PackageSearchResult, field: string): FacetItem[] {
-  const facets = isObject(result.search_facets) ? result.search_facets : {};
-  const facet = facets[field];
-  const items = isObject(facet) ? objectsOf(facet["items"]) : [];
+/**
+ * A facet's items from a search result (`search_facets.<field>.items`) that asked for it, zero
+ * counts dropped. A facet missing or not in CKAN's shape (items not a list of name and count) is a
+ * GovDataParseError naming the request: read as no values, it made a known organization "not in
+ * the catalogue" and a format facet empty.
+ */
+function facetItems(result: PackageSearchResult, field: string, trace: Trace): FacetItem[] {
+  const facet = isObject(result.search_facets) ? result.search_facets[field] : undefined;
+  const items = isObject(facet) ? facet["items"] : undefined;
+  const wrong = (): GovDataParseError =>
+    new GovDataParseError(`${trace.requestOf(result)}: unexpected response shape: expected search_facets.${field} with its items, a list of objects with a name and a numeric count.`);
+  if (!Array.isArray(items)) throw wrong();
   const out: FacetItem[] = [];
   for (const item of items) {
-    const name = typeof item["name"] === "string" ? item["name"] : undefined;
+    if (!isObject(item) || typeof item["name"] !== "string" || typeof item["count"] !== "number") throw wrong();
+    const name = item["name"];
     const count = item["count"];
-    if (name === undefined || typeof count !== "number" || count <= 0) continue;
+    if (count <= 0) continue;
     const label = textOf(item["display_name"]);
     out.push(label === undefined || label === name ? { name, count } : { name, label, count });
   }
@@ -840,7 +858,7 @@ export async function countDatasets(client: GovDataClient, params: CountDatasets
   const answer: CountDatasetsAnswer = {
     status: total === 0 ? "empty" : "ok",
     total,
-    facets: facets.map((facet) => countsOf(facet, facetItems(results.get(facet) as PackageSearchResult, FACETS[facet]), limit)),
+    facets: facets.map((facet) => countsOf(facet, facetItems(results.get(facet) as PackageSearchResult, FACETS[facet], trace), limit)),
     searched,
     notes: [],
   };
@@ -852,7 +870,7 @@ export async function countDatasets(client: GovDataClient, params: CountDatasets
   if (facets.includes("licence") && total > 0) {
     // A dataset has one dataset-level licence (license_id), so the sum over every value read
     // (all of them: the facet is read whole) counts each dataset with one exactly once.
-    const withLicence = facetItems(results.get("licence") as PackageSearchResult, FACETS.licence).reduce((sum, item) => sum + item.count, 0);
+    const withLicence = facetItems(results.get("licence") as PackageSearchResult, FACETS.licence, trace).reduce((sum, item) => sum + item.count, 0);
     answer.notes.push(`The licence facet counts the dataset-level licence, which only ${Math.min(withLicence, total)} of ${total} datasets carry; most state theirs on each file (findDatasets and listFiles read those).`);
   }
   return trace.done(answer);

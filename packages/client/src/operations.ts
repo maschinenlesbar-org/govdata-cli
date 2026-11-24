@@ -262,7 +262,7 @@ export function formatFilter(format: string): string {
 export interface Licence {
   /** As delivered. */
   uri: string;
-  /** A short name: "DL-DE BY 2.0", "CC BY 4.0", or the URI's tail when the licence is not known. */
+  /** A short name: "DL-DE BY 2.0", "CC BY 4.0", or the URI's tail when the licence is not known (with the name before a bare version: "gpl 3.0"). */
   label: string;
   /** Whether it is an open licence; absent when the licence is not known. */
   open?: boolean;
@@ -302,8 +302,15 @@ export function licenceOf(raw: unknown): Licence | undefined {
   const lower = uri.toLowerCase().replace(/\/+$/, "");
   const dcat = /dcat-ap\.de\/def\/licenses\/(.+)$/.exec(lower);
   if (dcat !== null) {
-    const known = DCAT_DE_LICENCES[(dcat[1] as string).replace(/_/g, ".")];
+    const id = (dcat[1] as string).replace(/_/g, ".");
+    const known = DCAT_DE_LICENCES[id];
     if (known !== undefined) return { uri, label: known[0], open: known[1] };
+    // The vocabulary's other Creative Commons ids: cc-by-nc-de/3.0, cc-by-nc-nd/4.0, cc-by-nd, …
+    const cc = /^cc-(by(?:-(?:nc|nd|sa))*)(-de)?(?:\/(\d\.\d))?$/.exec(id);
+    if (cc !== null) {
+      const kind = cc[1] as string;
+      return { uri, label: `CC ${kind.toUpperCase()}${cc[3] === undefined ? "" : ` ${cc[3]}`}${cc[2] === undefined ? "" : " DE"}`, open: !/nc|nd/.test(kind) };
+    }
   }
   const govdata = /govdata\.de\/dl-de\/(by|zero|by-nc)-(\d)-(\d)$/.exec(lower);
   if (govdata !== null) {
@@ -317,7 +324,11 @@ export function licenceOf(raw: unknown): Licence | undefined {
   }
   if (/creativecommons\.org\/publicdomain\/zero\//.test(lower)) return { uri, label: "CC0 1.0", open: true };
   if (/creativecommons\.org\/publicdomain\/mark\//.test(lower)) return { uri, label: "Public Domain Mark", open: true };
-  const tail = uri.replace(/\/+$/, "").split(/[/#]/).pop() ?? uri;
+  // The URI's tail; a bare version number (…/foo/1.0) with the name before it.
+  const parts = uri.replace(/\/+$/, "").split(/[/#]/);
+  const tail = parts.pop() ?? uri;
+  const before = parts.pop();
+  if (/^\d+(?:[._]\d+)*$/.test(tail) && before !== undefined && before !== "") return { uri, label: `${before} ${tail}` };
   return { uri, label: tail === "" ? uri : tail };
 }
 

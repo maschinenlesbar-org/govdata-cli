@@ -357,3 +357,29 @@ test("getDataset: markup the publisher escaped stays out of the plain text, othe
   assert.equal(answer.dataset?.description, "Beschreibung März über – a < b, x < y > z, &lt;i&gt;");
   assert.equal(answer.dataset?.files[0]?.attribution, "Quelle: Stadt © 2026");
 });
+
+// ---- licences --------------------------------------------------------------------------------
+
+/** A client whose package_search answers `count` and these facets, whatever is asked. */
+const facetsClient = (count: number, searchFacets: Record<string, unknown>) =>
+  new GovDataClient({ transport: makeMockTransport(() => jsonResponse({ help: "", success: true, result: { count, results: [], search_facets: searchFacets } })).transport, maxRetries: 0 });
+
+const items = (pairs: [string, number][]) => ({ items: pairs.map(([name, count]) => ({ name, display_name: name, count })) });
+
+test("every Creative Commons licence of the DCAT-AP.de vocabulary is named, its non-commercial and no-derivatives kinds not open; an unknown licence's version keeps its name", () => {
+  const dcat = "http://dcat-ap.de/def/licenses/";
+  assert.deepEqual(licenceOf(`${dcat}cc-by-nc-de/3.0`), { uri: `${dcat}cc-by-nc-de/3.0`, label: "CC BY-NC 3.0 DE", open: false }, "seen live, 2026-11-22");
+  assert.deepEqual([licenceOf(`${dcat}cc-by-nd-de/3_0`)?.label, licenceOf(`${dcat}cc-by-nd-de/3_0`)?.open], ["CC BY-ND 3.0 DE", false]);
+  assert.deepEqual([licenceOf(`${dcat}cc-by-nc-nd/4.0`)?.label, licenceOf(`${dcat}cc-by-nc-nd/4.0`)?.open], ["CC BY-NC-ND 4.0", false]);
+  assert.deepEqual([licenceOf(`${dcat}cc-by-nc-sa/4.0`)?.label, licenceOf(`${dcat}cc-by-nc-sa/4.0`)?.open], ["CC BY-NC-SA 4.0", false]);
+  assert.deepEqual([licenceOf(`${dcat}cc-by-nd`)?.label, licenceOf(`${dcat}cc-by-nd`)?.open], ["CC BY-ND", false]);
+  assert.deepEqual([licenceOf(`${dcat}cc-by-sa-de/3.0`)?.label, licenceOf(`${dcat}cc-by-sa-de/3.0`)?.open], ["CC BY-SA 3.0 DE", true]);
+  assert.deepEqual(licenceOf(`${dcat}gpl/3.0`), { uri: `${dcat}gpl/3.0`, label: "gpl 3.0" }, "not a bare version number");
+  assert.deepEqual(licenceOf("http://example.org/licences/hausrecht/1_0"), { uri: "http://example.org/licences/hausrecht/1_0", label: "hausrecht 1_0" });
+});
+
+test("countDatasets: two different licences are never folded into one value", async () => {
+  const dcat = "http://dcat-ap.de/def/licenses/";
+  const answer = await countDatasets(facetsClient(5000, { license_id: items([[`${dcat}cc-by-nc-nd/4.0`, 300], [`${dcat}cc-by-nc-sa/4.0`, 200]]) }), { facets: ["licence"] });
+  assert.deepEqual(answer.facets[0]?.values.map((v) => [v.value, v.count, v.upperBound]), [["CC BY-NC-ND 4.0", 300, undefined], ["CC BY-NC-SA 4.0", 200, undefined]]);
+});

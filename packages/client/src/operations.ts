@@ -77,35 +77,56 @@ function excerpt(text: string | undefined, max: number): string | undefined {
 }
 
 /**
- * `html` with each tag replaced by a space: a tag runs from "<" to the next ">"; a "<" with no ">"
- * after it is text. One pass with indexOf, so linear: the regular expression `/<[^>]*>/` tried a
- * match at every "<" and, with no ">" after it, rescanned the rest of the text (quadratic: a
- * publisher's description of 200 000 characters of "<a" took over a minute).
+ * `html` with each tag replaced by a space. A tag starts with "<" and a letter, "/", "!" or "?" (as
+ * in HTML: "x < y" is text) and runs to the next ">"; a "<" with no ">" after it is text. One pass
+ * with indexOf, so linear: the regular expression `/<[^>]*>/` tried a match at every "<" and, with
+ * no ">" after it, rescanned the rest of the text (quadratic: a publisher's description of 200 000
+ * characters of "<a" took over a minute).
  */
 function withoutTags(html: string): string {
   const out: string[] = [];
   let at = 0;
-  for (let open = html.indexOf("<"); open !== -1; open = html.indexOf("<", at)) {
+  for (let open = html.indexOf("<"); open !== -1; open = html.indexOf("<", open + 1)) {
+    if (!/[A-Za-z/!?]/.test(html.charAt(open + 1))) continue;
     const close = html.indexOf(">", open + 1);
     if (close === -1) break;
     out.push(html.slice(at, open), " ");
     at = close + 1;
+    open = close;
   }
   out.push(html.slice(at));
   return out.join("");
 }
 
-/** HTML (an attribution text or a description can arrive as `<p>…</p>`) as plain text, cut at `max`. */
+/** The named character references publishers use, by name. */
+const ENTITIES: Readonly<Record<string, string>> = {
+  nbsp: " ", lt: "<", gt: ">", quot: '"', apos: "'", amp: "&",
+  auml: "ä", ouml: "ö", uuml: "ü", Auml: "Ä", Ouml: "Ö", Uuml: "Ü", szlig: "ß",
+  eacute: "é", egrave: "è", agrave: "à", aacute: "á", ccedil: "ç", oacute: "ó",
+  sect: "§", deg: "°", middot: "·", bull: "•", shy: "", ndash: "–", mdash: "—", hellip: "…", euro: "€",
+  copy: "©", reg: "®", laquo: "«", raquo: "»", bdquo: "„", ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", sbquo: "‚",
+  times: "×", micro: "µ", sup2: "²", sup3: "³", frac12: "½", plusmn: "±",
+};
+
+/** `text` with its character references decoded (named ones from ENTITIES, numeric ones), in one pass. */
+function decodeEntities(text: string): string {
+  return text.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]{1,7});/gi, (whole, ref: string) => {
+    if (ref.startsWith("#")) {
+      const code = ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number(ref.slice(1));
+      return code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : whole;
+    }
+    return ENTITIES[ref] ?? whole;
+  });
+}
+
+/**
+ * HTML (an attribution text or a description can arrive as `<p>…</p>`) as plain text, cut at `max`:
+ * the tags stripped, the character references decoded, and then the tags stripped again, so markup
+ * the publisher escaped (`&lt;img …&gt;`) never comes back as a live tag.
+ */
 function plainText(html: string | undefined, max = 1000): string | undefined {
   if (html === undefined) return undefined;
-  const text = withoutTags(html)
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&");
-  return excerpt(text, max);
+  return excerpt(withoutTags(decodeEntities(withoutTags(html))), max);
 }
 
 /** Folded for comparing names: lower case, no accents (ü as u, like CKAN's slugs), ß as ss. */

@@ -344,3 +344,16 @@ test("getDataset: a description full of \"<\" without \">\" is read in linear ti
   assert.equal(answer.dataset?.description?.slice(0, 4), "<a<a");
   assert.equal(answer.dataset?.files[0]?.kind, "file", "a \"{\" with no \"}\" after it is no placeholder");
 });
+
+test("getDataset: markup the publisher escaped stays out of the plain text, other entities are decoded, a comparison is no tag", async () => {
+  const answer = await getDataset(
+    showing({
+      name: "d",
+      notes: "<p>Beschreibung &lt;img src=x onerror=alert(1)&gt; M&auml;rz &#252;ber &#x2013; a &lt; b, x < y > z, &amp;lt;i&amp;gt;</p>",
+      resources: [{ url: "https://x.example/a.csv", licenseAttributionByText: "<b>Quelle:</b> &lt;a href=javascript:x&gt;Stadt&lt;/a&gt; &copy; 2026" }],
+    }),
+    { id: "d" },
+  );
+  assert.equal(answer.dataset?.description, "Beschreibung März über – a < b, x < y > z, &lt;i&gt;");
+  assert.equal(answer.dataset?.files[0]?.attribution, "Quelle: Stadt © 2026");
+});
